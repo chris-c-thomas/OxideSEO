@@ -1,0 +1,82 @@
+[package]
+name = "oxide-seo"
+version = "0.1.0"
+description = "Open-source SEO crawler and audit platform"
+authors = ["OxideSEO Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/oxide-seo/oxide-seo"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "oxide_seo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# --- Tauri core ---
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+
+# --- Serialization ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# --- Async runtime ---
+tokio = { version = "1", features = ["full"] }
+
+# --- HTTP client ---
+reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "cookies", "rustls-tls"], default-features = false }
+
+# --- Storage ---
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# --- Hashing ---
+blake3 = "1"
+
+# --- URL handling ---
+url = "2"
+
+# --- HTML parsing ---
+lol_html = "2"
+scraper = "0.21"
+
+# --- CPU parallelism ---
+rayon = "1"
+
+# --- Robots.txt ---
+texting_robots = "0.2"
+
+# --- Error handling ---
+anyhow = "1"
+thiserror = "2"
+
+# --- Logging / tracing ---
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# --- Identifiers ---
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# --- Date/time ---
+chrono = { version = "0.4", features = ["serde"] }
+
+# --- Async trait ---
+async-trait = "0.1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+axum = "0.8"
+tempfile = "3"
+tokio-test = "0.4"
+
+[[bench]]
+name = "html_parsing"
+harness = false
+
+[[bench]]
+name = "frontier_ops"
+harness = false

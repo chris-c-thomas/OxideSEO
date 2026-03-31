@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /private/
+Crawl-delay: 1
+
+User-agent: OxideSEO
+Allow: /
+Disallow: /admin/
+Crawl-delay: 0.5
+
+Sitemap: https://test.local/sitemap.xml
