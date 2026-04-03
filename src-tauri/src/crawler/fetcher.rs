@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue};
 
 use crate::commands::crawl::CrawlConfig;
 use crate::crawler::{FetchResult, RedirectHop};
@@ -26,10 +26,7 @@ pub struct Fetcher {
 impl Fetcher {
     /// Build a new Fetcher from the crawl configuration.
     pub fn new(config: &CrawlConfig) -> Result<Self> {
-        let user_agent = config
-            .user_agent
-            .as_deref()
-            .unwrap_or(DEFAULT_USER_AGENT);
+        let user_agent = config.user_agent.as_deref().unwrap_or(DEFAULT_USER_AGENT);
 
         let mut default_headers = HeaderMap::new();
         for (key, value) in &config.custom_headers {
@@ -69,7 +66,7 @@ impl Fetcher {
         let mut current_url = url.to_string();
         let mut redirect_chain: Vec<RedirectHop> = Vec::new();
 
-        for hop in 0..=MAX_REDIRECTS {
+        for _hop in 0..=MAX_REDIRECTS {
             let response = self.client.get(&current_url).send().await?;
 
             let status = response.status().as_u16();

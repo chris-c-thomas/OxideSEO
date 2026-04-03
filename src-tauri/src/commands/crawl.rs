@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::storage::db::Database;
 use crate::CrawlState;
+use crate::storage::db::Database;
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -118,14 +118,14 @@ pub struct RecentUrl {
 #[tauri::command]
 pub async fn start_crawl(
     config: CrawlConfig,
-    db: State<'_, Database>,
-    app: tauri::AppHandle,
+    _db: State<'_, Database>,
+    _app: tauri::AppHandle,
 ) -> Result<String, String> {
     tracing::info!(url = %config.start_url, "Starting crawl");
 
     // TODO(phase-2): Validate config, create crawl record in DB,
     // spawn the crawl engine orchestrator task, return crawl_id.
-    let crawl_id = uuid::Uuid::new_v4().to_string();
+    let _crawl_id = uuid::Uuid::new_v4().to_string();
 
     Err("Not yet implemented — Phase 2".into())
 }
@@ -159,7 +159,7 @@ pub async fn stop_crawl(crawl_id: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_crawl_status(
     crawl_id: String,
-    db: State<'_, Database>,
+    _db: State<'_, Database>,
 ) -> Result<CrawlStatus, String> {
     tracing::debug!(%crawl_id, "Getting crawl status");
     // TODO(phase-2): Query crawl state from DB + in-memory stats.

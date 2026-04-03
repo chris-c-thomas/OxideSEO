@@ -41,11 +41,9 @@ export const useCrawlStore = create<CrawlStore>((set) => ({
       progress: null,
     }),
 
-  updateProgress: (progress) =>
-    set({ progress }),
+  updateProgress: (progress) => set({ progress }),
 
-  setCrawlState: (state) =>
-    set({ state }),
+  setCrawlState: (state) => set({ state }),
 
   clearCrawl: () =>
     set({

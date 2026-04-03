@@ -23,14 +23,11 @@ export function useCrawlProgress(crawlId: string | null) {
     let unlisten: UnlistenFn | null = null;
 
     const subscribe = async () => {
-      unlisten = await listen<CrawlProgress>(
-        "crawl://progress",
-        (event) => {
-          if (event.payload.crawlId === crawlId) {
-            updateProgress(event.payload);
-          }
-        },
-      );
+      unlisten = await listen<CrawlProgress>("crawl://progress", (event) => {
+        if (event.payload.crawlId === crawlId) {
+          updateProgress(event.payload);
+        }
+      });
     };
 
     subscribe();

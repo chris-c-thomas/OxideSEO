@@ -114,11 +114,17 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
 
       {/* Progress bar */}
       <div>
-        <div className="mb-1 flex items-center justify-between text-xs tabular-nums" style={{ color: "var(--color-muted-foreground)" }}>
+        <div
+          className="mb-1 flex items-center justify-between text-xs tabular-nums"
+          style={{ color: "var(--color-muted-foreground)" }}
+        >
           <span>{pct}% complete</span>
           <span>{formatDuration(progress?.elapsedMs ?? 0)}</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: "var(--color-muted)" }}>
+        <div
+          className="h-2 overflow-hidden rounded-full"
+          style={{ backgroundColor: "var(--color-muted)" }}
+        >
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{
@@ -148,8 +154,8 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
             <thead>
               <tr style={{ backgroundColor: "var(--color-muted)" }}>
                 <th className="px-3 py-2 text-left font-medium">URL</th>
-                <th className="px-3 py-2 text-right font-medium w-20">Status</th>
-                <th className="px-3 py-2 text-right font-medium w-20">Time</th>
+                <th className="w-20 px-3 py-2 text-right font-medium">Status</th>
+                <th className="w-20 px-3 py-2 text-right font-medium">Time</th>
               </tr>
             </thead>
             <tbody>
@@ -159,16 +165,27 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
                   className="border-t"
                   style={{ borderColor: "var(--color-border)" }}
                 >
-                  <td className="px-3 py-1.5 font-mono text-xs">{truncate(url.url, 80)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{url.statusCode ?? "..."}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums" style={{ color: "var(--color-muted-foreground)" }}>
+                  <td className="px-3 py-1.5 font-mono text-xs">
+                    {truncate(url.url, 80)}
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">
+                    {url.statusCode ?? "..."}
+                  </td>
+                  <td
+                    className="px-3 py-1.5 text-right tabular-nums"
+                    style={{ color: "var(--color-muted-foreground)" }}
+                  >
                     {url.responseTimeMs != null ? `${url.responseTimeMs}ms` : "..."}
                   </td>
                 </tr>
               ))}
               {(!progress || progress.recentUrls.length === 0) && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center" style={{ color: "var(--color-muted-foreground)" }}>
+                  <td
+                    colSpan={3}
+                    className="px-3 py-4 text-center"
+                    style={{ color: "var(--color-muted-foreground)" }}
+                  >
                     Waiting for crawl data...
                   </td>
                 </tr>
@@ -183,10 +200,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className="rounded-lg border p-3"
-      style={{ borderColor: "var(--color-border)" }}
-    >
+    <div className="rounded-lg border p-3" style={{ borderColor: "var(--color-border)" }}>
       <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
         {label}
       </p>

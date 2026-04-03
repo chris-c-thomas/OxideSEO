@@ -12,9 +12,7 @@ export function SettingsView() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    getSettings()
-      .then(setLocalSettings)
-      .catch(console.error);
+    getSettings().then(setLocalSettings).catch(console.error);
   }, []);
 
   const handleSave = async () => {
@@ -43,14 +41,23 @@ export function SettingsView() {
       {/* General */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">General</h2>
-        <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: "var(--color-border)" }}>
+        <div
+          className="space-y-4 rounded-lg border p-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Default Export Format</label>
             <select
               value={settings?.defaultExportFormat ?? "csv"}
               onChange={(e) =>
                 setLocalSettings((prev) =>
-                  prev ? { ...prev, defaultExportFormat: e.target.value as AppSettings["defaultExportFormat"] } : prev,
+                  prev
+                    ? {
+                        ...prev,
+                        defaultExportFormat: e.target
+                          .value as AppSettings["defaultExportFormat"],
+                      }
+                    : prev,
                 )
               }
               className="w-full rounded-md border px-3 py-2 text-sm"
@@ -77,7 +84,8 @@ export function SettingsView() {
           style={{ borderColor: "var(--color-border)" }}
         >
           <p className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
-            AI provider configuration (OpenAI, Anthropic, Ollama) will be available in a future release.
+            AI provider configuration (OpenAI, Anthropic, Ollama) will be available in a
+            future release.
           </p>
         </div>
       </section>
@@ -98,8 +106,13 @@ export function SettingsView() {
       {/* About */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">About</h2>
-        <div className="rounded-lg border p-4 space-y-2" style={{ borderColor: "var(--color-border)" }}>
-          <p className="text-sm"><span className="font-medium">OxideSEO</span> v0.1.0</p>
+        <div
+          className="space-y-2 rounded-lg border p-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <p className="text-sm">
+            <span className="font-medium">OxideSEO</span> v0.1.0
+          </p>
           <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
             Open-source SEO crawler and audit platform. MIT / Apache 2.0 dual license.
           </p>

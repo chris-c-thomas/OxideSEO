@@ -6,7 +6,7 @@
 use anyhow::Result;
 use url::Url;
 
-use crate::crawler::{ExtractedImage, ExtractedLink, ParsedPage};
+use crate::crawler::ParsedPage;
 
 /// Parse an HTML document and extract all SEO-relevant data.
 ///
@@ -23,12 +23,11 @@ pub fn parse_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> Parse
                 error = %e,
                 "lol_html parse failed, falling back to scraper"
             );
-            parse_with_scraper(html_bytes, page_url, root_domain)
-                .unwrap_or_else(|_| ParsedPage {
-                    url: page_url.to_string(),
-                    parse_ok: false,
-                    ..Default::default()
-                })
+            parse_with_scraper(html_bytes, page_url, root_domain).unwrap_or_else(|_| ParsedPage {
+                url: page_url.to_string(),
+                parse_ok: false,
+                ..Default::default()
+            })
         }
     }
 }
@@ -40,11 +39,10 @@ pub fn parse_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> Parse
 /// - `<h1>` through `<h6>`
 /// - `<a>`, `<img>`, `<script>`, `<link rel="stylesheet">`
 fn parse_with_lol_html(
-    html_bytes: &[u8],
+    _html_bytes: &[u8],
     page_url: &str,
-    root_domain: &str,
+    _root_domain: &str,
 ) -> Result<ParsedPage> {
-    use lol_html::{element, HtmlRewriter, Settings};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -79,15 +77,11 @@ fn parse_with_lol_html(
 }
 
 /// Fallback parser: scraper full DOM parse.
-fn parse_with_scraper(
-    html_bytes: &[u8],
-    page_url: &str,
-    root_domain: &str,
-) -> Result<ParsedPage> {
+fn parse_with_scraper(html_bytes: &[u8], page_url: &str, _root_domain: &str) -> Result<ParsedPage> {
     let html_str = String::from_utf8_lossy(html_bytes);
-    let document = scraper::Html::parse_document(&html_str);
+    let _document = scraper::Html::parse_document(&html_str);
 
-    let mut page = ParsedPage {
+    let page = ParsedPage {
         url: page_url.to_string(),
         parse_ok: true,
         ..Default::default()
@@ -103,12 +97,10 @@ fn parse_with_scraper(
 pub fn resolve_url(href: &str, base: &str) -> Option<String> {
     match Url::parse(href) {
         Ok(absolute) => Some(absolute.to_string()),
-        Err(url::ParseError::RelativeUrlWithoutBase) => {
-            Url::parse(base)
-                .ok()
-                .and_then(|b| b.join(href).ok())
-                .map(|u| u.to_string())
-        }
+        Err(url::ParseError::RelativeUrlWithoutBase) => Url::parse(base)
+            .ok()
+            .and_then(|b| b.join(href).ok())
+            .map(|u| u.to_string()),
         Err(_) => None,
     }
 }

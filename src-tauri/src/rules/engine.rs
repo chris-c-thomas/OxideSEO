@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
+use crate::Severity;
 use crate::crawler::ParsedPage;
 use crate::rules::rule::{CrawlContext, Issue, SeoRule};
-use crate::Severity;
 
 /// The rule registry manages all enabled SEO rules and executes them
 /// against parsed pages.
@@ -75,7 +75,8 @@ impl RuleRegistry {
 
     /// Set severity override for a rule.
     pub fn set_severity(&mut self, rule_id: &str, severity: Severity) {
-        self.severity_overrides.insert(rule_id.to_string(), severity);
+        self.severity_overrides
+            .insert(rule_id.to_string(), severity);
     }
 
     /// Apply configuration overrides from a crawl profile.
@@ -86,9 +87,9 @@ impl RuleRegistry {
                     self.set_enabled(rule_id, enabled);
                 }
                 if let Some(severity_str) = rule_config.get("severity").and_then(|s| s.as_str()) {
-                    if let Ok(severity) = serde_json::from_value(
-                        serde_json::Value::String(severity_str.to_string()),
-                    ) {
+                    if let Ok(severity) =
+                        serde_json::from_value(serde_json::Value::String(severity_str.to_string()))
+                    {
                         self.set_severity(rule_id, severity);
                     }
                 }

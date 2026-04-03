@@ -76,7 +76,7 @@ pub struct IssueRow {
 #[derive(Debug)]
 pub enum StorageCommand {
     /// Insert or update a page record.
-    UpsertPage(PageRow),
+    UpsertPage(Box<PageRow>),
     /// Insert one or more link records.
     InsertLinks(Vec<LinkRow>),
     /// Insert one or more issue records.
@@ -88,10 +88,7 @@ pub enum StorageCommand {
         urls_errored: i64,
     },
     /// Mark the crawl as completed.
-    CompleteCrawl {
-        crawl_id: String,
-        status: String,
-    },
+    CompleteCrawl { crawl_id: String, status: String },
     /// Flush current batch and commit transaction.
     Flush,
     /// Shutdown the storage writer.

@@ -55,6 +55,7 @@ pub struct UrlFrontier {
     /// Max entries to keep in the in-memory heap.
     heap_capacity: usize,
     /// Refill threshold — when heap drops below this, pull from SQLite.
+    #[allow(dead_code)]
     refill_threshold: usize,
     /// Set of URL hashes already seen (for fast dedup without DB round-trip).
     seen_hashes: HashSet<[u8; 32]>,

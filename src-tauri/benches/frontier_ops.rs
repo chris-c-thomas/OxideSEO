@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use oxide_seo_lib::crawler::frontier::{hash_url, normalize_url, FrontierEntry, UrlFrontier};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use oxide_seo_lib::crawler::frontier::{FrontierEntry, UrlFrontier, hash_url, normalize_url};
 
 fn bench_normalize_url(c: &mut Criterion) {
     c.bench_function("normalize_url", |b| {
@@ -30,7 +30,7 @@ fn bench_frontier_push_pop(c: &mut Criterion) {
                     url,
                     url_hash: hash,
                     depth: (i % 5) as u32,
-                    priority: 100 - (i % 5) as i32,
+                    priority: 100 - (i % 5),
                     source_page_id: None,
                 });
             }
@@ -41,5 +41,10 @@ fn bench_frontier_push_pop(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_normalize_url, bench_hash_url, bench_frontier_push_pop);
+criterion_group!(
+    benches,
+    bench_normalize_url,
+    bench_hash_url,
+    bench_frontier_push_pop
+);
 criterion_main!(benches);

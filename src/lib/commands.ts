@@ -57,9 +57,7 @@ export function getCrawlStatus(crawlId: string): Promise<CrawlStatus> {
 // ---------------------------------------------------------------------------
 
 /** Fetch recent crawls for the dashboard. */
-export function getRecentCrawls(
-  limit: number = 20,
-): Promise<CrawlSummary[]> {
+export function getRecentCrawls(limit: number = 20): Promise<CrawlSummary[]> {
   return invoke<CrawlSummary[]>("get_recent_crawls", { limit });
 }
 
@@ -82,10 +80,7 @@ export function getCrawlSummary(crawlId: string): Promise<CrawlSummary> {
 }
 
 /** Fetch full detail for a single page. */
-export function getPageDetail(
-  crawlId: string,
-  pageId: number,
-): Promise<PageDetail> {
+export function getPageDetail(crawlId: string, pageId: number): Promise<PageDetail> {
   return invoke<PageDetail>("get_page_detail", { crawlId, pageId });
 }
 
@@ -135,8 +130,6 @@ export function getRuleConfig(): Promise<RuleConfigOverride[]> {
 }
 
 /** Save rule configuration overrides. */
-export function setRuleConfig(
-  overrides: RuleConfigOverride[],
-): Promise<void> {
+export function setRuleConfig(overrides: RuleConfigOverride[]): Promise<void> {
   return invoke<void>("set_rule_config", { overrides });
 }

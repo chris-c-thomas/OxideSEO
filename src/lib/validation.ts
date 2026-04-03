@@ -8,10 +8,7 @@ import { z } from "zod";
 
 /** Crawl configuration validation schema. */
 export const crawlConfigSchema = z.object({
-  startUrl: z
-    .string()
-    .min(1, "Start URL is required")
-    .url("Must be a valid URL"),
+  startUrl: z.string().min(1, "Start URL is required").url("Must be a valid URL"),
   maxDepth: z.number().int().min(1).max(100).default(10),
   maxConcurrency: z.number().int().min(1).max(200).default(50),
   fetchWorkers: z.number().int().min(1).max(32).default(8),

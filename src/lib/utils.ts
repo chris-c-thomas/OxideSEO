@@ -2,9 +2,12 @@
  * Shared utility functions.
  */
 
-/** Concatenate CSS class names, filtering out falsy values. */
-export function cn(...classes: (string | false | null | undefined)[]): string {
-  return classes.filter(Boolean).join(" ");
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+/** Merge CSS class names with Tailwind conflict resolution. */
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
 }
 
 /** Format a duration in milliseconds to a human-readable string. */
@@ -55,9 +58,7 @@ export function extractDomain(url: string): string {
 }
 
 /** Map a severity string to a CSS color variable name. */
-export function severityColor(
-  severity: "error" | "warning" | "info",
-): string {
+export function severityColor(severity: "error" | "warning" | "info"): string {
   return `var(--color-severity-${severity})`;
 }
 

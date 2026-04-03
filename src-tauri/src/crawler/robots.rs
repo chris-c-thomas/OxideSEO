@@ -27,6 +27,7 @@ pub struct RobotsCache {
     /// Cache TTL — entries older than this are re-fetched.
     ttl: Duration,
     /// User-agent string to match against in robots.txt directives.
+    #[allow(dead_code)]
     user_agent: String,
 }
 
@@ -44,7 +45,10 @@ impl RobotsCache {
     /// If the robots.txt hasn't been fetched yet, returns `true`
     /// (allow by default — actual fetch should be triggered first).
     pub fn is_allowed(&self, url: &str) -> bool {
-        let domain = match url::Url::parse(url).ok().and_then(|u| u.host_str().map(|h| h.to_string())) {
+        let domain = match url::Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(|h| h.to_string()))
+        {
             Some(d) => d,
             None => return true,
         };
@@ -67,7 +71,7 @@ impl RobotsCache {
         self.cache
             .get(domain)
             .and_then(|info| info.crawl_delay)
-            .map(|secs| Duration::from_secs_f64(secs))
+            .map(Duration::from_secs_f64)
     }
 
     /// Fetch and cache robots.txt for the given domain.
@@ -77,23 +81,22 @@ impl RobotsCache {
     /// - 4xx: allow all (no restrictions)
     /// - 5xx: retry once, then allow all
     /// - Network error: allow all
-    pub async fn fetch_and_cache(
-        &mut self,
-        domain: &str,
-        client: &reqwest::Client,
-    ) -> Result<()> {
+    pub async fn fetch_and_cache(&mut self, domain: &str, client: &reqwest::Client) -> Result<()> {
         let robots_url = format!("https://{}/robots.txt", domain);
 
         let response = match client.get(&robots_url).send().await {
             Ok(r) => r,
             Err(_) => {
                 // Network error — cache as invalid (allow all).
-                self.cache.insert(domain.to_string(), RobotsInfo {
-                    is_valid: false,
-                    content: String::new(),
-                    crawl_delay: None,
-                    cached_at: Instant::now(),
-                });
+                self.cache.insert(
+                    domain.to_string(),
+                    RobotsInfo {
+                        is_valid: false,
+                        content: String::new(),
+                        crawl_delay: None,
+                        cached_at: Instant::now(),
+                    },
+                );
                 return Ok(());
             }
         };

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 fn bench_html_parse(c: &mut Criterion) {
     let html = include_bytes!("../../tests/fixtures/index.html");

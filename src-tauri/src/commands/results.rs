@@ -110,8 +110,8 @@ pub struct RedirectHop {
 /// Fetch recent crawls for the dashboard.
 #[tauri::command]
 pub async fn get_recent_crawls(
-    limit: Option<u32>,
-    db: State<'_, Database>,
+    _limit: Option<u32>,
+    _db: State<'_, Database>,
 ) -> Result<Vec<CrawlSummary>, String> {
     // TODO(phase-4): Query crawls table ordered by started_at DESC.
     Ok(Vec::new())
@@ -120,10 +120,10 @@ pub async fn get_recent_crawls(
 /// Fetch paginated crawl results (pages table) with sorting and filtering.
 #[tauri::command]
 pub async fn get_crawl_results(
-    crawl_id: String,
+    _crawl_id: String,
     pagination: PaginationParams,
-    filters: Option<PageFilters>,
-    db: State<'_, Database>,
+    _filters: Option<PageFilters>,
+    _db: State<'_, Database>,
 ) -> Result<PaginatedResponse<PageRow>, String> {
     // TODO(phase-4): Build SQL query with LIMIT/OFFSET, ORDER BY, WHERE clauses.
     Ok(PaginatedResponse {
@@ -137,8 +137,8 @@ pub async fn get_crawl_results(
 /// Fetch summary statistics for a single crawl.
 #[tauri::command]
 pub async fn get_crawl_summary(
-    crawl_id: String,
-    db: State<'_, Database>,
+    _crawl_id: String,
+    _db: State<'_, Database>,
 ) -> Result<CrawlSummary, String> {
     // TODO(phase-4): Aggregate from crawls + issues tables.
     Err("Not yet implemented — Phase 4".into())
@@ -147,9 +147,9 @@ pub async fn get_crawl_summary(
 /// Fetch full detail for a single page including issues and links.
 #[tauri::command]
 pub async fn get_page_detail(
-    crawl_id: String,
-    page_id: i64,
-    db: State<'_, Database>,
+    _crawl_id: String,
+    _page_id: i64,
+    _db: State<'_, Database>,
 ) -> Result<PageDetail, String> {
     // TODO(phase-4): Join pages + issues + links tables.
     Err("Not yet implemented — Phase 4".into())
@@ -158,10 +158,10 @@ pub async fn get_page_detail(
 /// Fetch paginated issues for a crawl.
 #[tauri::command]
 pub async fn get_issues(
-    crawl_id: String,
+    _crawl_id: String,
     pagination: PaginationParams,
-    filters: Option<IssueFilters>,
-    db: State<'_, Database>,
+    _filters: Option<IssueFilters>,
+    _db: State<'_, Database>,
 ) -> Result<PaginatedResponse<IssueRow>, String> {
     Ok(PaginatedResponse {
         items: Vec::new(),
@@ -174,10 +174,10 @@ pub async fn get_issues(
 /// Fetch paginated links for a crawl.
 #[tauri::command]
 pub async fn get_links(
-    crawl_id: String,
+    _crawl_id: String,
     pagination: PaginationParams,
-    filters: Option<LinkFilters>,
-    db: State<'_, Database>,
+    _filters: Option<LinkFilters>,
+    _db: State<'_, Database>,
 ) -> Result<PaginatedResponse<LinkRow>, String> {
     Ok(PaginatedResponse {
         items: Vec::new(),

@@ -27,12 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 
-export function Sidebar({
-  activeView,
-  onNavigate,
-  theme,
-  onToggleTheme,
-}: SidebarProps) {
+export function Sidebar({ activeView, onNavigate, theme, onToggleTheme }: SidebarProps) {
   const crawlState = useCrawlStore((s) => s.state);
 
   return (
@@ -54,10 +49,7 @@ export function Sidebar({
         }}
       >
         <span className="text-base font-bold tracking-tight">OxideSEO</span>
-        <span
-          className="text-xs"
-          style={{ color: "var(--color-muted-foreground)" }}
-        >
+        <span className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
           v0.1
         </span>
       </div>
@@ -66,8 +58,7 @@ export function Sidebar({
       <nav className="flex-1 space-y-1 p-2">
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
-          const showDot =
-            item.id === "crawl-monitor" && crawlState === "running";
+          const showDot = item.id === "crawl-monitor" && crawlState === "running";
 
           return (
             <button
@@ -78,9 +69,7 @@ export function Sidebar({
                 isActive && "font-medium",
               )}
               style={{
-                backgroundColor: isActive
-                  ? "var(--color-sidebar-active)"
-                  : "transparent",
+                backgroundColor: isActive ? "var(--color-sidebar-active)" : "transparent",
               }}
             >
               <span className="flex-1 text-left">{item.label}</span>
@@ -96,7 +85,10 @@ export function Sidebar({
       </nav>
 
       {/* Theme toggle */}
-      <div className="border-t p-2" style={{ borderColor: "var(--color-sidebar-border)" }}>
+      <div
+        className="border-t p-2"
+        style={{ borderColor: "var(--color-sidebar-border)" }}
+      >
         <button
           onClick={onToggleTheme}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors"

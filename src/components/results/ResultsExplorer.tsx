@@ -42,7 +42,10 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header with tabs */}
-      <div className="flex items-center gap-4 border-b px-6 pt-6" style={{ borderColor: "var(--color-border)" }}>
+      <div
+        className="flex items-center gap-4 border-b px-6 pt-6"
+        style={{ borderColor: "var(--color-border)" }}
+      >
         <h1 className="text-lg font-bold tracking-tight">Results</h1>
         <div className="flex gap-1">
           {TABS.map((tab) => (
@@ -55,9 +58,7 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
               )}
               style={{
                 backgroundColor:
-                  activeTab === tab.id
-                    ? "var(--color-background)"
-                    : "transparent",
+                  activeTab === tab.id ? "var(--color-background)" : "transparent",
                 borderBottom:
                   activeTab === tab.id
                     ? "2px solid var(--color-primary)"

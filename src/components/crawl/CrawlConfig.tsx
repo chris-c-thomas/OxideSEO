@@ -4,7 +4,11 @@
 
 import { useState } from "react";
 import { startCrawl } from "@/lib/commands";
-import { crawlConfigSchema, defaultCrawlConfig, type CrawlConfigFormValues } from "@/lib/validation";
+import {
+  crawlConfigSchema,
+  defaultCrawlConfig,
+  type CrawlConfigFormValues,
+} from "@/lib/validation";
 import { useCrawlStore } from "@/stores/crawlStore";
 import type { CrawlConfig as CrawlConfigType } from "@/types";
 
@@ -76,7 +80,9 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
             placeholder="https://example.com"
             className="w-full rounded-md border px-3 py-2 text-sm"
             style={{
-              borderColor: errors.startUrl ? "var(--color-severity-error)" : "var(--color-border)",
+              borderColor: errors.startUrl
+                ? "var(--color-severity-error)"
+                : "var(--color-border)",
               backgroundColor: "var(--color-background)",
               color: "var(--color-foreground)",
             }}
@@ -86,33 +92,68 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
         {/* Crawl limits */}
         <div className="grid grid-cols-2 gap-4">
           <FieldGroup label="Max Depth" error={errors.maxDepth}>
-            <NumberInput value={formData.maxDepth} onChange={(v) => updateField("maxDepth", v)} min={1} max={100} />
+            <NumberInput
+              value={formData.maxDepth}
+              onChange={(v) => updateField("maxDepth", v)}
+              min={1}
+              max={100}
+            />
           </FieldGroup>
           <FieldGroup label="Max Pages (0 = unlimited)" error={errors.maxPages}>
-            <NumberInput value={formData.maxPages} onChange={(v) => updateField("maxPages", v)} min={0} max={10000000} />
+            <NumberInput
+              value={formData.maxPages}
+              onChange={(v) => updateField("maxPages", v)}
+              min={0}
+              max={10000000}
+            />
           </FieldGroup>
         </div>
 
         {/* Concurrency */}
         <div className="grid grid-cols-3 gap-4">
           <FieldGroup label="Concurrent Requests" error={errors.maxConcurrency}>
-            <NumberInput value={formData.maxConcurrency} onChange={(v) => updateField("maxConcurrency", v)} min={1} max={200} />
+            <NumberInput
+              value={formData.maxConcurrency}
+              onChange={(v) => updateField("maxConcurrency", v)}
+              min={1}
+              max={200}
+            />
           </FieldGroup>
           <FieldGroup label="Fetch Workers" error={errors.fetchWorkers}>
-            <NumberInput value={formData.fetchWorkers} onChange={(v) => updateField("fetchWorkers", v)} min={1} max={32} />
+            <NumberInput
+              value={formData.fetchWorkers}
+              onChange={(v) => updateField("fetchWorkers", v)}
+              min={1}
+              max={32}
+            />
           </FieldGroup>
           <FieldGroup label="Parse Threads" error={errors.parseThreads}>
-            <NumberInput value={formData.parseThreads} onChange={(v) => updateField("parseThreads", v)} min={1} max={64} />
+            <NumberInput
+              value={formData.parseThreads}
+              onChange={(v) => updateField("parseThreads", v)}
+              min={1}
+              max={64}
+            />
           </FieldGroup>
         </div>
 
         {/* Politeness */}
         <div className="grid grid-cols-2 gap-4">
           <FieldGroup label="Crawl Delay (ms)" error={errors.crawlDelayMs}>
-            <NumberInput value={formData.crawlDelayMs} onChange={(v) => updateField("crawlDelayMs", v)} min={0} max={10000} />
+            <NumberInput
+              value={formData.crawlDelayMs}
+              onChange={(v) => updateField("crawlDelayMs", v)}
+              min={0}
+              max={10000}
+            />
           </FieldGroup>
           <FieldGroup label="Request Timeout (s)" error={errors.requestTimeoutSecs}>
-            <NumberInput value={formData.requestTimeoutSecs} onChange={(v) => updateField("requestTimeoutSecs", v)} min={5} max={120} />
+            <NumberInput
+              value={formData.requestTimeoutSecs}
+              onChange={(v) => updateField("requestTimeoutSecs", v)}
+              min={5}
+              max={120}
+            />
           </FieldGroup>
         </div>
 

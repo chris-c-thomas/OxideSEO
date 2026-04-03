@@ -7,12 +7,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
-use tokio::sync::{mpsc, watch, Semaphore};
+use tokio::sync::{Semaphore, watch};
 
-use crate::commands::crawl::CrawlConfig;
-use crate::crawler::frontier::UrlFrontier;
-use crate::storage::db::Database;
 use crate::CrawlState;
+use crate::commands::crawl::CrawlConfig;
+use crate::storage::db::Database;
 
 /// Handle to a running crawl. Used to control lifecycle from Tauri commands.
 pub struct CrawlHandle {
@@ -23,6 +22,7 @@ pub struct CrawlHandle {
     /// Receiver to observe current state.
     state_rx: watch::Receiver<CrawlState>,
     /// When the crawl started.
+    #[allow(dead_code)]
     started_at: Instant,
 }
 
@@ -56,8 +56,8 @@ impl CrawlHandle {
 pub async fn spawn_crawl(
     crawl_id: String,
     config: CrawlConfig,
-    db: Arc<Database>,
-    app_handle: tauri::AppHandle,
+    _db: Arc<Database>,
+    _app_handle: tauri::AppHandle,
 ) -> Result<CrawlHandle> {
     let (state_tx, state_rx) = watch::channel(CrawlState::Running);
 
@@ -70,7 +70,7 @@ pub async fn spawn_crawl(
     };
 
     // Global concurrency semaphore.
-    let global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
+    let _global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
 
     // TODO(phase-2): Implement the full orchestration loop:
     //

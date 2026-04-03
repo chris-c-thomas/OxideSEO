@@ -7,7 +7,7 @@
 
 use oxide_seo_lib::commands;
 use tauri::Manager;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 fn main() {
     // Initialize structured logging.

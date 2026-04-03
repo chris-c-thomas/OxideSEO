@@ -29,10 +29,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p
-            className="mt-1 text-sm"
-            style={{ color: "var(--color-muted-foreground)" }}
-          >
+          <p className="mt-1 text-sm" style={{ color: "var(--color-muted-foreground)" }}>
             Overview of your SEO crawls and audits.
           </p>
         </div>
@@ -81,15 +78,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 className="flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors hover:bg-[var(--color-muted)]"
                 style={{ borderColor: "var(--color-border)" }}
               >
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{crawl.startUrl}</p>
-                  <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--color-muted-foreground)" }}
+                  >
                     {crawl.startedAt ?? "Not started"}
                   </p>
                 </div>
-                <div className="text-right text-xs tabular-nums" style={{ color: "var(--color-muted-foreground)" }}>
+                <div
+                  className="text-right text-xs tabular-nums"
+                  style={{ color: "var(--color-muted-foreground)" }}
+                >
                   <p>{formatNumber(crawl.urlsCrawled)} pages</p>
-                  <p>{formatNumber(crawl.issueCounts.errors + crawl.issueCounts.warnings)} issues</p>
+                  <p>
+                    {formatNumber(crawl.issueCounts.errors + crawl.issueCounts.warnings)}{" "}
+                    issues
+                  </p>
                 </div>
                 <span
                   className="rounded-full px-2 py-0.5 text-xs font-medium capitalize"

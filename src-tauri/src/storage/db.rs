@@ -4,16 +4,17 @@
 //! maintains a global metadata database for settings and crawl history.
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 use tauri::Manager;
 
 /// Embedded migration SQL files, ordered by version.
-const MIGRATIONS: &[(&str, &str)] = &[
-    ("001_initial", include_str!("../../migrations/001_initial.sql")),
-];
+const MIGRATIONS: &[(&str, &str)] = &[(
+    "001_initial",
+    include_str!("../../migrations/001_initial.sql"),
+)];
 
 /// Application database handle.
 ///
@@ -38,12 +39,10 @@ impl Database {
             .app_data_dir()
             .context("Failed to resolve app data directory")?;
 
-        std::fs::create_dir_all(&app_data_dir)
-            .context("Failed to create app data directory")?;
+        std::fs::create_dir_all(&app_data_dir).context("Failed to create app data directory")?;
 
         let db_path = app_data_dir.join("oxide-seo.db");
-        let conn = Connection::open(&db_path)
-            .context("Failed to open SQLite database")?;
+        let conn = Connection::open(&db_path).context("Failed to open SQLite database")?;
 
         // Enable WAL mode for concurrent read/write performance.
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -64,8 +63,7 @@ impl Database {
     pub fn open_crawl_file(path: &std::path::Path) -> Result<Self> {
         let conn = Connection::open_with_flags(
             path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
 
         Ok(Self {
@@ -97,14 +95,17 @@ impl Database {
 
     /// Run all pending migrations.
     fn run_migrations(&self) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
 
         // Create migrations tracking table.
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS _migrations (
                 name TEXT PRIMARY KEY,
                 applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );"
+            );",
         )?;
 
         for (name, sql) in MIGRATIONS {
@@ -120,10 +121,7 @@ impl Database {
                 tracing::info!(migration = %name, "Running migration");
                 conn.execute_batch(sql)
                     .with_context(|| format!("Failed to run migration: {}", name))?;
-                conn.execute(
-                    "INSERT INTO _migrations (name) VALUES (?1)",
-                    [name],
-                )?;
+                conn.execute("INSERT INTO _migrations (name) VALUES (?1)", [name])?;
             }
         }
 
@@ -138,7 +136,10 @@ impl Database {
     where
         F: FnOnce(&Connection) -> Result<T>,
     {
-        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         f(&conn)
     }
 
@@ -147,7 +148,10 @@ impl Database {
     where
         F: FnOnce(&mut Connection) -> Result<T>,
     {
-        let mut conn = self.conn.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         f(&mut conn)
     }
 }
