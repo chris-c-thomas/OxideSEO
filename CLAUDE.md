@@ -65,6 +65,8 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Crawl progress event subscription hook
 - CSS design tokens for light/dark mode
 - App icons generated in `src-tauri/icons/` (placeholder — replace with real branding)
+- shadcn/ui initialized with 10 components in `src/components/ui/` (button, badge, dialog, input, label, table, select, tabs, separator, tooltip). Add more with `npx shadcn@latest add <component>`.
+- husky + lint-staged configured for pre-commit hooks (eslint + prettier on staged `.ts`/`.tsx` files)
 - GitHub Actions CI for cross-platform builds
 
 ### What Needs Implementation (by Phase)
@@ -72,10 +74,10 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 **Phase 1 — Remaining (finish first):**
 - ~~Verify `cargo tauri dev` compiles and opens the webview window end-to-end~~ ✅
 - ~~Resolve any dependency version conflicts in `Cargo.toml`~~ ✅
-- Install shadcn/ui components (run `npx shadcn@latest init` and add needed primitives)
-- Verify the SQLite database file is created in the Tauri app data directory on launch
-- Add husky + lint-staged for pre-commit hooks
-- Ensure CI workflow runs successfully
+- ~~Install shadcn/ui components (run `npx shadcn@latest init` and add needed primitives)~~ ✅
+- ~~Verify the SQLite database file is created in the Tauri app data directory on launch~~ ✅
+- ~~Add husky + lint-staged for pre-commit hooks~~ ✅
+- ~~Ensure CI workflow runs successfully~~ ✅
 
 **Phase 2 — Core Crawl Engine (primary implementation work):**
 - `crawler/parser.rs`: Implement the full `lol_html` element content handlers for all 11 tag types. This is the most important parse function. Wire up text extraction for title, H1-H6, anchor text. Implement `parse_with_scraper` fallback.
@@ -262,3 +264,5 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Icons must exist before build** — `tauri::generate_context!()` panics at compile time if `src-tauri/icons/` is missing. Run `npx tauri icon app-icon.png` to generate from a source PNG.
 - **`tsconfig.node.json` must set `composite: true`** — Required by the project reference in `tsconfig.json`. Use `emitDeclarationOnly: true` instead of `noEmit: true` (they conflict with `composite`).
 - **Commit both lock files** — `Cargo.lock` and `package-lock.json` are checked in (this is an application, not a library).
+- **ESLint v9 flat config** — This project uses `eslint.config.js` (flat config). The `--ext` flag does not work; target directories instead (`eslint src/`). Requires `typescript-eslint` and `@eslint/js` as devDependencies.
+- **`cargo fix` breaks formatting** — Always run `cargo fmt --all` after `cargo fix --allow-dirty`.
