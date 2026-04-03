@@ -33,6 +33,9 @@ npm run typecheck
 
 # Frontend format
 npm run format:check
+
+# Generate app icons (requires a 1024x1024 source PNG)
+npx tauri icon app-icon.png
 ```
 
 ## Current State
@@ -61,13 +64,14 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Theme hook with system preference detection and localStorage persistence
 - Crawl progress event subscription hook
 - CSS design tokens for light/dark mode
+- App icons generated in `src-tauri/icons/` (placeholder — replace with real branding)
 - GitHub Actions CI for cross-platform builds
 
 ### What Needs Implementation (by Phase)
 
 **Phase 1 — Remaining (finish first):**
-- Verify `cargo tauri dev` compiles and opens the webview window end-to-end
-- Resolve any dependency version conflicts in `Cargo.toml`
+- ~~Verify `cargo tauri dev` compiles and opens the webview window end-to-end~~ ✅
+- ~~Resolve any dependency version conflicts in `Cargo.toml`~~ ✅
 - Install shadcn/ui components (run `npx shadcn@latest init` and add needed primitives)
 - Verify the SQLite database file is created in the Tauri app data directory on launch
 - Add husky + lint-staged for pre-commit hooks
@@ -251,3 +255,10 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **TanStack Table v8** — Headless table (no DOM). Column definitions, sorting state, filter state are all managed by the library. You provide the render functions.
 - **TanStack Virtual v3** — Row virtualization. Renders only ~50 DOM nodes regardless of total row count.
 - **Zustand v5** — Minimal state management. Stores are plain functions. Access with `useStore((s) => s.field)`.
+
+## Gotchas
+
+- **Tauri v2 `Manager` trait** — `use tauri::Manager;` is required in any file that calls `.manage()`, `.path()`, `.emit()`, or other trait methods on `AppHandle`/`App`. The compiler error says "method not found" rather than "trait not in scope" — easy to miss.
+- **Icons must exist before build** — `tauri::generate_context!()` panics at compile time if `src-tauri/icons/` is missing. Run `npx tauri icon app-icon.png` to generate from a source PNG.
+- **`tsconfig.node.json` must set `composite: true`** — Required by the project reference in `tsconfig.json`. Use `emitDeclarationOnly: true` instead of `noEmit: true` (they conflict with `composite`).
+- **Commit both lock files** — `Cargo.lock` and `package-lock.json` are checked in (this is an application, not a library).
