@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
+use tauri::Manager;
 
 /// Embedded migration SQL files, ordered by version.
 const MIGRATIONS: &[(&str, &str)] = &[

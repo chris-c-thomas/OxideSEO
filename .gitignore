@@ -5,27 +5,55 @@ node_modules/
 dist/
 src-tauri/target/
 
-# IDE
+# Lock files — keep both Cargo.lock and package-lock.json
+# (this is an application, not a library)
+
+# IDE / Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+._*
 
-# Environment
+# Environment / Secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# Tauri
+# Tauri auto-generated
 src-tauri/gen/
+
+# Tauri dev / WKWebView
+WebKitCache/
+GPUCache/
 
 # Test
 coverage/
+*.lcov
 
-# Crawl databases (user data, not committed)
+# Crawl databases (user data)
 *.seocrawl
+
+# Rust
+*.pdb
+
+# TypeScript
+*.tsbuildinfo
+
+# Temporary source icon used for generation
+app-icon.png
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

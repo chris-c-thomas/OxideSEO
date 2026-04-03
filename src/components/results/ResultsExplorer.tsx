@@ -85,7 +85,7 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
 // Tab placeholders — each will use the shared DataTable component.
 // ---------------------------------------------------------------------------
 
-function PagesTab({ crawlId }: { crawlId: string }) {
+function PagesTab({ crawlId: _crawlId }: { crawlId: string }) {
   // TODO(phase-4): Implement with DataTable, TanStack Table columns for:
   // URL, Status Code, Title, Meta Description, H1, Word Count,
   // Response Time, Body Size, Canonical, Issues Count.
@@ -99,7 +99,7 @@ function PagesTab({ crawlId }: { crawlId: string }) {
   );
 }
 
-function IssuesTab({ crawlId }: { crawlId: string }) {
+function IssuesTab({ crawlId: _crawlId }: { crawlId: string }) {
   // TODO(phase-4): Columns: Severity Badge, Rule ID, Page URL, Message, Category.
   // Group by severity, then by category.
   return (
@@ -110,7 +110,7 @@ function IssuesTab({ crawlId }: { crawlId: string }) {
   );
 }
 
-function LinksTab({ crawlId }: { crawlId: string }) {
+function LinksTab({ crawlId: _crawlId }: { crawlId: string }) {
   // TODO(phase-4): Columns: Source URL, Target URL, Anchor Text, Link Type,
   // Internal/External, Status, Nofollow.
   return (
@@ -121,7 +121,7 @@ function LinksTab({ crawlId }: { crawlId: string }) {
   );
 }
 
-function ImagesTab({ crawlId }: { crawlId: string }) {
+function ImagesTab({ crawlId: _crawlId }: { crawlId: string }) {
   // TODO(phase-4): Columns: Image URL, Source Page, Alt Text, File Size, Status.
   // Filter by missing alt, broken, oversized.
   return (

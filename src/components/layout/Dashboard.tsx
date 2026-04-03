@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import type { AppView } from "@/App";
 import { getRecentCrawls } from "@/lib/commands";
-import { formatDuration, formatNumber, stateColor } from "@/lib/utils";
+import { formatNumber, stateColor } from "@/lib/utils";
 import type { CrawlSummary } from "@/types";
 
 interface DashboardProps {
