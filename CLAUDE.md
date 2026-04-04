@@ -65,7 +65,7 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Crawl progress event subscription hook
 - CSS design tokens for light/dark mode
 - App icons generated in `src-tauri/icons/` (placeholder — replace with real branding)
-- shadcn/ui initialized with 10 components in `src/components/ui/` (button, badge, dialog, input, label, table, select, tabs, separator, tooltip). Add more with `npx shadcn@latest add <component>`.
+- shadcn/ui initialized with 12 components in `src/components/ui/` (badge, button, dialog, input, label, select, separator, sheet, table, tabs, tooltip). Add more with `npx shadcn@latest add <component>`.
 - husky + lint-staged configured for pre-commit hooks (eslint + prettier on staged `.ts`/`.tsx` files)
 - GitHub Actions CI for cross-platform builds
 
@@ -89,12 +89,14 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - `FlushAck` storage command for synchronizing post-crawl analysis after all writes
 - 8 post-crawl unit tests + 8 performance rule tests + 1 integration test (7 total integration tests)
 
-**Phase 4 — Frontend UI (MVP gate):**
-- Build the `DataTable` component using TanStack Table v8 + TanStack Virtual v3
-- Implement server-side pagination: invoke `getCrawlResults` with offset/limit, wire infinite scroll
-- Implement column definitions for each results tab (pages, issues, links, images)
-- Build the Page Detail view
-- Add shadcn/ui components (Badge, Dialog, Combobox, etc.)
+**Phase 4 — Frontend UI (MVP gate):** ~~All work units implemented~~ ✅
+- `DataTable` component using TanStack Table v8 + TanStack Virtual v3 with infinite scroll
+- All 6 result commands implemented (`get_recent_crawls`, `get_crawl_results`, `get_crawl_summary`, `get_page_detail`, `get_issues`, `get_links`) with pagination, sorting, and filtering
+- Column definitions for all 4 tabs (pages, issues, links, images) with color-coded badges and formatted values
+- Filter toolbars per tab (URL search, status codes, content type, severity, category, link type, scope, broken status, missing alt text)
+- Page Detail slide-out sheet with SEO metadata, performance stats, issues, and link tables
+- Summary bar with issue counts, Dashboard with severity indicators
+- Images tab reuses `getLinks` with `linkType: "img"` filter; `anchorText` = alt text
 
 ## Architecture Invariants
 
@@ -141,7 +143,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `main.rs` | Tauri entry point, logging init, command registration | Complete |
 | `lib.rs` | Module declarations, shared enums | Complete |
 | `commands/crawl.rs` | Crawl lifecycle IPC handlers | Complete |
-| `commands/results.rs` | Data query IPC handlers | Signatures complete, bodies stubbed |
+| `commands/results.rs` | Data query IPC handlers | Complete (all 6 commands with pagination, sorting, filtering) |
 | `commands/settings.rs` | Settings IPC handlers | Signatures complete, bodies stubbed |
 | `crawler/mod.rs` | Crawler types: FetchResult, ParsedPage, ExtractedLink | Complete |
 | `crawler/engine.rs` | Crawl orchestrator | Complete |
@@ -161,7 +163,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `rules/post_crawl.rs` | PostCrawlAnalyzer for cross-page rules | Complete with tests |
 | `storage/db.rs` | SQLite connection + migrations | Complete with tests |
 | `storage/models.rs` | Data structs + StorageCommand enum | Complete |
-| `storage/queries.rs` | SQL statements + execution functions | Complete |
+| `storage/queries.rs` | SQL statements + execution functions | Complete (paginated queries with dynamic filtering for pages, issues, links) |
 | `storage/writer.rs` | Batched storage writer thread | Complete with tests |
 | `ai/provider.rs` | LlmProvider trait | Complete (Phase 7) |
 
@@ -178,11 +180,20 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `stores/settingsStore.ts` | Settings Zustand store | Complete |
 | `hooks/useTheme.ts` | Theme management | Complete |
 | `hooks/useCrawlProgress.ts` | Tauri event subscription | Complete |
+| `hooks/useServerData.ts` | Infinite-scroll data fetching with sort/filter | Complete |
 | `components/layout/Sidebar.tsx` | Navigation sidebar | Complete |
-| `components/layout/Dashboard.tsx` | Dashboard with recent crawls | Complete |
+| `components/layout/Dashboard.tsx` | Dashboard with recent crawls + severity indicators | Complete |
 | `components/crawl/CrawlConfig.tsx` | Crawl config form | Complete |
 | `components/crawl/CrawlMonitor.tsx` | Live crawl monitor | Complete |
-| `components/results/ResultsExplorer.tsx` | Tabbed results view | Shell complete, DataTable TODO |
+| `components/results/ResultsExplorer.tsx` | Tabbed results view with summary bar + page detail | Complete |
+| `components/results/DataTable.tsx` | Virtualized table (TanStack Table + Virtual) | Complete |
+| `components/results/PagesTab.tsx` | Pages tab with filters | Complete |
+| `components/results/IssuesTab.tsx` | Issues tab with filters | Complete |
+| `components/results/LinksTab.tsx` | Links tab with filters | Complete |
+| `components/results/ImagesTab.tsx` | Images tab (filtered links) with filters | Complete |
+| `components/results/PageDetail.tsx` | Slide-out sheet with SEO metadata, issues, links | Complete |
+| `components/results/columns/*.tsx` | Column definitions for each tab | Complete |
+| `components/results/filters/*.tsx` | Filter toolbar components per tab | Complete |
 | `components/settings/SettingsView.tsx` | Settings page | Complete |
 
 ## Testing Approach

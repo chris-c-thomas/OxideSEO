@@ -62,6 +62,19 @@ export function severityColor(severity: "error" | "warning" | "info"): string {
   return `var(--color-severity-${severity})`;
 }
 
+/** Strip protocol and trailing slash from a URL for compact display. */
+export function formatUrl(url: string): string {
+  return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+/** Map a status code to a CSS color string. */
+export function statusCodeColor(code: number): string {
+  if (code >= 500) return "var(--color-severity-error)";
+  if (code >= 400) return "var(--color-severity-warning)";
+  if (code >= 300) return "var(--color-primary)";
+  return "var(--color-status-completed)";
+}
+
 /** Map a crawl state to a CSS color variable name. */
 export function stateColor(state: string): string {
   switch (state) {

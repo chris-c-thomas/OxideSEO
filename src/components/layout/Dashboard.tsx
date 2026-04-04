@@ -92,10 +92,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   style={{ color: "var(--color-muted-foreground)" }}
                 >
                   <p>{formatNumber(crawl.urlsCrawled)} pages</p>
-                  <p>
-                    {formatNumber(crawl.issueCounts.errors + crawl.issueCounts.warnings)}{" "}
-                    issues
-                  </p>
+                  <div className="flex items-center justify-end gap-2">
+                    {crawl.issueCounts.errors > 0 && (
+                      <span className="flex items-center gap-1">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ backgroundColor: "var(--color-severity-error)" }}
+                        />
+                        {crawl.issueCounts.errors}
+                      </span>
+                    )}
+                    {crawl.issueCounts.warnings > 0 && (
+                      <span className="flex items-center gap-1">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ backgroundColor: "var(--color-severity-warning)" }}
+                        />
+                        {crawl.issueCounts.warnings}
+                      </span>
+                    )}
+                    {crawl.issueCounts.errors === 0 &&
+                      crawl.issueCounts.warnings === 0 && <span>No issues</span>}
+                  </div>
                 </div>
                 <span
                   className="rounded-full px-2 py-0.5 text-xs font-medium capitalize"

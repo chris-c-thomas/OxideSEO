@@ -167,7 +167,7 @@ async fn test_full_crawl() {
 
     // Verify the index page was crawled with title.
     let pages = db
-        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 100, None, false))
+        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 100, None, false, None, None, None))
         .unwrap();
     let index_page = pages
         .iter()
@@ -305,7 +305,7 @@ async fn test_max_depth_limit() {
     // With max_depth=1, we should crawl the seed (depth 0) and its direct links (depth 1),
     // but NOT pages linked only from depth-1 pages.
     let pages = db
-        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 100, None, false))
+        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 100, None, false, None, None, None))
         .unwrap();
 
     // All pages should have depth <= 1.
@@ -463,7 +463,7 @@ async fn test_parser_extracts_seo_data() {
 
     // Verify the index page has extracted SEO data.
     let pages = db
-        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 10, None, false))
+        .with_conn(|conn| queries::select_pages(conn, &crawl_id, 0, 10, None, false, None, None, None))
         .unwrap();
 
     let index = pages

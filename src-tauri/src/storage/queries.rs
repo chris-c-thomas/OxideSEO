@@ -5,7 +5,7 @@
 //! for reads with LIMIT/OFFSET pagination.
 
 use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, types::Value};
 
 use super::models::{CrawlRow, IssueRow, LinkRow, PageRow};
 
@@ -132,6 +132,29 @@ pub const SELECT_OUTBOUND_LINKS: &str = r#"
            link_type, is_internal, nofollow
     FROM links
     WHERE crawl_id = ?1 AND source_page = ?2
+"#;
+
+/// Fetch a single crawl by ID.
+pub const SELECT_CRAWL_BY_ID: &str = r#"
+    SELECT id, start_url, config_json, status, started_at, completed_at,
+           urls_crawled, urls_errored
+    FROM crawls
+    WHERE id = ?1
+"#;
+
+/// Base query for paginated issues.
+pub const SELECT_ISSUES_BASE: &str = r#"
+    SELECT id, crawl_id, page_id, rule_id, severity, category, message, detail_json
+    FROM issues
+    WHERE crawl_id = ?1
+"#;
+
+/// Base query for paginated links.
+pub const SELECT_LINKS_BASE: &str = r#"
+    SELECT id, crawl_id, source_page, target_url, anchor_text,
+           link_type, is_internal, nofollow
+    FROM links
+    WHERE crawl_id = ?1
 "#;
 
 /// Find duplicate titles across a crawl.
@@ -372,17 +395,9 @@ pub fn select_page_by_id(
     Ok(rows.next().and_then(|r| r.ok()))
 }
 
-/// Fetch paginated pages with dynamic ordering.
-pub fn select_pages(
-    conn: &Connection,
-    crawl_id: &str,
-    offset: i64,
-    limit: i64,
-    sort_by: Option<&str>,
-    sort_desc: bool,
-) -> Result<Vec<PageRow>> {
-    // Allowlist of sortable columns to prevent SQL injection.
-    let order_col = match sort_by {
+/// Allowlisted sort column for pages.
+fn pages_sort_col(sort_by: Option<&str>) -> &'static str {
+    match sort_by {
         Some("url") => "url",
         Some("statusCode") => "status_code",
         Some("title") => "title",
@@ -391,19 +406,103 @@ pub fn select_pages(
         Some("depth") => "depth",
         Some("state") => "state",
         _ => "id",
-    };
+    }
+}
+
+/// Build dynamic WHERE clauses and parameter values for page filters.
+fn build_page_filters(
+    url_search: Option<&str>,
+    status_codes: Option<&[u16]>,
+    content_type: Option<&str>,
+) -> (String, Vec<Value>) {
+    let mut clauses = String::new();
+    let mut values: Vec<Value> = Vec::new();
+
+    if let Some(search) = url_search {
+        if !search.is_empty() {
+            clauses.push_str(" AND url LIKE ?");
+            values.push(Value::Text(format!("%{}%", search)));
+        }
+    }
+
+    if let Some(codes) = status_codes {
+        if !codes.is_empty() {
+            let placeholders: Vec<&str> = codes.iter().map(|_| "?").collect();
+            clauses.push_str(&format!(" AND status_code IN ({})", placeholders.join(",")));
+            for &code in codes {
+                values.push(Value::Integer(code as i64));
+            }
+        }
+    }
+
+    if let Some(ct) = content_type {
+        if !ct.is_empty() {
+            clauses.push_str(" AND content_type LIKE ?");
+            values.push(Value::Text(format!("{}%", ct)));
+        }
+    }
+
+    (clauses, values)
+}
+
+/// Fetch paginated pages with dynamic ordering and filtering.
+#[allow(clippy::too_many_arguments)]
+pub fn select_pages(
+    conn: &Connection,
+    crawl_id: &str,
+    offset: i64,
+    limit: i64,
+    sort_by: Option<&str>,
+    sort_desc: bool,
+    url_search: Option<&str>,
+    status_codes: Option<&[u16]>,
+    content_type: Option<&str>,
+) -> Result<Vec<PageRow>> {
+    let order_col = pages_sort_col(sort_by);
     let dir = if sort_desc { "DESC" } else { "ASC" };
+    let (filter_clauses, filter_values) =
+        build_page_filters(url_search, status_codes, content_type);
+
     let query = format!(
-        "{} ORDER BY {} {} LIMIT ?2 OFFSET ?3",
-        SELECT_PAGES_BASE, order_col, dir
+        "{}{} ORDER BY {} {} LIMIT ? OFFSET ?",
+        SELECT_PAGES_BASE, filter_clauses, order_col, dir
     );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+    param_values.push(Value::Integer(limit));
+    param_values.push(Value::Integer(offset));
 
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
-        .query_map(params![crawl_id, limit, offset], row_to_page)?
+        .query_map(rusqlite::params_from_iter(&param_values), row_to_page)?
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
+}
+
+/// Count pages with optional filters (for pagination total).
+pub fn count_pages_filtered(
+    conn: &Connection,
+    crawl_id: &str,
+    url_search: Option<&str>,
+    status_codes: Option<&[u16]>,
+    content_type: Option<&str>,
+) -> Result<i64> {
+    let (filter_clauses, filter_values) =
+        build_page_filters(url_search, status_codes, content_type);
+
+    let query = format!(
+        "SELECT COUNT(*) FROM pages WHERE crawl_id = ?{}",
+        filter_clauses
+    );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+
+    let mut stmt = conn.prepare(&query)?;
+    let count: i64 = stmt.query_row(rusqlite::params_from_iter(&param_values), |row| row.get(0))?;
+    Ok(count)
 }
 
 /// Fetch issues for a specific page.
@@ -446,4 +545,256 @@ pub fn select_inbound_links(
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
+}
+
+/// Fetch a single crawl by ID.
+pub fn select_crawl_by_id(conn: &Connection, crawl_id: &str) -> Result<Option<CrawlRow>> {
+    let mut stmt = conn.prepare(SELECT_CRAWL_BY_ID)?;
+    let mut rows = stmt.query_map(params![crawl_id], row_to_crawl)?;
+    Ok(rows.next().and_then(|r| r.ok()))
+}
+
+/// Count issues grouped by severity for a crawl. Returns (errors, warnings, info).
+pub fn count_issues_by_severity(conn: &Connection, crawl_id: &str) -> Result<(u64, u64, u64)> {
+    let mut stmt = conn.prepare(COUNT_ISSUES_BY_SEVERITY)?;
+    let rows = stmt.query_map(params![crawl_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+    })?;
+
+    let mut errors: u64 = 0;
+    let mut warnings: u64 = 0;
+    let mut info: u64 = 0;
+
+    for row in rows.flatten() {
+        match row.0.as_str() {
+            "error" => errors = row.1 as u64,
+            "warning" => warnings = row.1 as u64,
+            "info" => info = row.1 as u64,
+            _ => {}
+        }
+    }
+
+    Ok((errors, warnings, info))
+}
+
+/// Allowlisted sort column for issues.
+fn issues_sort_col(sort_by: Option<&str>) -> &'static str {
+    match sort_by {
+        Some("severity") => "severity",
+        Some("category") => "category",
+        Some("ruleId") => "rule_id",
+        Some("message") => "message",
+        Some("pageId") => "page_id",
+        _ => "id",
+    }
+}
+
+/// Build dynamic WHERE clauses for issue filters.
+fn build_issue_filters(
+    severity: Option<&str>,
+    category: Option<&str>,
+    rule_id: Option<&str>,
+) -> (String, Vec<Value>) {
+    let mut clauses = String::new();
+    let mut values: Vec<Value> = Vec::new();
+
+    if let Some(sev) = severity {
+        if !sev.is_empty() {
+            clauses.push_str(" AND severity = ?");
+            values.push(Value::Text(sev.to_string()));
+        }
+    }
+
+    if let Some(cat) = category {
+        if !cat.is_empty() {
+            clauses.push_str(" AND category = ?");
+            values.push(Value::Text(cat.to_string()));
+        }
+    }
+
+    if let Some(rid) = rule_id {
+        if !rid.is_empty() {
+            clauses.push_str(" AND rule_id = ?");
+            values.push(Value::Text(rid.to_string()));
+        }
+    }
+
+    (clauses, values)
+}
+
+/// Fetch paginated issues with filtering and sorting.
+#[allow(clippy::too_many_arguments)]
+pub fn select_issues(
+    conn: &Connection,
+    crawl_id: &str,
+    offset: i64,
+    limit: i64,
+    sort_by: Option<&str>,
+    sort_desc: bool,
+    severity: Option<&str>,
+    category: Option<&str>,
+    rule_id: Option<&str>,
+) -> Result<Vec<IssueRow>> {
+    let order_col = issues_sort_col(sort_by);
+    let dir = if sort_desc { "DESC" } else { "ASC" };
+    let (filter_clauses, filter_values) = build_issue_filters(severity, category, rule_id);
+
+    let query = format!(
+        "{}{} ORDER BY {} {} LIMIT ? OFFSET ?",
+        SELECT_ISSUES_BASE, filter_clauses, order_col, dir
+    );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+    param_values.push(Value::Integer(limit));
+    param_values.push(Value::Integer(offset));
+
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(&param_values), row_to_issue)?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Count issues with optional filters.
+pub fn count_issues(
+    conn: &Connection,
+    crawl_id: &str,
+    severity: Option<&str>,
+    category: Option<&str>,
+    rule_id: Option<&str>,
+) -> Result<i64> {
+    let (filter_clauses, filter_values) = build_issue_filters(severity, category, rule_id);
+
+    let query = format!(
+        "SELECT COUNT(*) FROM issues WHERE crawl_id = ?{}",
+        filter_clauses
+    );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+
+    let mut stmt = conn.prepare(&query)?;
+    let count: i64 = stmt.query_row(rusqlite::params_from_iter(&param_values), |row| row.get(0))?;
+    Ok(count)
+}
+
+/// Allowlisted sort column for links.
+fn links_sort_col(sort_by: Option<&str>) -> &'static str {
+    match sort_by {
+        Some("sourcePage") => "source_page",
+        Some("targetUrl") => "target_url",
+        Some("linkType") => "link_type",
+        Some("anchorText") => "anchor_text",
+        _ => "id",
+    }
+}
+
+/// Build dynamic WHERE clauses for link filters.
+fn build_link_filters(
+    link_type: Option<&str>,
+    is_internal: Option<bool>,
+    is_broken: Option<bool>,
+    anchor_text_missing: Option<bool>,
+) -> (String, Vec<Value>) {
+    let mut clauses = String::new();
+    let mut values: Vec<Value> = Vec::new();
+
+    if let Some(lt) = link_type {
+        if !lt.is_empty() {
+            clauses.push_str(" AND link_type = ?");
+            values.push(Value::Text(lt.to_string()));
+        }
+    }
+
+    if let Some(internal) = is_internal {
+        clauses.push_str(" AND is_internal = ?");
+        values.push(Value::Integer(if internal { 1 } else { 0 }));
+    }
+
+    if let Some(true) = anchor_text_missing {
+        clauses.push_str(" AND (anchor_text IS NULL OR anchor_text = '')");
+    }
+
+    if let Some(broken) = is_broken {
+        if broken {
+            // Only internal links can be checked for broken status
+            clauses.push_str(
+                " AND is_internal = 1 AND target_url IN (\
+                    SELECT url FROM pages WHERE crawl_id = links.crawl_id AND status_code >= 400\
+                 )",
+            );
+        } else {
+            clauses.push_str(
+                " AND (is_internal = 0 OR target_url NOT IN (\
+                    SELECT url FROM pages WHERE crawl_id = links.crawl_id AND status_code >= 400\
+                 ))",
+            );
+        }
+    }
+
+    (clauses, values)
+}
+
+/// Fetch paginated links with filtering and sorting.
+#[allow(clippy::too_many_arguments)]
+pub fn select_links(
+    conn: &Connection,
+    crawl_id: &str,
+    offset: i64,
+    limit: i64,
+    sort_by: Option<&str>,
+    sort_desc: bool,
+    link_type: Option<&str>,
+    is_internal: Option<bool>,
+    is_broken: Option<bool>,
+    anchor_text_missing: Option<bool>,
+) -> Result<Vec<LinkRow>> {
+    let order_col = links_sort_col(sort_by);
+    let dir = if sort_desc { "DESC" } else { "ASC" };
+    let (filter_clauses, filter_values) =
+        build_link_filters(link_type, is_internal, is_broken, anchor_text_missing);
+
+    let query = format!(
+        "{}{} ORDER BY {} {} LIMIT ? OFFSET ?",
+        SELECT_LINKS_BASE, filter_clauses, order_col, dir
+    );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+    param_values.push(Value::Integer(limit));
+    param_values.push(Value::Integer(offset));
+
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(&param_values), row_to_link)?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Count links with optional filters.
+pub fn count_links(
+    conn: &Connection,
+    crawl_id: &str,
+    link_type: Option<&str>,
+    is_internal: Option<bool>,
+    is_broken: Option<bool>,
+    anchor_text_missing: Option<bool>,
+) -> Result<i64> {
+    let (filter_clauses, filter_values) =
+        build_link_filters(link_type, is_internal, is_broken, anchor_text_missing);
+
+    let query = format!(
+        "SELECT COUNT(*) FROM links WHERE crawl_id = ?{}",
+        filter_clauses
+    );
+
+    let mut param_values: Vec<Value> = vec![Value::Text(crawl_id.to_string())];
+    param_values.extend(filter_values);
+
+    let mut stmt = conn.prepare(&query)?;
+    let count: i64 = stmt.query_row(rusqlite::params_from_iter(&param_values), |row| row.get(0))?;
+    Ok(count)
 }
