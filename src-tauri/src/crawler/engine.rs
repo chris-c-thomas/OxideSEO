@@ -343,12 +343,16 @@ pub async fn spawn_crawl(
                     // --- Parse on rayon ---
                     let body = fetch_result.body_bytes.clone();
                     let final_url = fetch_result.final_url.clone();
+                    let fetch_body_size = fetch_result.body_size;
+                    let fetch_response_time_ms = fetch_result.response_time_ms;
                     let rd = task_root_domain.clone();
                     let registry = task_rule_registry.clone();
 
                     let (tx, rx) = tokio::sync::oneshot::channel();
                     rayon::spawn(move || {
-                        let page = parser::parse_html(&body, &final_url, &rd);
+                        let mut page = parser::parse_html(&body, &final_url, &rd);
+                        page.body_size = Some(fetch_body_size);
+                        page.response_time_ms = Some(fetch_response_time_ms);
                         let ctx = CrawlContext {
                             root_domain: rd,
                             cross_page_available: false,
@@ -527,6 +531,37 @@ pub async fn spawn_crawl(
                 urls_errored: final_errored as i64,
             })
             .await;
+
+        // Flush all pending writes and wait for confirmation before post-crawl analysis.
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        let _ = storage_tx.send(StorageCommand::FlushAck(ack_tx)).await;
+        let _ = ack_rx.await;
+
+        // Post-crawl cross-page analysis.
+        {
+            let post_db = db.clone();
+            let post_crawl_id = crawl_id.clone();
+            let post_result = tokio::task::spawn_blocking(move || {
+                let analyzer = crate::rules::PostCrawlAnalyzer::new(&post_db, &post_crawl_id);
+                analyzer.analyze()
+            })
+            .await;
+
+            match post_result {
+                Ok(Ok(issues)) if !issues.is_empty() => {
+                    tracing::info!(count = issues.len(), "Post-crawl analysis found issues");
+                    let _ = storage_tx.send(StorageCommand::InsertIssues(issues)).await;
+                    let _ = storage_tx.send(StorageCommand::Flush).await;
+                }
+                Ok(Err(e)) => {
+                    tracing::error!(error = %e, "Post-crawl analysis failed");
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Post-crawl analysis task panicked");
+                }
+                _ => {}
+            }
+        }
 
         let final_state = match *orchestrator_state_rx.borrow() {
             CrawlState::Stopped => CrawlState::Stopped,

@@ -6,7 +6,9 @@
 
 pub mod builtin;
 pub mod engine;
+pub mod post_crawl;
 pub mod rule;
 
 pub use engine::RuleRegistry;
+pub use post_crawl::PostCrawlAnalyzer;
 pub use rule::{Issue, SeoRule};

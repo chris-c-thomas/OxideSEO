@@ -37,6 +37,10 @@ pub fn spawn_storage_writer(
                 Some(StorageCommand::Flush) => {
                     flush_batch(&db, &mut batch);
                 }
+                Some(StorageCommand::FlushAck(sender)) => {
+                    flush_batch(&db, &mut batch);
+                    let _ = sender.send(());
+                }
                 Some(cmd) => {
                     batch.push(cmd);
 
@@ -50,6 +54,11 @@ pub fn spawn_storage_writer(
                             }
                             Ok(StorageCommand::Flush) => {
                                 flush_batch(&db, &mut batch);
+                                break;
+                            }
+                            Ok(StorageCommand::FlushAck(sender)) => {
+                                flush_batch(&db, &mut batch);
+                                let _ = sender.send(());
                                 break;
                             }
                             Ok(cmd) => batch.push(cmd),
@@ -155,7 +164,7 @@ fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) {
                         );
                     }
                 }
-                StorageCommand::Flush | StorageCommand::Shutdown => {
+                StorageCommand::Flush | StorageCommand::FlushAck(_) | StorageCommand::Shutdown => {
                     // Already handled at the receive level; shouldn't appear in batch.
                 }
             }

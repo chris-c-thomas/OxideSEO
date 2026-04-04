@@ -20,8 +20,8 @@ use oxide_seo_lib::storage::queries;
 // Test server
 // ---------------------------------------------------------------------------
 
-async fn start_test_server() -> (String, tokio::task::JoinHandle<()>) {
-    let app = Router::new()
+fn base_routes() -> Router {
+    Router::new()
         .route(
             "/",
             get(|| async { Html(include_str!("../../tests/fixtures/index.html").to_string()) }),
@@ -62,7 +62,11 @@ async fn start_test_server() -> (String, tokio::task::JoinHandle<()>) {
         .route(
             "/app.js",
             get(|| async { (StatusCode::OK, "console.log('hello');") }),
-        );
+        )
+}
+
+async fn start_test_server() -> (String, tokio::task::JoinHandle<()>) {
+    let app = base_routes();
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -473,4 +477,122 @@ async fn test_parser_extracts_seo_data() {
     assert_eq!(index.status_code, Some(200));
     assert!(index.body_size.unwrap_or(0) > 0);
     assert!(index.response_time_ms.is_some());
+}
+
+#[tokio::test]
+async fn test_post_crawl_analysis() {
+    // Use a custom index that links to /duplicate-title and /broken-link.
+    let index_html = r#"<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>About Us - Test Site</title>
+<meta name="description" content="Test homepage for post-crawl analysis.">
+</head><body>
+<h1>Home</h1>
+<a href="/about">About</a>
+<a href="/duplicate-title">Dup page</a>
+<a href="/broken-link">Broken</a>
+</body></html>"#;
+
+    let app = base_routes()
+        .route(
+            "/duplicate-title",
+            get(|| async {
+                Html(
+                    include_str!("../../tests/fixtures/duplicate-title.html").to_string(),
+                )
+            }),
+        )
+        // Override the index route with custom HTML containing the link
+        .route(
+            "/post-crawl-index",
+            get(move || {
+                let html = index_html.to_string();
+                async move { Html(html) }
+            }),
+        );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let _server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let base_url = format!("http://127.0.0.1:{}", addr.port());
+    let db = Arc::new(Database::new_in_memory().unwrap());
+    let emitter: Arc<dyn oxide_seo_lib::crawler::engine::ProgressEmitter> = Arc::new(NoopEmitter);
+
+    let crawl_id = "post-crawl-test".to_string();
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &oxide_seo_lib::storage::models::CrawlRow {
+                id: crawl_id.clone(),
+                start_url: format!("{}/post-crawl-index", base_url),
+                config_json: "{}".into(),
+                status: "running".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .unwrap();
+
+    let mut config = test_config(&format!("{}/post-crawl-index", base_url));
+    config.max_depth = 2;
+    config.respect_robots_txt = false;
+
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+        .await
+        .unwrap();
+
+    wait_for_completion(&handle, 30).await;
+
+    // Verify duplicate title issues were generated.
+    // Both /post-crawl-index and /about share "About Us - Test Site".
+    let dup_title_count = db
+        .with_conn(|conn| -> anyhow::Result<i64> {
+            Ok(conn.query_row(
+                "SELECT COUNT(*) FROM issues WHERE crawl_id = ?1 AND rule_id = 'meta.title_duplicate'",
+                rusqlite::params![crawl_id],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert!(
+        dup_title_count >= 2,
+        "Expected at least 2 duplicate title issues (one per page sharing the title), got {}",
+        dup_title_count
+    );
+
+    // Verify broken internal link issues were generated.
+    // /broken-link returns 404.
+    let broken_link_count = db
+        .with_conn(|conn| -> anyhow::Result<i64> {
+            Ok(conn.query_row(
+                "SELECT COUNT(*) FROM issues WHERE crawl_id = ?1 AND rule_id = 'links.broken_internal'",
+                rusqlite::params![crawl_id],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert!(
+        broken_link_count >= 1,
+        "Expected at least 1 broken internal link issue, got {}",
+        broken_link_count
+    );
+
+    // Verify crawl completed successfully.
+    let status = db
+        .with_conn(|conn| -> anyhow::Result<String> {
+            Ok(conn.query_row(
+                "SELECT status FROM crawls WHERE id = ?1",
+                rusqlite::params![crawl_id],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(status, "completed");
 }

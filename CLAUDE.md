@@ -55,7 +55,7 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - `RobotsCache` scaffold for robots.txt fetch/parse/cache
 - `SeoRule` trait with full contract (`id`, `name`, `category`, `default_severity`, `evaluate`, `config_schema`, `configure`)
 - `RuleRegistry` with `register_builtins()`, config overlay, and `evaluate_page()`
-- 18 built-in rules implemented across meta, content, links, images, performance, security (some with full logic, some stubbed for cross-page data)
+- 20 built-in rules implemented across meta, content, links, images, performance, security (all per-page rules fully implemented; 5 cross-page rules via PostCrawlAnalyzer)
 - `LlmProvider` async trait for Phase 7
 - Full React frontend shell: App, Sidebar, Dashboard, CrawlConfig, CrawlMonitor, ResultsExplorer, SettingsView
 - Typed Tauri IPC wrappers in `src/lib/commands.ts`
@@ -83,11 +83,11 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Full crawl pipeline: parser (lol_html + scraper), streaming fetcher with blake3, texting_robots, batched storage writer, frontier SQLite overflow, engine orchestrator with rayon parse dispatch, Tauri command wiring
 - 6 integration tests (axum test server) + 21 new unit tests
 
-**Phase 3 — SEO Rule Engine:**
-- Complete cross-page rules: `meta.title_duplicate`, `meta.desc_duplicate`, `content.h1_duplicate`, `links.broken_internal`, `links.orphan_page`
-- Implement post-crawl analysis runner that queries the DB for duplicates and orphans
-- Wire rule results into the storage writer pipeline
-- Performance/security rules need access to `FetchResult` data — either pass it through `ParsedPage` or evaluate in the pipeline before the rayon handoff
+**Phase 3 — SEO Rule Engine:** ~~All work units implemented~~ ✅
+- Performance rules (`perf.large_page`, `perf.slow_response`) with configurable thresholds via `ParsedPage` fetch metadata
+- `PostCrawlAnalyzer` with 5 cross-page rules: `meta.title_duplicate`, `meta.desc_duplicate`, `content.h1_duplicate`, `links.broken_internal`, `links.orphan_page`
+- `FlushAck` storage command for synchronizing post-crawl analysis after all writes
+- 8 post-crawl unit tests + 8 performance rule tests + 1 integration test (7 total integration tests)
 
 **Phase 4 — Frontend UI (MVP gate):**
 - Build the `DataTable` component using TanStack Table v8 + TanStack Virtual v3
@@ -154,10 +154,11 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `rules/engine.rs` | Rule registry + executor | Complete |
 | `rules/builtin/meta.rs` | 7 meta rules | Complete with tests |
 | `rules/builtin/content.rs` | 4 content rules | Complete |
-| `rules/builtin/links.rs` | 3 link rules | Partially stubbed (need cross-page) |
+| `rules/builtin/links.rs` | 3 link rules | 1 per-page complete; 2 cross-page via PostCrawlAnalyzer |
 | `rules/builtin/images.rs` | 2 image rules | Complete |
-| `rules/builtin/performance.rs` | 2 performance rules | Stubbed (need FetchResult access) |
+| `rules/builtin/performance.rs` | 2 performance rules | Complete with tests (configurable thresholds) |
 | `rules/builtin/security.rs` | 2 security rules | Complete |
+| `rules/post_crawl.rs` | PostCrawlAnalyzer for cross-page rules | Complete with tests |
 | `storage/db.rs` | SQLite connection + migrations | Complete with tests |
 | `storage/models.rs` | Data structs + StorageCommand enum | Complete |
 | `storage/queries.rs` | SQL statements + execution functions | Complete |

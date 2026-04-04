@@ -166,6 +166,25 @@ pub const SELECT_ORPHAN_PAGES: &str = r#"
       AND p.depth > 0
 "#;
 
+/// Find duplicate H1 headings across a crawl.
+pub const SELECT_DUPLICATE_H1S: &str = r#"
+    SELECT h1, GROUP_CONCAT(id) as page_ids, COUNT(*) as cnt
+    FROM pages
+    WHERE crawl_id = ?1 AND h1 IS NOT NULL AND h1 != ''
+    GROUP BY h1
+    HAVING cnt > 1
+"#;
+
+/// Find broken internal links (target page has 4xx/5xx status).
+pub const SELECT_BROKEN_INTERNAL_LINKS: &str = r#"
+    SELECT l.source_page, l.target_url, p_target.status_code
+    FROM links l
+    JOIN pages p_target ON p_target.crawl_id = l.crawl_id AND p_target.url = l.target_url
+    WHERE l.crawl_id = ?1
+      AND l.is_internal = 1
+      AND p_target.status_code >= 400
+"#;
+
 // ---------------------------------------------------------------------------
 // Write execution functions
 // ---------------------------------------------------------------------------

@@ -344,6 +344,8 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         word_count: count_words(&body_text.borrow()),
         base_url: base_resolved,
         parse_ok: true,
+        body_size: None,
+        response_time_ms: None,
     })
 }
 
@@ -497,6 +499,8 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
         word_count: count_words(&body_text),
         base_url,
         parse_ok: true,
+        body_size: None,
+        response_time_ms: None,
     })
 }
 
