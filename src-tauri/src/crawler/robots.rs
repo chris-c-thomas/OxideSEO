@@ -6,28 +6,26 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use texting_robots::Robot;
 
 /// Cached robots.txt info for a single domain.
-#[derive(Debug, Clone)]
-pub struct RobotsInfo {
-    /// Whether the robots.txt was successfully fetched and parsed.
-    pub is_valid: bool,
-    /// The raw robots.txt content.
-    pub content: String,
+#[derive(Debug)]
+struct RobotsEntry {
+    /// Parsed robot rules (None if robots.txt was unavailable/invalid).
+    robot: Option<Robot>,
     /// Crawl-delay directive value (if present), in seconds.
-    pub crawl_delay: Option<f64>,
+    crawl_delay: Option<f64>,
     /// When this entry was cached.
-    pub cached_at: Instant,
+    cached_at: Instant,
 }
 
 /// Cache and fetcher for robots.txt files.
 pub struct RobotsCache {
-    /// Cached robots.txt per domain.
-    cache: HashMap<String, RobotsInfo>,
+    /// Cached entries per domain.
+    cache: HashMap<String, RobotsEntry>,
     /// Cache TTL — entries older than this are re-fetched.
     ttl: Duration,
     /// User-agent string to match against in robots.txt directives.
-    #[allow(dead_code)]
     user_agent: String,
 }
 
@@ -38,6 +36,13 @@ impl RobotsCache {
             ttl: Duration::from_secs(ttl_secs),
             user_agent: user_agent.to_string(),
         }
+    }
+
+    /// Check whether we have a cached (non-expired) entry for this domain.
+    pub fn has_cached(&self, domain: &str) -> bool {
+        self.cache
+            .get(domain)
+            .is_some_and(|e| e.cached_at.elapsed() < self.ttl)
     }
 
     /// Check if a URL is allowed by the domain's robots.txt.
@@ -54,15 +59,13 @@ impl RobotsCache {
         };
 
         match self.cache.get(&domain) {
-            Some(info) if info.cached_at.elapsed() < self.ttl => {
-                if !info.is_valid {
-                    return true; // No valid robots.txt = allow all.
+            Some(entry) if entry.cached_at.elapsed() < self.ttl => {
+                match &entry.robot {
+                    Some(robot) => robot.allowed(url),
+                    None => true, // No valid robots.txt = allow all
                 }
-                // TODO(phase-2): Use texting_robots to check if `url` is allowed
-                // for `self.user_agent`.
-                true
             }
-            _ => true, // Not cached or expired — allow (will be fetched).
+            _ => true, // Not cached or expired
         }
     }
 
@@ -70,29 +73,26 @@ impl RobotsCache {
     pub fn crawl_delay(&self, domain: &str) -> Option<Duration> {
         self.cache
             .get(domain)
-            .and_then(|info| info.crawl_delay)
+            .and_then(|entry| entry.crawl_delay)
             .map(Duration::from_secs_f64)
     }
 
     /// Fetch and cache robots.txt for the given domain.
     ///
     /// Handles:
-    /// - 200: parse and cache
+    /// - 200: parse with texting_robots and cache
     /// - 4xx: allow all (no restrictions)
-    /// - 5xx: retry once, then allow all
-    /// - Network error: allow all
+    /// - 5xx/network error: allow all
     pub async fn fetch_and_cache(&mut self, domain: &str, client: &reqwest::Client) -> Result<()> {
         let robots_url = format!("https://{}/robots.txt", domain);
 
         let response = match client.get(&robots_url).send().await {
             Ok(r) => r,
             Err(_) => {
-                // Network error — cache as invalid (allow all).
                 self.cache.insert(
                     domain.to_string(),
-                    RobotsInfo {
-                        is_valid: false,
-                        content: String::new(),
+                    RobotsEntry {
+                        robot: None,
                         crawl_delay: None,
                         cached_at: Instant::now(),
                     },
@@ -104,34 +104,134 @@ impl RobotsCache {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
 
-        let info = match status {
-            200 => {
-                // TODO(phase-2): Parse with texting_robots, extract Crawl-delay.
-                RobotsInfo {
-                    is_valid: true,
-                    content: body,
-                    crawl_delay: None, // Extract from parsed rules.
-                    cached_at: Instant::now(),
+        let entry = if status == 200 {
+            match Robot::new(&self.user_agent, body.as_bytes()) {
+                Ok(robot) => {
+                    let crawl_delay = robot.delay.map(|d| d as f64);
+                    RobotsEntry {
+                        robot: Some(robot),
+                        crawl_delay,
+                        cached_at: Instant::now(),
+                    }
                 }
-            }
-            400..=499 => RobotsInfo {
-                is_valid: false,
-                content: String::new(),
-                crawl_delay: None,
-                cached_at: Instant::now(),
-            },
-            _ => {
-                // 5xx or other — allow all for now.
-                RobotsInfo {
-                    is_valid: false,
-                    content: String::new(),
+                Err(_) => RobotsEntry {
+                    robot: None,
                     crawl_delay: None,
                     cached_at: Instant::now(),
-                }
+                },
+            }
+        } else {
+            // 4xx, 5xx, or other — allow all
+            RobotsEntry {
+                robot: None,
+                crawl_delay: None,
+                cached_at: Instant::now(),
             }
         };
 
-        self.cache.insert(domain.to_string(), info);
+        self.cache.insert(domain.to_string(), entry);
         Ok(())
+    }
+
+    /// Insert robots.txt content directly (used in tests).
+    pub fn insert_from_content(&mut self, domain: &str, content: &[u8]) {
+        let entry = match Robot::new(&self.user_agent, content) {
+            Ok(robot) => {
+                let crawl_delay = robot.delay.map(|d| d as f64);
+                RobotsEntry {
+                    robot: Some(robot),
+                    crawl_delay,
+                    cached_at: Instant::now(),
+                }
+            }
+            Err(_) => RobotsEntry {
+                robot: None,
+                crawl_delay: None,
+                cached_at: Instant::now(),
+            },
+        };
+        self.cache.insert(domain.to_string(), entry);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &[u8] = include_bytes!("../../../tests/fixtures/robots.txt");
+
+    #[test]
+    fn test_allowed_paths_wildcard_agent() {
+        let mut cache = RobotsCache::new("SomeBot", 3600);
+        cache.insert_from_content("test.local", FIXTURE);
+
+        assert!(cache.is_allowed("https://test.local/"));
+        assert!(cache.is_allowed("https://test.local/about"));
+        assert!(!cache.is_allowed("https://test.local/admin/"));
+        assert!(!cache.is_allowed("https://test.local/admin/settings"));
+        assert!(!cache.is_allowed("https://test.local/private/"));
+        assert!(!cache.is_allowed("https://test.local/private/data"));
+    }
+
+    #[test]
+    fn test_allowed_paths_oxideseo_agent() {
+        let mut cache = RobotsCache::new("OxideSEO", 3600);
+        cache.insert_from_content("test.local", FIXTURE);
+
+        assert!(cache.is_allowed("https://test.local/"));
+        assert!(cache.is_allowed("https://test.local/about"));
+        assert!(!cache.is_allowed("https://test.local/admin/"));
+    }
+
+    #[test]
+    fn test_crawl_delay_wildcard() {
+        let mut cache = RobotsCache::new("SomeBot", 3600);
+        cache.insert_from_content("test.local", FIXTURE);
+
+        let delay = cache.crawl_delay("test.local");
+        assert!(delay.is_some());
+        assert_eq!(delay.unwrap(), Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_crawl_delay_oxideseo() {
+        let mut cache = RobotsCache::new("OxideSEO", 3600);
+        cache.insert_from_content("test.local", FIXTURE);
+
+        let delay = cache.crawl_delay("test.local");
+        assert!(delay.is_some());
+        assert_eq!(delay.unwrap(), Duration::from_millis(500));
+    }
+
+    #[test]
+    fn test_uncached_domain_allows_all() {
+        let cache = RobotsCache::new("OxideSEO", 3600);
+        assert!(cache.is_allowed("https://uncached.example.com/anything"));
+    }
+
+    #[test]
+    fn test_has_cached() {
+        let mut cache = RobotsCache::new("OxideSEO", 3600);
+        assert!(!cache.has_cached("test.local"));
+
+        cache.insert_from_content("test.local", FIXTURE);
+        assert!(cache.has_cached("test.local"));
+    }
+
+    #[test]
+    fn test_invalid_robots_allows_all() {
+        let mut cache = RobotsCache::new("OxideSEO", 3600);
+        cache.insert_from_content("test.local", b"not valid robots content @#$%");
+
+        // Invalid content should still result in a cached entry that allows all
+        assert!(cache.is_allowed("https://test.local/admin/"));
+    }
+
+    #[test]
+    fn test_empty_robots_allows_all() {
+        let mut cache = RobotsCache::new("OxideSEO", 3600);
+        cache.insert_from_content("test.local", b"");
+
+        assert!(cache.is_allowed("https://test.local/anything"));
     }
 }
