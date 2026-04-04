@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use std::sync::Arc;
+
 use crate::storage::db::Database;
 
 /// Application-level settings persisted across sessions.
@@ -45,7 +47,7 @@ pub struct RuleConfigOverride {
 }
 
 #[tauri::command]
-pub async fn get_settings(_db: State<'_, Database>) -> Result<AppSettings, String> {
+pub async fn get_settings(_db: State<'_, Arc<Database>>) -> Result<AppSettings, String> {
     // TODO(phase-4): Read from settings table or return defaults.
     Ok(AppSettings {
         default_crawl_config: serde_json::json!({}),
@@ -55,13 +57,18 @@ pub async fn get_settings(_db: State<'_, Database>) -> Result<AppSettings, Strin
 }
 
 #[tauri::command]
-pub async fn set_settings(_settings: AppSettings, _db: State<'_, Database>) -> Result<(), String> {
+pub async fn set_settings(
+    _settings: AppSettings,
+    _db: State<'_, Arc<Database>>,
+) -> Result<(), String> {
     // TODO(phase-4): Persist to settings table.
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_rule_config(_db: State<'_, Database>) -> Result<Vec<RuleConfigOverride>, String> {
+pub async fn get_rule_config(
+    _db: State<'_, Arc<Database>>,
+) -> Result<Vec<RuleConfigOverride>, String> {
     // TODO(phase-3): Read from rule_config table.
     Ok(Vec::new())
 }
@@ -69,7 +76,7 @@ pub async fn get_rule_config(_db: State<'_, Database>) -> Result<Vec<RuleConfigO
 #[tauri::command]
 pub async fn set_rule_config(
     _overrides: Vec<RuleConfigOverride>,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<(), String> {
     // TODO(phase-3): Persist to rule_config table.
     Ok(())

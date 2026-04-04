@@ -1,10 +1,25 @@
 //! Crawl lifecycle commands: start, pause, resume, stop, status.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use tokio::sync::Mutex;
 
 use crate::CrawlState;
+use crate::crawler::engine::{CrawlHandle, TauriEmitter};
 use crate::storage::db::Database;
+use crate::storage::models::CrawlRow;
+use crate::storage::queries;
+
+// ---------------------------------------------------------------------------
+// Managed state type for active crawl handles
+// ---------------------------------------------------------------------------
+
+/// Map of active crawl handles, keyed by crawl_id.
+pub type CrawlHandles = Arc<Mutex<HashMap<String, CrawlHandle>>>;
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -118,50 +133,147 @@ pub struct RecentUrl {
 #[tauri::command]
 pub async fn start_crawl(
     config: CrawlConfig,
-    _db: State<'_, Database>,
-    _app: tauri::AppHandle,
+    db: State<'_, Arc<Database>>,
+    handles: State<'_, CrawlHandles>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
-    tracing::info!(url = %config.start_url, "Starting crawl");
+    // Validate config.
+    if config.start_url.is_empty() {
+        return Err("Start URL is required".into());
+    }
+    if url::Url::parse(&config.start_url).is_err() {
+        return Err("Invalid start URL".into());
+    }
 
-    // TODO(phase-2): Validate config, create crawl record in DB,
-    // spawn the crawl engine orchestrator task, return crawl_id.
-    let _crawl_id = uuid::Uuid::new_v4().to_string();
+    let crawl_id = uuid::Uuid::new_v4().to_string();
+    tracing::info!(url = %config.start_url, %crawl_id, "Starting crawl");
 
-    Err("Not yet implemented — Phase 2".into())
+    // Insert crawl record in DB.
+    let config_json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &CrawlRow {
+                id: crawl_id.clone(),
+                start_url: config.start_url.clone(),
+                config_json,
+                status: "running".into(),
+                started_at: None, // Set by SQL datetime('now')
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .map_err(|e| e.to_string())?;
+
+    // Spawn the crawl engine.
+    let emitter = Arc::new(TauriEmitter::new(app));
+    let handle =
+        crate::crawler::engine::spawn_crawl(crawl_id.clone(), config, db.inner().clone(), emitter)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    // Store the handle for lifecycle control.
+    handles.lock().await.insert(crawl_id.clone(), handle);
+
+    Ok(crawl_id)
 }
 
-/// Pause an active crawl. In-flight requests will complete; the frontier
-/// is persisted to SQLite for later resume.
+/// Pause an active crawl.
 #[tauri::command]
-pub async fn pause_crawl(crawl_id: String) -> Result<(), String> {
+pub async fn pause_crawl(crawl_id: String, handles: State<'_, CrawlHandles>) -> Result<(), String> {
     tracing::info!(%crawl_id, "Pausing crawl");
-    // TODO(phase-2): Signal the orchestrator to stop dequeuing.
-    Err("Not yet implemented — Phase 2".into())
+    let map = handles.lock().await;
+    let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
+    handle.pause();
+    Ok(())
 }
 
-/// Resume a previously paused crawl. Restores frontier from SQLite.
+/// Resume a previously paused crawl.
 #[tauri::command]
-pub async fn resume_crawl(crawl_id: String) -> Result<(), String> {
+pub async fn resume_crawl(
+    crawl_id: String,
+    handles: State<'_, CrawlHandles>,
+) -> Result<(), String> {
     tracing::info!(%crawl_id, "Resuming crawl");
-    // TODO(phase-2): Restore frontier, restart orchestrator loop.
-    Err("Not yet implemented — Phase 2".into())
+    let map = handles.lock().await;
+    let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
+    handle.resume();
+    Ok(())
 }
 
-/// Stop a crawl entirely. Cancels in-flight requests and marks crawl as stopped.
+/// Stop a crawl entirely.
 #[tauri::command]
-pub async fn stop_crawl(crawl_id: String) -> Result<(), String> {
+pub async fn stop_crawl(crawl_id: String, handles: State<'_, CrawlHandles>) -> Result<(), String> {
     tracing::info!(%crawl_id, "Stopping crawl");
-    // TODO(phase-2): Cancel all tasks, persist final state.
-    Err("Not yet implemented — Phase 2".into())
+    let map = handles.lock().await;
+    let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
+    handle.stop();
+    Ok(())
 }
 
 /// Get the current status of a crawl.
 #[tauri::command]
 pub async fn get_crawl_status(
     crawl_id: String,
-    _db: State<'_, Database>,
+    handles: State<'_, CrawlHandles>,
+    db: State<'_, Arc<Database>>,
 ) -> Result<CrawlStatus, String> {
-    tracing::debug!(%crawl_id, "Getting crawl status");
-    // TODO(phase-2): Query crawl state from DB + in-memory stats.
-    Err("Not yet implemented — Phase 2".into())
+    // Check for a live crawl handle first.
+    let map = handles.lock().await;
+    if let Some(handle) = map.get(&crawl_id) {
+        let crawled = handle.stats.urls_crawled.load(Ordering::SeqCst);
+        let errored = handle.stats.urls_errored.load(Ordering::SeqCst);
+        let elapsed = handle.elapsed_ms();
+        let queued = {
+            let f = handle.frontier.lock().await;
+            f.total_queued()
+        };
+        let elapsed_secs = elapsed as f64 / 1000.0;
+        let rps = if elapsed_secs > 0.0 {
+            crawled as f64 / elapsed_secs
+        } else {
+            0.0
+        };
+
+        return Ok(CrawlStatus {
+            crawl_id,
+            state: handle.state(),
+            urls_crawled: crawled,
+            urls_queued: queued,
+            urls_errored: errored,
+            elapsed_ms: elapsed,
+            current_rps: rps,
+        });
+    }
+    drop(map);
+
+    // No live handle — query from DB (historical crawl).
+    let crawl = db
+        .with_conn(|conn| {
+            let rows = queries::select_recent_crawls(conn, 1000)?;
+            Ok(rows.into_iter().find(|r| r.id == crawl_id))
+        })
+        .map_err(|e| e.to_string())?
+        .ok_or("Crawl not found")?;
+
+    let state = match crawl.status.as_str() {
+        "completed" => CrawlState::Completed,
+        "stopped" => CrawlState::Stopped,
+        "error" => CrawlState::Error,
+        "paused" => CrawlState::Paused,
+        "running" => CrawlState::Running,
+        _ => CrawlState::Created,
+    };
+
+    Ok(CrawlStatus {
+        crawl_id,
+        state,
+        urls_crawled: crawl.urls_crawled as u64,
+        urls_queued: 0,
+        urls_errored: crawl.urls_errored as u64,
+        elapsed_ms: 0,
+        current_rps: 0.0,
+    })
 }

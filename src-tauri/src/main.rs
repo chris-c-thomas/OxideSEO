@@ -5,7 +5,10 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Arc;
+
 use oxide_seo_lib::commands;
+use oxide_seo_lib::commands::crawl::CrawlHandles;
 use tauri::Manager;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -31,9 +34,11 @@ fn main() {
             let app_handle = app.handle().clone();
             let db = oxide_seo_lib::storage::db::Database::init(&app_handle)?;
 
-            // Store the database handle in Tauri managed state so
-            // command handlers can access it via `State<Database>`.
-            app.manage(db);
+            // Wrap in Arc for shared ownership across crawl engine and commands.
+            app.manage(Arc::new(db));
+
+            // Initialize empty crawl handles map.
+            app.manage(CrawlHandles::default());
 
             tracing::info!("Database initialized");
             Ok(())
