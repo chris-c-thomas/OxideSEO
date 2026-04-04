@@ -89,6 +89,30 @@ fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) {
                         tracing::warn!(url = %page.url, error = %e, "Failed to upsert page");
                     }
                 }
+                StorageCommand::StorePage {
+                    page,
+                    url_hash,
+                    links,
+                    issues,
+                } => match queries::upsert_page(&tx, &page, &url_hash) {
+                    Ok(page_id) => {
+                        for mut link in links {
+                            link.source_page = page_id;
+                            if let Err(e) = queries::insert_link(&tx, &link) {
+                                tracing::warn!(error = %e, "Failed to insert link");
+                            }
+                        }
+                        for mut issue in issues {
+                            issue.page_id = page_id;
+                            if let Err(e) = queries::insert_issue(&tx, &issue) {
+                                tracing::warn!(error = %e, "Failed to insert issue");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(url = %page.url, error = %e, "Failed to upsert page");
+                    }
+                },
                 StorageCommand::InsertLinks(links) => {
                     for link in &links {
                         if let Err(e) = queries::insert_link(&tx, link) {

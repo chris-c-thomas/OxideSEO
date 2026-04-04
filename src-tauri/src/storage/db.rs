@@ -154,11 +154,8 @@ impl Database {
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         f(&mut conn)
     }
-}
 
-/// Create an in-memory database for testing (with migrations applied).
-#[cfg(test)]
-impl Database {
+    /// Create an in-memory database for testing (with migrations applied).
     pub fn new_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;

@@ -84,7 +84,18 @@ impl RobotsCache {
     /// - 4xx: allow all (no restrictions)
     /// - 5xx/network error: allow all
     pub async fn fetch_and_cache(&mut self, domain: &str, client: &reqwest::Client) -> Result<()> {
-        let robots_url = format!("https://{}/robots.txt", domain);
+        self.fetch_and_cache_with_scheme(domain, "https", client)
+            .await
+    }
+
+    /// Fetch robots.txt with a specific URL scheme (http or https).
+    pub async fn fetch_and_cache_with_scheme(
+        &mut self,
+        domain: &str,
+        scheme: &str,
+        client: &reqwest::Client,
+    ) -> Result<()> {
+        let robots_url = format!("{}://{}/robots.txt", scheme, domain);
 
         let response = match client.get(&robots_url).send().await {
             Ok(r) => r,

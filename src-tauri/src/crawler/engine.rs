@@ -29,7 +29,8 @@ pub struct CrawlHandle {
     pub crawl_id: String,
     pub config: CrawlConfig,
     /// Sender to signal state transitions (pause, resume, stop).
-    state_tx: watch::Sender<CrawlState>,
+    /// Wrapped in Arc so both the handle and the orchestrator can access it.
+    state_tx: Arc<watch::Sender<CrawlState>>,
     /// Receiver to observe current state.
     state_rx: watch::Receiver<CrawlState>,
     /// Shared stats for status queries.
@@ -92,10 +93,8 @@ impl ProgressEmitter for TauriEmitter {
 }
 
 /// No-op emitter for tests.
-#[cfg(test)]
 pub struct NoopEmitter;
 
-#[cfg(test)]
 impl ProgressEmitter for NoopEmitter {
     fn emit_progress(&self, _progress: &CrawlProgress) {}
 }
@@ -139,9 +138,11 @@ pub async fn spawn_crawl(
     rule_registry.register_builtins();
     let rule_registry = Arc::new(rule_registry);
 
-    // Extract root domain from seed URL.
+    // Extract root domain and scheme from seed URL.
     let seed_url = normalize_url(&config.start_url, true)?;
-    let root_domain = Url::parse(&seed_url)?.host_str().unwrap_or("").to_string();
+    let parsed_seed = Url::parse(&seed_url)?;
+    let root_domain = parsed_seed.host_str().unwrap_or("").to_string();
+    let seed_scheme = parsed_seed.scheme().to_string();
 
     // Seed the frontier.
     {
@@ -162,10 +163,11 @@ pub async fn spawn_crawl(
     let global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
     let in_flight = Arc::new(AtomicU64::new(0));
 
+    let state_tx = Arc::new(state_tx);
     let handle = CrawlHandle {
         crawl_id: crawl_id.clone(),
         config: config.clone(),
-        state_tx,
+        state_tx: state_tx.clone(),
         state_rx: state_rx.clone(),
         stats: stats.clone(),
         frontier: frontier.clone(),
@@ -174,6 +176,7 @@ pub async fn spawn_crawl(
 
     // Spawn the orchestrator loop.
     let orchestrator_state_rx = state_rx.clone();
+    let started_at = handle.started_at;
     tokio::spawn(async move {
         tracing::info!(%crawl_id, "Crawl orchestrator started");
 
@@ -226,29 +229,32 @@ pub async fn spawn_crawl(
             let entry = match entry {
                 Some(e) => e,
                 None => {
-                    // Frontier empty — check if tasks are still in-flight.
                     if in_flight.load(Ordering::SeqCst) == 0 {
                         tracing::info!(%crawl_id, "Frontier empty, crawl complete");
                         break;
                     }
-                    // Wait briefly for in-flight tasks to discover new URLs.
                     tokio::time::sleep(Duration::from_millis(50)).await;
                     continue;
                 }
             };
 
-            // Check robots.txt for this domain.
+            // Mark as in-flight immediately to prevent premature completion.
+            in_flight.fetch_add(1, Ordering::SeqCst);
+
+            // Check robots.txt for this domain (skip fetch entirely if disabled).
             let domain = extract_domain(&entry.url);
-            {
+            if config.respect_robots_txt {
                 let mut rc = robots_cache.lock().await;
                 if !rc.has_cached(&domain) {
-                    rc.fetch_and_cache(&domain, fetcher.client()).await.ok();
-                    // Apply crawl-delay from robots.txt.
+                    rc.fetch_and_cache_with_scheme(&domain, &seed_scheme, fetcher.client())
+                        .await
+                        .ok();
                     if let Some(delay) = rc.crawl_delay(&domain) {
                         politeness.set_domain_delay(&domain, delay).await;
                     }
                 }
-                if config.respect_robots_txt && !rc.is_allowed(&entry.url) {
+                if !rc.is_allowed(&entry.url) {
+                    in_flight.fetch_sub(1, Ordering::SeqCst);
                     continue;
                 }
             }
@@ -259,6 +265,7 @@ pub async fn spawn_crawl(
             // Acquire global concurrency permit.
             let permit = global_semaphore.clone().acquire_owned().await;
             let Ok(permit) = permit else {
+                in_flight.fetch_sub(1, Ordering::SeqCst);
                 break; // Semaphore closed
             };
 
@@ -266,10 +273,9 @@ pub async fn spawn_crawl(
             let host_sem = politeness.acquire_host_permit(&domain).await;
             let host_permit = host_sem.acquire_owned().await;
             let Ok(host_permit) = host_permit else {
+                in_flight.fetch_sub(1, Ordering::SeqCst);
                 continue;
             };
-
-            in_flight.fetch_add(1, Ordering::SeqCst);
 
             // Spawn a task for this URL: fetch → parse → store.
             let task_fetcher = fetcher.clone();
@@ -396,51 +402,46 @@ pub async fn spawn_crawl(
                         error_message: None,
                     };
 
+                    // Build link rows.
+                    let link_rows: Vec<LinkRow> = parsed_page
+                        .links
+                        .iter()
+                        .map(|l| LinkRow {
+                            id: 0,
+                            crawl_id: task_crawl_id.clone(),
+                            source_page: 0, // Resolved by storage writer
+                            target_url: l.href.clone(),
+                            anchor_text: l.anchor_text.clone(),
+                            link_type: "a".into(),
+                            is_internal: l.is_internal,
+                            nofollow: l.is_nofollow,
+                        })
+                        .collect();
+
+                    // Build issue rows.
+                    let issue_rows: Vec<IssueRow> = issues
+                        .iter()
+                        .map(|i| IssueRow {
+                            id: 0,
+                            crawl_id: task_crawl_id.clone(),
+                            page_id: 0, // Resolved by storage writer
+                            rule_id: i.rule_id.clone(),
+                            severity: format!("{:?}", i.severity).to_lowercase(),
+                            category: format!("{:?}", i.category).to_lowercase(),
+                            message: i.message.clone(),
+                            detail_json: i.detail.as_ref().map(|d| d.to_string()),
+                        })
+                        .collect();
+
+                    // Send page + links + issues together so writer can resolve page ID.
                     let _ = task_storage_tx
-                        .send(StorageCommand::UpsertPage {
+                        .send(StorageCommand::StorePage {
                             page: Box::new(page_row),
                             url_hash,
+                            links: link_rows,
+                            issues: issue_rows,
                         })
                         .await;
-
-                    if !parsed_page.links.is_empty() {
-                        let link_rows: Vec<LinkRow> = parsed_page
-                            .links
-                            .iter()
-                            .map(|l| LinkRow {
-                                id: 0,
-                                crawl_id: task_crawl_id.clone(),
-                                source_page: 0,
-                                target_url: l.href.clone(),
-                                anchor_text: l.anchor_text.clone(),
-                                link_type: "a".into(),
-                                is_internal: l.is_internal,
-                                nofollow: l.is_nofollow,
-                            })
-                            .collect();
-                        let _ = task_storage_tx
-                            .send(StorageCommand::InsertLinks(link_rows))
-                            .await;
-                    }
-
-                    if !issues.is_empty() {
-                        let issue_rows: Vec<IssueRow> = issues
-                            .iter()
-                            .map(|i| IssueRow {
-                                id: 0,
-                                crawl_id: task_crawl_id.clone(),
-                                page_id: 0,
-                                rule_id: i.rule_id.clone(),
-                                severity: format!("{:?}", i.severity).to_lowercase(),
-                                category: format!("{:?}", i.category).to_lowercase(),
-                                message: i.message.clone(),
-                                detail_json: i.detail.as_ref().map(|d| d.to_string()),
-                            })
-                            .collect();
-                        let _ = task_storage_tx
-                            .send(StorageCommand::InsertIssues(issue_rows))
-                            .await;
-                    }
                 } else {
                     // Non-HTML resource or error status — record metadata only.
                     let url_hash = entry.url_hash.to_vec();
@@ -482,7 +483,7 @@ pub async fn spawn_crawl(
                     let f = frontier.lock().await;
                     f.total_queued()
                 };
-                let elapsed = handle.started_at.elapsed().as_millis() as u64;
+                let elapsed = started_at.elapsed().as_millis() as u64;
                 let elapsed_secs = elapsed as f64 / 1000.0;
                 let rps = if elapsed_secs > 0.0 {
                     current_crawled as f64 / elapsed_secs
@@ -527,10 +528,17 @@ pub async fn spawn_crawl(
             })
             .await;
 
-        let final_status = match *orchestrator_state_rx.borrow() {
+        let final_state = match *orchestrator_state_rx.borrow() {
+            CrawlState::Stopped => CrawlState::Stopped,
+            _ => CrawlState::Completed,
+        };
+        let final_status = match final_state {
             CrawlState::Stopped => "stopped",
             _ => "completed",
         };
+
+        // Update the watch channel so handle.state() reflects completion.
+        let _ = state_tx.send(final_state);
 
         let _ = storage_tx
             .send(StorageCommand::CompleteCrawl {
@@ -547,7 +555,7 @@ pub async fn spawn_crawl(
             let f = frontier.lock().await;
             f.total_queued()
         };
-        let elapsed = handle.started_at.elapsed().as_millis() as u64;
+        let elapsed = started_at.elapsed().as_millis() as u64;
         emitter.emit_progress(&CrawlProgress {
             crawl_id: crawl_id.clone(),
             urls_crawled: final_crawled,
