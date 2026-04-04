@@ -79,16 +79,9 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - ~~Add husky + lint-staged for pre-commit hooks~~ ✅
 - ~~Ensure CI workflow runs successfully~~ ✅
 
-**Phase 2 — Core Crawl Engine (primary implementation work):**
-- `crawler/parser.rs`: Implement the full `lol_html` element content handlers for all 11 tag types. This is the most important parse function. Wire up text extraction for title, H1-H6, anchor text. Implement `parse_with_scraper` fallback.
-- `crawler/engine.rs`: Implement the full orchestrator loop — channel creation, fetch worker spawning, rayon dispatch, storage writer thread, progress event emission.
-- `crawler/frontier.rs`: Implement SQLite overflow (persist to pages table when heap full), restore on resume, refill from DB.
-- `crawler/fetcher.rs`: Implement streaming body read with blake3 hash computation and size cap enforcement.
-- `crawler/robots.rs`: Wire in `texting_robots` crate for actual robots.txt parsing and URL checking. Extract `Crawl-delay`.
-- `crawler/politeness.rs`: Integration with the orchestrator loop.
-- `commands/crawl.rs`: Wire `start_crawl` to spawn the engine, store `CrawlHandle` in Tauri managed state. Implement pause/resume/stop by signaling via `watch::channel`.
-- `storage/queries.rs`: Write the actual `with_conn` calls that execute the prepared statements.
-- Integration test infrastructure: build the local axum test server in `tests/` with HTML fixtures.
+**Phase 2 — Core Crawl Engine:** ~~All work units implemented~~ ✅
+- Full crawl pipeline: parser (lol_html + scraper), streaming fetcher with blake3, texting_robots, batched storage writer, frontier SQLite overflow, engine orchestrator with rayon parse dispatch, Tauri command wiring
+- 6 integration tests (axum test server) + 21 new unit tests
 
 **Phase 3 — SEO Rule Engine:**
 - Complete cross-page rules: `meta.title_duplicate`, `meta.desc_duplicate`, `content.h1_duplicate`, `links.broken_internal`, `links.orphan_page`
@@ -147,16 +140,16 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 |---|---|---|
 | `main.rs` | Tauri entry point, logging init, command registration | Complete |
 | `lib.rs` | Module declarations, shared enums | Complete |
-| `commands/crawl.rs` | Crawl lifecycle IPC handlers | Signatures complete, bodies stubbed |
+| `commands/crawl.rs` | Crawl lifecycle IPC handlers | Complete |
 | `commands/results.rs` | Data query IPC handlers | Signatures complete, bodies stubbed |
 | `commands/settings.rs` | Settings IPC handlers | Signatures complete, bodies stubbed |
 | `crawler/mod.rs` | Crawler types: FetchResult, ParsedPage, ExtractedLink | Complete |
-| `crawler/engine.rs` | Crawl orchestrator | Stubbed — Phase 2 primary work |
-| `crawler/frontier.rs` | URL priority queue + dedup | Core logic done, SQLite overflow TODO |
-| `crawler/fetcher.rs` | HTTP client with redirect tracking | Structure done, streaming body TODO |
-| `crawler/parser.rs` | HTML parser (lol_html + scraper) | Scaffolded, handlers TODO |
+| `crawler/engine.rs` | Crawl orchestrator | Complete |
+| `crawler/frontier.rs` | URL priority queue + dedup + SQLite overflow | Complete with tests |
+| `crawler/fetcher.rs` | HTTP client with redirect tracking + blake3 | Complete |
+| `crawler/parser.rs` | HTML parser (lol_html + scraper) | Complete with tests |
 | `crawler/politeness.rs` | Per-domain rate limiting | Complete |
-| `crawler/robots.rs` | robots.txt cache | Scaffolded, texting_robots TODO |
+| `crawler/robots.rs` | robots.txt cache (texting_robots) | Complete with tests |
 | `rules/rule.rs` | SeoRule trait + Issue struct | Complete |
 | `rules/engine.rs` | Rule registry + executor | Complete |
 | `rules/builtin/meta.rs` | 7 meta rules | Complete with tests |
@@ -167,7 +160,8 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `rules/builtin/security.rs` | 2 security rules | Complete |
 | `storage/db.rs` | SQLite connection + migrations | Complete with tests |
 | `storage/models.rs` | Data structs + StorageCommand enum | Complete |
-| `storage/queries.rs` | All SQL prepared statements | Complete |
+| `storage/queries.rs` | SQL statements + execution functions | Complete |
+| `storage/writer.rs` | Batched storage writer thread | Complete with tests |
 | `ai/provider.rs` | LlmProvider trait | Complete (Phase 7) |
 
 ### Frontend (`src/`)
@@ -266,3 +260,4 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Commit both lock files** — `Cargo.lock` and `package-lock.json` are checked in (this is an application, not a library).
 - **ESLint v9 flat config** — This project uses `eslint.config.js` (flat config). The `--ext` flag does not work; target directories instead (`eslint src/`). Requires `typescript-eslint` and `@eslint/js` as devDependencies.
 - **`cargo fix` breaks formatting** — Always run `cargo fmt --all` after `cargo fix --allow-dirty`.
+- **Production build requires `@types/node`** — `tsc -b` (used by `npm run build`) needs Node type definitions for `vite.config.ts`. Install with `npm i -D @types/node`.
