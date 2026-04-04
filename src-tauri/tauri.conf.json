@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nickel-org/nickel.rs/refs/heads/master/examples/static_file/tauri.conf.json",
   "productName": "OxideSEO",
   "version": "0.1.0",
-  "identifier": "com.oxideseo.app",
+  "identifier": "com.oxideseo.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",

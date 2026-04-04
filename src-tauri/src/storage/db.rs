@@ -154,6 +154,20 @@ impl Database {
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {}", e))?;
         f(&mut conn)
     }
+
+    /// Create an in-memory database for testing (with migrations applied).
+    pub fn new_in_memory() -> Result<Self> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+        conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+
+        let db = Self {
+            path: std::path::PathBuf::from(":memory:"),
+            conn: Mutex::new(conn),
+        };
+        db.run_migrations()?;
+        Ok(db)
+    }
 }
 
 // Required for Tauri managed state.

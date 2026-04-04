@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use std::sync::Arc;
+
 use crate::storage::db::Database;
 use crate::storage::models::*;
 use crate::{RuleCategory, Severity};
@@ -111,7 +113,7 @@ pub struct RedirectHop {
 #[tauri::command]
 pub async fn get_recent_crawls(
     _limit: Option<u32>,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<Vec<CrawlSummary>, String> {
     // TODO(phase-4): Query crawls table ordered by started_at DESC.
     Ok(Vec::new())
@@ -123,7 +125,7 @@ pub async fn get_crawl_results(
     _crawl_id: String,
     pagination: PaginationParams,
     _filters: Option<PageFilters>,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<PaginatedResponse<PageRow>, String> {
     // TODO(phase-4): Build SQL query with LIMIT/OFFSET, ORDER BY, WHERE clauses.
     Ok(PaginatedResponse {
@@ -138,7 +140,7 @@ pub async fn get_crawl_results(
 #[tauri::command]
 pub async fn get_crawl_summary(
     _crawl_id: String,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<CrawlSummary, String> {
     // TODO(phase-4): Aggregate from crawls + issues tables.
     Err("Not yet implemented — Phase 4".into())
@@ -149,7 +151,7 @@ pub async fn get_crawl_summary(
 pub async fn get_page_detail(
     _crawl_id: String,
     _page_id: i64,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<PageDetail, String> {
     // TODO(phase-4): Join pages + issues + links tables.
     Err("Not yet implemented — Phase 4".into())
@@ -161,7 +163,7 @@ pub async fn get_issues(
     _crawl_id: String,
     pagination: PaginationParams,
     _filters: Option<IssueFilters>,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<PaginatedResponse<IssueRow>, String> {
     Ok(PaginatedResponse {
         items: Vec::new(),
@@ -177,7 +179,7 @@ pub async fn get_links(
     _crawl_id: String,
     pagination: PaginationParams,
     _filters: Option<LinkFilters>,
-    _db: State<'_, Database>,
+    _db: State<'_, Arc<Database>>,
 ) -> Result<PaginatedResponse<LinkRow>, String> {
     Ok(PaginatedResponse {
         items: Vec::new(),

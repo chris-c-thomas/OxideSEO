@@ -103,8 +103,8 @@ impl Fetcher {
                 }
             }
 
-            // Read body with size cap.
-            let body_bytes = self.read_body_capped(response).await?;
+            // Read body with size cap, computing blake3 hash as bytes stream in.
+            let (body_bytes, body_hash) = self.read_body_capped(response).await?;
             let body_size = body_bytes.len();
             let response_time_ms = start.elapsed().as_millis() as u32;
 
@@ -115,6 +115,7 @@ impl Fetcher {
                 headers,
                 body_bytes,
                 body_size,
+                body_hash: Some(body_hash),
                 content_type,
                 response_time_ms,
                 redirect_chain,
@@ -128,15 +129,37 @@ impl Fetcher {
         )
     }
 
-    /// Read response body up to `max_body_size` bytes.
-    async fn read_body_capped(&self, response: reqwest::Response) -> Result<Vec<u8>> {
-        // TODO(phase-2): Stream body, compute blake3 hash as bytes arrive,
-        // abort if exceeding max_body_size.
-        let bytes = response.bytes().await?;
-        if bytes.len() > self.max_body_size {
-            Ok(bytes[..self.max_body_size].to_vec())
-        } else {
-            Ok(bytes.to_vec())
+    /// Read response body up to `max_body_size` bytes, computing blake3 hash incrementally.
+    ///
+    /// Streams the response in chunks to avoid holding the full body in memory
+    /// before checking size. Returns `(body_bytes, blake3_hash)`.
+    async fn read_body_capped(
+        &self,
+        mut response: reqwest::Response,
+    ) -> Result<(Vec<u8>, [u8; 32])> {
+        let mut hasher = blake3::Hasher::new();
+        let mut buffer = Vec::new();
+        let mut total = 0usize;
+
+        while let Some(chunk) = response.chunk().await? {
+            total += chunk.len();
+            if total > self.max_body_size {
+                // Take only the bytes up to the limit from this chunk.
+                let remaining = self.max_body_size.saturating_sub(total - chunk.len());
+                hasher.update(&chunk[..remaining]);
+                buffer.extend_from_slice(&chunk[..remaining]);
+                break;
+            }
+            hasher.update(&chunk);
+            buffer.extend_from_slice(&chunk);
         }
+
+        let hash: [u8; 32] = hasher.finalize().into();
+        Ok((buffer, hash))
+    }
+
+    /// Expose the underlying client for robots.txt fetching.
+    pub fn client(&self) -> &reqwest::Client {
+        &self.client
     }
 }

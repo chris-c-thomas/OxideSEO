@@ -24,6 +24,7 @@ pub struct FetchResult {
     pub headers: Vec<(String, String)>,
     pub body_bytes: Vec<u8>,
     pub body_size: usize,
+    pub body_hash: Option<[u8; 32]>,
     pub content_type: Option<String>,
     pub response_time_ms: u32,
     pub redirect_chain: Vec<RedirectHop>,
