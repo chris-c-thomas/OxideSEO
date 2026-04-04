@@ -75,8 +75,11 @@ pub struct IssueRow {
 /// them inside a single SQLite transaction.
 #[derive(Debug)]
 pub enum StorageCommand {
-    /// Insert or update a page record.
-    UpsertPage(Box<PageRow>),
+    /// Insert or update a page record (includes url_hash for dedup key).
+    UpsertPage {
+        page: Box<PageRow>,
+        url_hash: Vec<u8>,
+    },
     /// Insert one or more link records.
     InsertLinks(Vec<LinkRow>),
     /// Insert one or more issue records.
