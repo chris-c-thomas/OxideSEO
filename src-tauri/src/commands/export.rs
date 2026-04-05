@@ -126,6 +126,27 @@ fn write_csv_row<W: std::io::Write>(
     Ok(())
 }
 
+/// Write a single serializable row as one NDJSON line, keeping only the requested columns.
+fn write_ndjson_row<W: std::io::Write>(
+    writer: &mut W,
+    row: &impl Serialize,
+    columns: &[String],
+) -> anyhow::Result<()> {
+    let value = serde_json::to_value(row).context("failed to serialize row")?;
+    let full_map = match value {
+        serde_json::Value::Object(m) => m,
+        _ => anyhow::bail!("expected JSON object from row serialization"),
+    };
+    let filtered: serde_json::Map<String, serde_json::Value> = columns
+        .iter()
+        .filter_map(|col| full_map.get(col).map(|v| (col.clone(), v.clone())))
+        .collect();
+    let line = serde_json::to_string(&filtered).context("failed to serialize NDJSON line")?;
+    std::io::Write::write_all(writer, line.as_bytes())?;
+    std::io::Write::write_all(writer, b"\n")?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Export command
 // ---------------------------------------------------------------------------
@@ -234,12 +255,78 @@ fn export_csv(
 // ---------------------------------------------------------------------------
 
 fn export_ndjson(
-    _request: &ExportRequest,
-    _db: &Database,
-    _app: &tauri::AppHandle,
+    request: &ExportRequest,
+    db: &Database,
+    app: &tauri::AppHandle,
 ) -> anyhow::Result<ExportResult> {
-    // TODO(phase-5): Implement NDJSON export with streaming.
-    anyhow::bail!("NDJSON export not yet implemented")
+    let filename = default_filename(db, &request.crawl_id, request.data_type, "jsonl");
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("JSON Lines", &["jsonl", "json"])
+        .set_file_name(&filename)
+        .set_title("Export as NDJSON")
+        .blocking_save_file()
+        .and_then(|fp| fp.into_path().ok())
+        .ok_or_else(|| anyhow::anyhow!("Export cancelled"))?;
+
+    let columns = request
+        .columns
+        .clone()
+        .unwrap_or_else(|| default_columns(request.data_type));
+
+    let file = File::create(&file_path)
+        .with_context(|| format!("failed to create {}", file_path.display()))?;
+    let mut writer = BufWriter::new(file);
+
+    let mut rows_exported: u64 = 0;
+    let crawl_id = request.crawl_id.clone();
+
+    db.with_conn(|conn| {
+        match request.data_type {
+            ExportDataType::Pages => {
+                queries::for_each_page(conn, &crawl_id, |page| {
+                    write_ndjson_row(&mut writer, &page, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
+            ExportDataType::Issues => {
+                queries::for_each_issue(conn, &crawl_id, |issue| {
+                    write_ndjson_row(&mut writer, &issue, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
+            ExportDataType::Links => {
+                queries::for_each_link(conn, &crawl_id, |link| {
+                    write_ndjson_row(&mut writer, &link, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
+            ExportDataType::Images => {
+                queries::for_each_image(conn, &crawl_id, |img| {
+                    write_ndjson_row(&mut writer, &img, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
+            ExportDataType::FullReport => {
+                anyhow::bail!("Use HTML format for full report export");
+            }
+        }
+        Ok(())
+    })?;
+
+    let path_str = file_path.to_string_lossy().to_string();
+    tracing::info!(path = %path_str, rows = rows_exported, "NDJSON export complete");
+
+    Ok(ExportResult {
+        file_path: path_str,
+        rows_exported,
+    })
 }
 
 // ---------------------------------------------------------------------------
