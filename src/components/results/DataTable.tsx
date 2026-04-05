@@ -1,3 +1,10 @@
+/**
+ * Virtualized data table using TanStack Table v8 + TanStack Virtual v3.
+ *
+ * Renders large datasets with row virtualization and infinite scroll.
+ * Sorting is server-side via the parent hook (useServerData).
+ */
+
 import { useCallback, useEffect, useRef } from "react";
 import {
   type ColumnDef,

@@ -408,6 +408,14 @@ fn pages_sort_col(sort_by: Option<&str>) -> &'static str {
     }
 }
 
+/// Escape SQL LIKE metacharacters so user input is matched literally.
+fn escape_like_pattern(input: &str) -> String {
+    input
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 /// Build dynamic WHERE clauses and parameter values for page filters.
 fn build_page_filters(
     url_search: Option<&str>,
@@ -419,8 +427,8 @@ fn build_page_filters(
 
     if let Some(search) = url_search {
         if !search.is_empty() {
-            clauses.push_str(" AND url LIKE ?");
-            values.push(Value::Text(format!("%{}%", search)));
+            clauses.push_str(" AND url LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(format!("%{}%", escape_like_pattern(search))));
         }
     }
 
@@ -436,8 +444,8 @@ fn build_page_filters(
 
     if let Some(ct) = content_type {
         if !ct.is_empty() {
-            clauses.push_str(" AND content_type LIKE ?");
-            values.push(Value::Text(format!("{}%", ct)));
+            clauses.push_str(" AND content_type LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(format!("{}%", escape_like_pattern(ct))));
         }
     }
 
@@ -445,6 +453,8 @@ fn build_page_filters(
 }
 
 /// Fetch paginated pages with dynamic ordering and filtering.
+// Parameters map 1:1 to SQL WHERE clauses, sort column, pagination, and connection.
+// A params struct would add indirection without reducing complexity.
 #[allow(clippy::too_many_arguments)]
 pub fn select_pages(
     conn: &Connection,
@@ -618,6 +628,7 @@ fn build_issue_filters(
 }
 
 /// Fetch paginated issues with filtering and sorting.
+// Parameters map 1:1 to SQL WHERE clauses, sort column, pagination, and connection.
 #[allow(clippy::too_many_arguments)]
 pub fn select_issues(
     conn: &Connection,
@@ -732,6 +743,7 @@ fn build_link_filters(
 }
 
 /// Fetch paginated links with filtering and sorting.
+// Parameters map 1:1 to SQL WHERE clauses, sort column, pagination, and connection.
 #[allow(clippy::too_many_arguments)]
 pub fn select_links(
     conn: &Connection,

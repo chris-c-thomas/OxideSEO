@@ -1,3 +1,8 @@
+/**
+ * Images tab: reuses the links data model with linkType="img" filter.
+ * In this context, anchorText represents the image alt text.
+ */
+
 import { useCallback, useMemo, useState } from "react";
 import { getLinks } from "@/lib/commands";
 import { useServerData } from "@/hooks/useServerData";

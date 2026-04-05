@@ -159,12 +159,6 @@ export interface PageDetail {
   issues: IssueRow[];
   inboundLinks: LinkRow[];
   outboundLinks: LinkRow[];
-  redirectChain: RedirectHop[] | null;
-}
-
-export interface RedirectHop {
-  url: string;
-  statusCode: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +185,6 @@ export interface RuleConfigOverride {
 export interface PageFilters {
   urlSearch: string | null;
   statusCodes: number[] | null;
-  minSeverity: Severity | null;
   contentType: string | null;
 }
 

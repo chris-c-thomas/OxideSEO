@@ -83,7 +83,6 @@ export function PageFilterBar({ filters, onChange }: PageFilterBarProps) {
     onChange({
       urlSearch: null,
       statusCodes: null,
-      minSeverity: null,
       contentType: null,
     });
   };
