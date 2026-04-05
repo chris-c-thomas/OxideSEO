@@ -374,8 +374,7 @@ pub fn select_recent_crawls(conn: &Connection, limit: u32) -> Result<Vec<CrawlRo
     let mut stmt = conn.prepare(SELECT_RECENT_CRAWLS)?;
     let rows = stmt
         .query_map(params![limit], row_to_crawl)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -392,7 +391,7 @@ pub fn select_page_by_id(
 ) -> Result<Option<PageRow>> {
     let mut stmt = conn.prepare(SELECT_PAGE_BY_ID)?;
     let mut rows = stmt.query_map(params![crawl_id, page_id], row_to_page)?;
-    Ok(rows.next().and_then(|r| r.ok()))
+    Ok(rows.next().transpose()?)
 }
 
 /// Allowlisted sort column for pages.
@@ -476,8 +475,7 @@ pub fn select_pages(
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
         .query_map(rusqlite::params_from_iter(&param_values), row_to_page)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -514,8 +512,7 @@ pub fn select_issues_for_page(
     let mut stmt = conn.prepare(SELECT_ISSUES_FOR_PAGE)?;
     let rows = stmt
         .query_map(params![crawl_id, page_id], row_to_issue)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -528,8 +525,7 @@ pub fn select_outbound_links(
     let mut stmt = conn.prepare(SELECT_OUTBOUND_LINKS)?;
     let rows = stmt
         .query_map(params![crawl_id, page_id], row_to_link)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -542,8 +538,7 @@ pub fn select_inbound_links(
     let mut stmt = conn.prepare(SELECT_INBOUND_LINKS)?;
     let rows = stmt
         .query_map(params![crawl_id, page_id], row_to_link)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -551,7 +546,7 @@ pub fn select_inbound_links(
 pub fn select_crawl_by_id(conn: &Connection, crawl_id: &str) -> Result<Option<CrawlRow>> {
     let mut stmt = conn.prepare(SELECT_CRAWL_BY_ID)?;
     let mut rows = stmt.query_map(params![crawl_id], row_to_crawl)?;
-    Ok(rows.next().and_then(|r| r.ok()))
+    Ok(rows.next().transpose()?)
 }
 
 /// Count issues grouped by severity for a crawl. Returns (errors, warnings, info).
@@ -652,8 +647,7 @@ pub fn select_issues(
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
         .query_map(rusqlite::params_from_iter(&param_values), row_to_issue)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -769,8 +763,7 @@ pub fn select_links(
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt
         .query_map(rusqlite::params_from_iter(&param_values), row_to_link)?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 

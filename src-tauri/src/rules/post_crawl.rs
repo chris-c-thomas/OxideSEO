@@ -94,8 +94,9 @@ impl<'a> PostCrawlAnalyzer<'a> {
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
 
-                let truncated_value = if value.len() > 80 {
-                    format!("{}...", &value[..77])
+                let truncated_value = if value.chars().count() > 80 {
+                    let truncated: String = value.chars().take(77).collect();
+                    format!("{truncated}...")
                 } else {
                     value.clone()
                 };
