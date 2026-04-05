@@ -2702,7 +2702,7 @@ dependencies = [
 
 [[package]]
 name = "oxide-seo"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",

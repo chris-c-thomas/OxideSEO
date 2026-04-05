@@ -1,3 +1,8 @@
+/**
+ * Issues tab: paginated table of SEO issues with severity,
+ * category, and rule ID filters.
+ */
+
 import { useCallback, useMemo, useState } from "react";
 import { getIssues } from "@/lib/commands";
 import { useServerData } from "@/hooks/useServerData";

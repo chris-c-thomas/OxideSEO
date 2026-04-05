@@ -67,8 +67,11 @@ impl SeoRule for LargePage {
     }
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
-        if let Some(max) = params.get("max_bytes").and_then(|v| v.as_u64()) {
-            self.max_bytes = max as usize;
+        if let Some(val) = params.get("max_bytes") {
+            self.max_bytes = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("max_bytes must be a positive integer"))?
+                as usize;
         }
         Ok(())
     }
@@ -133,8 +136,11 @@ impl SeoRule for SlowResponse {
     }
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
-        if let Some(max) = params.get("max_ms").and_then(|v| v.as_u64()) {
-            self.max_ms = max as u32;
+        if let Some(val) = params.get("max_ms") {
+            self.max_ms = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("max_ms must be a positive integer"))?
+                as u32;
         }
         Ok(())
     }

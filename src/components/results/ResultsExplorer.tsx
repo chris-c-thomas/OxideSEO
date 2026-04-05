@@ -26,10 +26,22 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
   const [activeTab, setActiveTab] = useState<ResultsTab>("pages");
   const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
   const [summary, setSummary] = useState<CrawlSummary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!crawlId) return;
-    getCrawlSummary(crawlId).then(setSummary).catch(console.error);
+    let stale = false;
+    setSummaryError(null);
+    getCrawlSummary(crawlId)
+      .then((result) => {
+        if (!stale) setSummary(result);
+      })
+      .catch((err) => {
+        if (!stale) setSummaryError(String(err));
+      });
+    return () => {
+      stale = true;
+    };
   }, [crawlId]);
 
   if (!crawlId) {
@@ -75,7 +87,17 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
       </div>
 
       {/* Summary bar */}
-      {summary && (
+      {summaryError && (
+        <div
+          className="border-b px-6 py-2"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <span className="text-xs" style={{ color: "var(--color-severity-error)" }}>
+            Failed to load summary: {summaryError}
+          </span>
+        </div>
+      )}
+      {summary && !summaryError && (
         <div
           className="flex items-center gap-4 border-b px-6 py-2"
           style={{ borderColor: "var(--color-border)" }}

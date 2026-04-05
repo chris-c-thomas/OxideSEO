@@ -177,8 +177,11 @@ impl SeoRule for ThinContent {
     }
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
-        if let Some(min) = params.get("min_words").and_then(|v| v.as_u64()) {
-            self.min_words = min as u32;
+        if let Some(val) = params.get("min_words") {
+            self.min_words = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("min_words must be a positive integer"))?
+                as u32;
         }
         Ok(())
     }

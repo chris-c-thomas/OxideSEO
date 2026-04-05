@@ -116,11 +116,17 @@ impl SeoRule for TitleLength {
     }
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
-        if let Some(min) = params.get("min").and_then(|v| v.as_u64()) {
-            self.min = min as usize;
+        if let Some(val) = params.get("min") {
+            self.min = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("min must be a positive integer"))?
+                as usize;
         }
-        if let Some(max) = params.get("max").and_then(|v| v.as_u64()) {
-            self.max = max as usize;
+        if let Some(val) = params.get("max") {
+            self.max = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("max must be a positive integer"))?
+                as usize;
         }
         Ok(())
     }
@@ -228,11 +234,17 @@ impl SeoRule for DescLength {
     }
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
-        if let Some(min) = params.get("min").and_then(|v| v.as_u64()) {
-            self.min = min as usize;
+        if let Some(val) = params.get("min") {
+            self.min = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("min must be a positive integer"))?
+                as usize;
         }
-        if let Some(max) = params.get("max").and_then(|v| v.as_u64()) {
-            self.max = max as usize;
+        if let Some(val) = params.get("max") {
+            self.max = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("max must be a positive integer"))?
+                as usize;
         }
         Ok(())
     }

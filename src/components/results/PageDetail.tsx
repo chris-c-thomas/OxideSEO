@@ -1,3 +1,8 @@
+/**
+ * Page detail slide-out sheet showing SEO metadata, performance stats,
+ * issues, and link tables for a single crawled page.
+ */
+
 import { useEffect, useState } from "react";
 import { getPageDetail } from "@/lib/commands";
 import type { PageDetail as PageDetailType, IssueRow, LinkRow, Severity } from "@/types";
@@ -49,6 +54,7 @@ export function PageDetail({ crawlId, pageId, open, onClose }: PageDetailProps) 
 
   useEffect(() => {
     if (!open) return;
+    setData(null);
     setIsLoading(true);
     setError(null);
 
