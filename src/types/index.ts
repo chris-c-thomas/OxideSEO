@@ -205,4 +205,5 @@ export interface LinkFilters {
   linkType: string | null;
   isInternal: boolean | null;
   isBroken: boolean | null;
+  anchorTextMissing: boolean | null;
 }

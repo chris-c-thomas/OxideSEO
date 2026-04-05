@@ -55,8 +55,8 @@ impl RuleRegistry {
         self.register(Box::new(builtin::images::AltEmpty));
 
         // Performance & Security rules
-        self.register(Box::new(builtin::performance::LargePage));
-        self.register(Box::new(builtin::performance::SlowResponse));
+        self.register(Box::new(builtin::performance::LargePage::default()));
+        self.register(Box::new(builtin::performance::SlowResponse::default()));
         self.register(Box::new(builtin::security::MixedContent));
         self.register(Box::new(builtin::security::HttpPage));
 

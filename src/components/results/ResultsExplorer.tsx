@@ -1,17 +1,13 @@
-/**
- * Results Explorer: tabbed interface for viewing crawl results.
- *
- * Tabs: All Pages | Issues | Links | Images
- *
- * Each tab uses a virtualized table (TanStack Table + TanStack Virtual)
- * with server-side sorting, filtering, and infinite scroll.
- */
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-
-// TODO(phase-4): Import and wire up the DataTable component with
-// TanStack Table + Virtual for each tab.
+import { getCrawlSummary } from "@/lib/commands";
+import type { CrawlSummary } from "@/types";
+import { PagesTab } from "./PagesTab";
+import { IssuesTab } from "./IssuesTab";
+import { LinksTab } from "./LinksTab";
+import { ImagesTab } from "./ImagesTab";
+import { PageDetail } from "./PageDetail";
+import { Badge } from "@/components/ui/badge";
 
 interface ResultsExplorerProps {
   crawlId: string | null;
@@ -28,6 +24,13 @@ const TABS: { id: ResultsTab; label: string }[] = [
 
 export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
   const [activeTab, setActiveTab] = useState<ResultsTab>("pages");
+  const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
+  const [summary, setSummary] = useState<CrawlSummary | null>(null);
+
+  useEffect(() => {
+    if (!crawlId) return;
+    getCrawlSummary(crawlId).then(setSummary).catch(console.error);
+  }, [crawlId]);
 
   if (!crawlId) {
     return (
@@ -71,86 +74,60 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
         </div>
       </div>
 
+      {/* Summary bar */}
+      {summary && (
+        <div
+          className="flex items-center gap-4 border-b px-6 py-2"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <span
+            className="text-xs tabular-nums"
+            style={{ color: "var(--color-muted-foreground)" }}
+          >
+            {summary.urlsCrawled.toLocaleString()} pages
+          </span>
+          {summary.issueCounts.errors > 0 && (
+            <Badge variant="destructive" className="text-xs">
+              {summary.issueCounts.errors} errors
+            </Badge>
+          )}
+          {summary.issueCounts.warnings > 0 && (
+            <Badge variant="default" className="text-xs">
+              {summary.issueCounts.warnings} warnings
+            </Badge>
+          )}
+          {summary.issueCounts.info > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {summary.issueCounts.info} info
+            </Badge>
+          )}
+        </div>
+      )}
+
       {/* Tab content area */}
       <div className="flex-1 overflow-hidden p-6">
-        {activeTab === "pages" && <PagesTab crawlId={crawlId} />}
-        {activeTab === "issues" && <IssuesTab crawlId={crawlId} />}
+        {activeTab === "pages" && (
+          <PagesTab crawlId={crawlId} onRowClick={(page) => setSelectedPageId(page.id)} />
+        )}
+        {activeTab === "issues" && (
+          <IssuesTab
+            crawlId={crawlId}
+            onPageClick={(pageId) => setSelectedPageId(pageId)}
+          />
+        )}
         {activeTab === "links" && <LinksTab crawlId={crawlId} />}
         {activeTab === "images" && <ImagesTab crawlId={crawlId} />}
       </div>
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// Tab placeholders — each will use the shared DataTable component.
-// ---------------------------------------------------------------------------
-
-function PagesTab({ crawlId: _crawlId }: { crawlId: string }) {
-  // TODO(phase-4): Implement with DataTable, TanStack Table columns for:
-  // URL, Status Code, Title, Meta Description, H1, Word Count,
-  // Response Time, Body Size, Canonical, Issues Count.
-  // Server-side sorting and filtering via getCrawlResults.
-  // Infinite scroll with prefetch at 20-row boundary.
-  return (
-    <PlaceholderTable
-      heading="All Pages"
-      description="Virtualized table with 100k+ row support. Implement in Phase 4 with TanStack Table + Virtual."
-    />
-  );
-}
-
-function IssuesTab({ crawlId: _crawlId }: { crawlId: string }) {
-  // TODO(phase-4): Columns: Severity Badge, Rule ID, Page URL, Message, Category.
-  // Group by severity, then by category.
-  return (
-    <PlaceholderTable
-      heading="Issues"
-      description="Issue list grouped by severity and category. Implement in Phase 4."
-    />
-  );
-}
-
-function LinksTab({ crawlId: _crawlId }: { crawlId: string }) {
-  // TODO(phase-4): Columns: Source URL, Target URL, Anchor Text, Link Type,
-  // Internal/External, Status, Nofollow.
-  return (
-    <PlaceholderTable
-      heading="Links"
-      description="Link inventory with type and status filtering. Implement in Phase 4."
-    />
-  );
-}
-
-function ImagesTab({ crawlId: _crawlId }: { crawlId: string }) {
-  // TODO(phase-4): Columns: Image URL, Source Page, Alt Text, File Size, Status.
-  // Filter by missing alt, broken, oversized.
-  return (
-    <PlaceholderTable
-      heading="Images"
-      description="Image inventory with alt text and size analysis. Implement in Phase 4."
-    />
-  );
-}
-
-function PlaceholderTable({
-  heading,
-  description,
-}: {
-  heading: string;
-  description: string;
-}) {
-  return (
-    <div
-      className="flex h-full items-center justify-center rounded-lg border"
-      style={{ borderColor: "var(--color-border)" }}
-    >
-      <div className="text-center">
-        <p className="text-sm font-medium">{heading}</p>
-        <p className="mt-1 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
-          {description}
-        </p>
-      </div>
+      {/* Page detail sheet */}
+      {selectedPageId !== null && (
+        <PageDetail
+          crawlId={crawlId}
+          pageId={selectedPageId}
+          open={selectedPageId !== null}
+          onClose={() => setSelectedPageId(null)}
+        />
+      )}
     </div>
   );
 }

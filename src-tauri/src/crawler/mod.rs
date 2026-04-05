@@ -60,6 +60,10 @@ pub struct ParsedPage {
     pub base_url: Option<String>,
     /// Whether the parse completed successfully.
     pub parse_ok: bool,
+    /// Response body size in bytes (populated from FetchResult).
+    pub body_size: Option<usize>,
+    /// Server response time in milliseconds (populated from FetchResult).
+    pub response_time_ms: Option<u32>,
 }
 
 /// A link extracted from HTML.

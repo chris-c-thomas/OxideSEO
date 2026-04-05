@@ -102,6 +102,8 @@ pub enum StorageCommand {
     CompleteCrawl { crawl_id: String, status: String },
     /// Flush current batch and commit transaction.
     Flush,
+    /// Flush current batch and acknowledge completion via oneshot sender.
+    FlushAck(tokio::sync::oneshot::Sender<()>),
     /// Shutdown the storage writer.
     Shutdown,
 }
