@@ -200,3 +200,21 @@ export interface LinkFilters {
   isBroken: boolean | null;
   anchorTextMissing: boolean | null;
 }
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+export type ExportDataType = "pages" | "issues" | "links" | "images" | "full_report";
+
+export interface ExportRequest {
+  crawlId: string;
+  format: "csv" | "json" | "html" | "xlsx";
+  dataType: ExportDataType;
+  columns: string[] | null;
+}
+
+export interface ExportResult {
+  filePath: string;
+  rowsExported: number;
+}

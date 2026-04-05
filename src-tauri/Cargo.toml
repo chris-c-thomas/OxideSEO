@@ -64,6 +64,9 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # --- Date/time ---
 chrono = { version = "0.4", features = ["serde"] }
 
+# --- Export ---
+csv = "1"
+
 # --- Async trait ---
 async-trait = "0.1"
 

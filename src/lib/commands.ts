@@ -11,6 +11,8 @@ import type {
   CrawlConfig,
   CrawlStatus,
   CrawlSummary,
+  ExportRequest,
+  ExportResult,
   IssueFilters,
   IssueRow,
   LinkFilters,
@@ -132,4 +134,23 @@ export function getRuleConfig(): Promise<RuleConfigOverride[]> {
 /** Save rule configuration overrides. */
 export function setRuleConfig(overrides: RuleConfigOverride[]): Promise<void> {
   return invoke<void>("set_rule_config", { overrides });
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+/** Export crawl data in the requested format. */
+export function exportData(request: ExportRequest): Promise<ExportResult> {
+  return invoke<ExportResult>("export_data", { request });
+}
+
+/** Save a crawl to a standalone .seocrawl file. Returns file path or null if cancelled. */
+export function saveCrawlFile(crawlId: string): Promise<string | null> {
+  return invoke<string | null>("save_crawl_file", { crawlId });
+}
+
+/** Open a .seocrawl file and import its data. Returns the imported crawl ID or null if cancelled. */
+export function openCrawlFile(): Promise<string | null> {
+  return invoke<string | null>("open_crawl_file");
 }

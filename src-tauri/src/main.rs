@@ -62,6 +62,10 @@ fn main() {
             commands::settings::set_settings,
             commands::settings::get_rule_config,
             commands::settings::set_rule_config,
+            // Export
+            commands::export::export_data,
+            commands::export::save_crawl_file,
+            commands::export::open_crawl_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OxideSEO");
