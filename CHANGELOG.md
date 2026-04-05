@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-05
+
+### Bug Fixes
+
+- **crawler,storage:** Handle channel send errors and flush failures in crawl pipeline
+- **storage,rules:** Propagate row deserialization errors and fix UTF-8 truncation panic
+- Formatting
+
+### Features
+
+- **ui:** Implement Phase 4 frontend UI with results tables and page detail
+- **rules:** Implement Phase 3 SEO rule engine
+
+### Miscellaneous
+
+- Update CLAUDE.md
+
 ## [0.2.0] - 2026-04-04
 
 ### Bug Fixes
