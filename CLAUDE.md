@@ -98,6 +98,16 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Summary bar with issue counts, Dashboard with severity indicators
 - Images tab reuses `getLinks` with `linkType: "img"` filter; `anchorText` = alt text
 
+**Phase 5 — Export, Reporting & Crawl Management:** ~~All work units implemented~~ ✅
+- CSV export with streaming `for_each_*` callbacks and column selection
+- NDJSON (line-delimited JSON) export
+- HTML report generation with summary stats, status code distribution, top issues
+- Settings persistence (`get_settings`/`set_settings` backed by SQLite `settings` table)
+- `.seocrawl` file save/open via `ATTACH DATABASE` for data transfer between SQLite files
+- Export dialog frontend component with format/data type/column selection
+- Dashboard "Open File" and per-crawl "Save" buttons
+- See `.claude/plans/seo-crawler-development-plan.pdf` for Phases 6-8 roadmap
+
 ## Architecture Invariants
 
 These design decisions are intentional and should not be changed:
@@ -165,6 +175,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `storage/models.rs` | Data structs + StorageCommand enum | Complete |
 | `storage/queries.rs` | SQL statements + execution functions | Complete (paginated queries with dynamic filtering for pages, issues, links) |
 | `storage/writer.rs` | Batched storage writer thread | Complete with tests |
+| `commands/export.rs` | Export commands: CSV, NDJSON, HTML report, .seocrawl save/open | Complete |
 | `ai/provider.rs` | LlmProvider trait | Complete (Phase 7) |
 
 ### Frontend (`src/`)
@@ -194,6 +205,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `components/results/PageDetail.tsx` | Slide-out sheet with SEO metadata, issues, links | Complete |
 | `components/results/columns/*.tsx` | Column definitions for each tab | Complete |
 | `components/results/filters/*.tsx` | Filter toolbar components per tab | Complete |
+| `components/export/ExportDialog.tsx` | Export dialog with format/type/column selection | Complete |
 | `components/settings/SettingsView.tsx` | Settings page | Complete |
 
 ## Testing Approach
@@ -254,8 +266,16 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 2. Add the entry to the `MIGRATIONS` array in `storage/db.rs`
 3. Migrations run automatically on app start and are tracked in the `_migrations` table
 
+### Adding a new export format
+
+1. Add variant to `ExportFormat` enum in `commands/settings.rs`
+2. Add match arm in `export_data()` in `commands/export.rs`
+3. Implement the export function following the CSV/NDJSON pattern: dialog → stream → write
+4. Use `for_each_page`/`for_each_issue`/`for_each_link`/`for_each_image` from `queries.rs` for streaming
+
 ## Dependencies to Note
 
+- **csv v1** — Streaming CSV writer. Used in `commands/export.rs` for CSV export with column filtering.
 - **lol_html v2** — Cloudflare's streaming HTML parser. Does not build a DOM. Uses element content handlers registered before parse. Cannot go back to re-read earlier content.
 - **texting_robots v0.2** — RFC 9309 compliant robots.txt parser. Exposes `Robot::new()` and `robot.allowed()`.
 - **rusqlite v0.32 (bundled)** — Bundles SQLite. No system SQLite dependency. WAL mode enabled.
@@ -273,3 +293,8 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **ESLint v9 flat config** — This project uses `eslint.config.js` (flat config). The `--ext` flag does not work; target directories instead (`eslint src/`). Requires `typescript-eslint` and `@eslint/js` as devDependencies.
 - **`cargo fix` breaks formatting** — Always run `cargo fmt --all` after `cargo fix --allow-dirty`.
 - **Production build requires `@types/node`** — `tsc -b` (used by `npm run build`) needs Node type definitions for `vite.config.ts`. Install with `npm i -D @types/node`.
+- **Cargo commands require `src-tauri/` CWD** — `cargo check`, `cargo test`, `cargo fmt`, `cargo clippy` must run from `src-tauri/`, not the project root. There is no workspace `Cargo.toml` at the root.
+- **Run Prettier via npx** — `npx prettier --write <file>` for formatting. It is not installed globally. The pre-commit hook (husky + lint-staged) runs Prettier automatically on staged `.ts`/`.tsx` files.
+- **Use `.clamp()` not `.min().max()`** — Clippy's `manual_clamp` lint rejects the `.min(max).max(min)` pattern. Use `value.clamp(min, max)`.
+- **`Severity` and `RuleCategory` have `Display`/`FromStr`/`ToSql`/`FromSql`** — Use these enums directly in `IssueRow`, SQLite params, and string formatting. No manual `format!("{:?}").to_lowercase()` conversion needed.
+- **`tauri-plugin-dialog` Rust API** — Import `use tauri_plugin_dialog::DialogExt;`. Use `app.dialog().file().add_filter(...).blocking_save_file()` which returns `Option<FilePath>`. Call `.into_path()` for `PathBuf`. `blocking_*` methods are safe from async Tauri commands (they run on tokio worker threads, not the main thread).
