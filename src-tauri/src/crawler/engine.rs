@@ -524,21 +524,31 @@ pub async fn spawn_crawl(
         let final_crawled = stats.urls_crawled.load(Ordering::SeqCst);
         let final_errored = stats.urls_errored.load(Ordering::SeqCst);
 
-        let _ = storage_tx
+        if let Err(e) = storage_tx
             .send(StorageCommand::UpdateCrawlStats {
                 crawl_id: crawl_id.clone(),
                 urls_crawled: final_crawled as i64,
                 urls_errored: final_errored as i64,
             })
-            .await;
+            .await
+        {
+            tracing::error!(error = %e, "Failed to send crawl stats to storage writer");
+        }
 
         // Flush all pending writes and wait for confirmation before post-crawl analysis.
-        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
-        let _ = storage_tx.send(StorageCommand::FlushAck(ack_tx)).await;
-        let _ = ack_rx.await;
+        let flush_ok = {
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            if let Err(e) = storage_tx.send(StorageCommand::FlushAck(ack_tx)).await {
+                tracing::error!(error = %e, "Failed to send FlushAck to storage writer");
+                false
+            } else {
+                ack_rx.await.is_ok()
+            }
+        };
 
-        // Post-crawl cross-page analysis.
-        {
+        // Post-crawl cross-page analysis. Runs on spawn_blocking because
+        // PostCrawlAnalyzer performs synchronous SQLite reads via Database::with_conn.
+        if flush_ok {
             let post_db = db.clone();
             let post_crawl_id = crawl_id.clone();
             let post_result = tokio::task::spawn_blocking(move || {
@@ -550,8 +560,12 @@ pub async fn spawn_crawl(
             match post_result {
                 Ok(Ok(issues)) if !issues.is_empty() => {
                     tracing::info!(count = issues.len(), "Post-crawl analysis found issues");
-                    let _ = storage_tx.send(StorageCommand::InsertIssues(issues)).await;
-                    let _ = storage_tx.send(StorageCommand::Flush).await;
+                    if let Err(e) = storage_tx.send(StorageCommand::InsertIssues(issues)).await {
+                        tracing::error!(error = %e, "Failed to persist post-crawl issues");
+                    }
+                    if let Err(e) = storage_tx.send(StorageCommand::Flush).await {
+                        tracing::error!(error = %e, "Failed to flush post-crawl issues");
+                    }
                 }
                 Ok(Err(e)) => {
                     tracing::error!(error = %e, "Post-crawl analysis failed");
@@ -561,6 +575,8 @@ pub async fn spawn_crawl(
                 }
                 _ => {}
             }
+        } else {
+            tracing::error!("Skipping post-crawl analysis — storage flush did not complete");
         }
 
         let final_state = match *orchestrator_state_rx.borrow() {
@@ -575,15 +591,22 @@ pub async fn spawn_crawl(
         // Update the watch channel so handle.state() reflects completion.
         let _ = state_tx.send(final_state);
 
-        let _ = storage_tx
+        if let Err(e) = storage_tx
             .send(StorageCommand::CompleteCrawl {
                 crawl_id: crawl_id.clone(),
                 status: final_status.into(),
             })
-            .await;
+            .await
+        {
+            tracing::error!(error = %e, crawl_id = %crawl_id, "Failed to mark crawl as complete");
+        }
 
-        let _ = storage_tx.send(StorageCommand::Flush).await;
-        let _ = storage_tx.send(StorageCommand::Shutdown).await;
+        if let Err(e) = storage_tx.send(StorageCommand::Flush).await {
+            tracing::error!(error = %e, "Failed to send final flush to storage writer");
+        }
+        if let Err(e) = storage_tx.send(StorageCommand::Shutdown).await {
+            tracing::error!(error = %e, "Failed to send shutdown to storage writer");
+        }
 
         // Emit final progress.
         let queued = {

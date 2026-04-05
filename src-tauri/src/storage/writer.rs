@@ -38,8 +38,10 @@ pub fn spawn_storage_writer(
                     flush_batch(&db, &mut batch);
                 }
                 Some(StorageCommand::FlushAck(sender)) => {
-                    flush_batch(&db, &mut batch);
-                    let _ = sender.send(());
+                    if flush_batch(&db, &mut batch) {
+                        let _ = sender.send(());
+                    }
+                    // On failure, sender is dropped — receiver gets RecvError.
                 }
                 Some(cmd) => {
                     batch.push(cmd);
@@ -57,8 +59,10 @@ pub fn spawn_storage_writer(
                                 break;
                             }
                             Ok(StorageCommand::FlushAck(sender)) => {
-                                flush_batch(&db, &mut batch);
-                                let _ = sender.send(());
+                                if flush_batch(&db, &mut batch) {
+                                    let _ = sender.send(());
+                                }
+                                // On failure, sender is dropped — receiver gets RecvError.
                                 break;
                             }
                             Ok(cmd) => batch.push(cmd),
@@ -82,9 +86,10 @@ pub fn spawn_storage_writer(
 }
 
 /// Flush all accumulated commands in a single transaction.
-fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) {
+/// Returns `true` if the flush succeeded, `false` if it failed.
+fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) -> bool {
     if batch.is_empty() {
-        return;
+        return true;
     }
 
     let count = batch.len();
@@ -177,9 +182,11 @@ fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) {
     match result {
         Ok(()) => {
             tracing::debug!(count, "Storage writer flushed batch");
+            true
         }
         Err(e) => {
             tracing::error!(error = %e, count, "Storage writer batch flush failed");
+            false
         }
     }
 }
