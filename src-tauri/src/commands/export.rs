@@ -158,12 +158,13 @@ pub async fn export_data(
     db: State<'_, Arc<Database>>,
     app: tauri::AppHandle,
 ) -> Result<ExportResult, String> {
-    match request.format {
-        ExportFormat::Csv => export_csv(&request, &db, &app).map_err(|e| format!("{e:#}")),
-        ExportFormat::Json => export_ndjson(&request, &db, &app).map_err(|e| format!("{e:#}")),
-        ExportFormat::Html => export_html_report(&request, &db, &app).await,
-        ExportFormat::Xlsx => Err("XLSX export is not yet implemented".into()),
-    }
+    let result = match request.format {
+        ExportFormat::Csv => export_csv(&request, &db, &app),
+        ExportFormat::Json => export_ndjson(&request, &db, &app),
+        ExportFormat::Html => export_html_report_inner(&request, &db, &app),
+        ExportFormat::Xlsx => Err(anyhow::anyhow!("XLSX export is not yet implemented")),
+    };
+    result.map_err(|e| format!("{e:#}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -333,13 +334,114 @@ fn export_ndjson(
 // HTML report
 // ---------------------------------------------------------------------------
 
-async fn export_html_report(
-    _request: &ExportRequest,
-    _db: &Database,
-    _app: &tauri::AppHandle,
-) -> Result<ExportResult, String> {
-    // TODO(phase-5): Implement HTML report generation.
-    Err("HTML report not yet implemented".into())
+fn export_html_report_inner(
+    request: &ExportRequest,
+    db: &Database,
+    app: &tauri::AppHandle,
+) -> anyhow::Result<ExportResult> {
+    let filename = default_filename(db, &request.crawl_id, ExportDataType::FullReport, "html");
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("HTML Report", &["html"])
+        .set_file_name(&filename)
+        .set_title("Export HTML Report")
+        .blocking_save_file()
+        .and_then(|fp| fp.into_path().ok())
+        .ok_or_else(|| anyhow::anyhow!("Export cancelled"))?;
+
+    let crawl_id = &request.crawl_id;
+
+    let html = db.with_conn(|conn| {
+        let crawl = queries::select_crawl_by_id(conn, crawl_id)?
+            .ok_or_else(|| anyhow::anyhow!("Crawl not found: {crawl_id}"))?;
+
+        let (errors, warnings, info) = queries::count_issues_by_severity(conn, crawl_id)?;
+        let (s2xx, s3xx, s4xx, s5xx, _other) = queries::count_pages_by_status_group(conn, crawl_id)?;
+        let avg_ms = queries::avg_response_time(conn, crawl_id)?;
+        let top_issues = queries::select_top_issues_by_rule(conn, crawl_id, 15)?;
+
+        let top_issues_html = build_top_issues_table(&top_issues);
+
+        let template = include_str!("../../templates/report.html");
+        let html = template
+            .replace("{{START_URL}}", &html_escape(&crawl.start_url))
+            .replace("{{STARTED_AT}}", &html_escape(&crawl.started_at.unwrap_or_default()))
+            .replace("{{STATUS}}", &html_escape(&crawl.status))
+            .replace("{{TOTAL_PAGES}}", &crawl.urls_crawled.to_string())
+            .replace("{{ERRORS}}", &errors.to_string())
+            .replace("{{WARNINGS}}", &warnings.to_string())
+            .replace("{{INFO_COUNT}}", &info.to_string())
+            .replace("{{AVG_RESPONSE_MS}}", &format_avg_ms(avg_ms))
+            .replace("{{STATUS_2XX}}", &s2xx.to_string())
+            .replace("{{STATUS_3XX}}", &s3xx.to_string())
+            .replace("{{STATUS_4XX}}", &s4xx.to_string())
+            .replace("{{STATUS_5XX}}", &s5xx.to_string())
+            .replace("{{TOP_ISSUES_TABLE}}", &top_issues_html);
+
+        Ok(html)
+    })?;
+
+    std::fs::write(&file_path, &html)
+        .with_context(|| format!("failed to write report to {}", file_path.display()))?;
+
+    let path_str = file_path.to_string_lossy().to_string();
+    tracing::info!(path = %path_str, "HTML report export complete");
+
+    Ok(ExportResult {
+        file_path: path_str,
+        rows_exported: 0,
+    })
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn format_avg_ms(avg: Option<f64>) -> String {
+    match avg {
+        Some(ms) => format!("{:.0}", ms),
+        None => "N/A".into(),
+    }
+}
+
+fn severity_badge(severity: &str) -> String {
+    let class = match severity {
+        "error" => "badge-error",
+        "warning" => "badge-warning",
+        _ => "badge-info",
+    };
+    format!(r#"<span class="badge {class}">{severity}</span>"#)
+}
+
+fn build_top_issues_table(issues: &[(String, String, String, i64)]) -> String {
+    if issues.is_empty() {
+        return "<p>No issues found.</p>".into();
+    }
+
+    let mut html = String::from(
+        r#"<table>
+<thead><tr><th>Rule</th><th>Severity</th><th>Category</th><th>Count</th></tr></thead>
+<tbody>
+"#,
+    );
+
+    for (rule_id, severity, category, count) in issues {
+        html.push_str(&format!(
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n",
+            html_escape(rule_id),
+            severity_badge(severity),
+            html_escape(category),
+            count,
+        ));
+    }
+
+    html.push_str("</tbody></table>");
+    html
 }
 
 // ---------------------------------------------------------------------------
