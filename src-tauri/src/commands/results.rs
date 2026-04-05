@@ -133,10 +133,7 @@ fn category_to_str(c: &RuleCategory) -> &'static str {
     }
 }
 
-fn crawl_row_to_summary(
-    crawl: &CrawlRow,
-    issue_counts: IssueCounts,
-) -> CrawlSummary {
+fn crawl_row_to_summary(crawl: &CrawlRow, issue_counts: IssueCounts) -> CrawlSummary {
     CrawlSummary {
         crawl_id: crawl.id.clone(),
         start_url: crawl.start_url.clone(),
@@ -163,11 +160,14 @@ pub async fn get_recent_crawls(
         let crawls = queries::select_recent_crawls(conn, limit.unwrap_or(20))?;
         let mut summaries = Vec::with_capacity(crawls.len());
         for crawl in &crawls {
-            let (errors, warnings, info) =
-                queries::count_issues_by_severity(conn, &crawl.id)?;
+            let (errors, warnings, info) = queries::count_issues_by_severity(conn, &crawl.id)?;
             summaries.push(crawl_row_to_summary(
                 crawl,
-                IssueCounts { errors, warnings, info },
+                IssueCounts {
+                    errors,
+                    warnings,
+                    info,
+                },
             ));
         }
         Ok(summaries)
@@ -191,9 +191,8 @@ pub async fn get_crawl_results(
         let status_codes = status_codes_vec.as_deref();
         let content_type = filters.as_ref().and_then(|f| f.content_type.as_deref());
 
-        let total = queries::count_pages_filtered(
-            conn, &crawl_id, url_search, status_codes, content_type,
-        )?;
+        let total =
+            queries::count_pages_filtered(conn, &crawl_id, url_search, status_codes, content_type)?;
         let items = queries::select_pages(
             conn,
             &crawl_id,
@@ -225,11 +224,14 @@ pub async fn get_crawl_summary(
     db.with_conn(|conn| {
         let crawl = queries::select_crawl_by_id(conn, &crawl_id)?
             .ok_or_else(|| anyhow::anyhow!("Crawl not found: {}", crawl_id))?;
-        let (errors, warnings, info) =
-            queries::count_issues_by_severity(conn, &crawl_id)?;
+        let (errors, warnings, info) = queries::count_issues_by_severity(conn, &crawl_id)?;
         Ok(crawl_row_to_summary(
             &crawl,
-            IssueCounts { errors, warnings, info },
+            IssueCounts {
+                errors,
+                warnings,
+                info,
+            },
         ))
     })
     .map_err(|e| e.to_string())
@@ -271,17 +273,17 @@ pub async fn get_issues(
     let sort_desc = matches!(pagination.sort_dir, Some(SortDirection::Desc));
 
     db.with_conn(|conn| {
-        let severity_str = filters.as_ref()
+        let severity_str = filters
+            .as_ref()
             .and_then(|f| f.severity.as_ref())
             .map(severity_to_str);
-        let category_str = filters.as_ref()
+        let category_str = filters
+            .as_ref()
             .and_then(|f| f.category.as_ref())
             .map(category_to_str);
         let rule_id = filters.as_ref().and_then(|f| f.rule_id.as_deref());
 
-        let total = queries::count_issues(
-            conn, &crawl_id, severity_str, category_str, rule_id,
-        )?;
+        let total = queries::count_issues(conn, &crawl_id, severity_str, category_str, rule_id)?;
         let items = queries::select_issues(
             conn,
             &crawl_id,
@@ -321,7 +323,12 @@ pub async fn get_links(
         let anchor_text_missing = filters.as_ref().and_then(|f| f.anchor_text_missing);
 
         let total = queries::count_links(
-            conn, &crawl_id, link_type, is_internal, is_broken, anchor_text_missing,
+            conn,
+            &crawl_id,
+            link_type,
+            is_internal,
+            is_broken,
+            anchor_text_missing,
         )?;
         let items = queries::select_links(
             conn,
