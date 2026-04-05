@@ -109,28 +109,6 @@ pub struct PageDetail {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn severity_to_str(s: &Severity) -> &'static str {
-    match s {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Info => "info",
-    }
-}
-
-fn category_to_str(c: &RuleCategory) -> &'static str {
-    match c {
-        RuleCategory::Meta => "meta",
-        RuleCategory::Content => "content",
-        RuleCategory::Links => "links",
-        RuleCategory::Images => "images",
-        RuleCategory::Performance => "performance",
-        RuleCategory::Security => "security",
-        RuleCategory::Indexability => "indexability",
-        RuleCategory::Structured => "structured",
-        RuleCategory::International => "international",
-    }
-}
-
 fn crawl_row_to_summary(crawl: &CrawlRow, issue_counts: IssueCounts) -> CrawlSummary {
     CrawlSummary {
         crawl_id: crawl.id.clone(),
@@ -270,14 +248,16 @@ pub async fn get_issues(
     let sort_desc = matches!(pagination.sort_dir, Some(SortDirection::Desc));
 
     db.with_conn(|conn| {
-        let severity_str = filters
+        let severity_owned = filters
             .as_ref()
             .and_then(|f| f.severity.as_ref())
-            .map(severity_to_str);
-        let category_str = filters
+            .map(|s| s.to_string());
+        let category_owned = filters
             .as_ref()
             .and_then(|f| f.category.as_ref())
-            .map(category_to_str);
+            .map(|c| c.to_string());
+        let severity_str = severity_owned.as_deref();
+        let category_str = category_owned.as_deref();
         let rule_id = filters.as_ref().and_then(|f| f.rule_id.as_deref());
 
         let total = queries::count_issues(conn, &crawl_id, severity_str, category_str, rule_id)?;

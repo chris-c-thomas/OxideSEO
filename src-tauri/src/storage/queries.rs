@@ -571,11 +571,11 @@ pub fn count_issues_by_severity(conn: &Connection, crawl_id: &str) -> Result<(u6
     let mut info: u64 = 0;
 
     for row in rows.flatten() {
-        match row.0.as_str() {
-            "error" => errors = row.1 as u64,
-            "warning" => warnings = row.1 as u64,
-            "info" => info = row.1 as u64,
-            _ => {}
+        match row.0.parse::<crate::Severity>() {
+            Ok(crate::Severity::Error) => errors = row.1 as u64,
+            Ok(crate::Severity::Warning) => warnings = row.1 as u64,
+            Ok(crate::Severity::Info) => info = row.1 as u64,
+            Err(e) => tracing::warn!(severity = %row.0, "Unknown severity in issue counts: {e}"),
         }
     }
 

@@ -152,8 +152,8 @@ impl RuleRegistry {
                 (
                     r.id().to_string(),
                     r.name().to_string(),
-                    format!("{:?}", r.category()),
-                    format!("{:?}", r.default_severity()),
+                    r.category().to_string(),
+                    r.default_severity().to_string(),
                 )
             })
             .collect()

@@ -11,6 +11,7 @@ use rusqlite::params;
 use crate::storage::db::Database;
 use crate::storage::models::IssueRow;
 use crate::storage::queries;
+use crate::{RuleCategory, Severity};
 
 /// Analyzes a completed crawl for cross-page SEO issues.
 pub struct PostCrawlAnalyzer<'a> {
@@ -39,8 +40,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
         self.find_duplicates(
             queries::SELECT_DUPLICATE_TITLES,
             "meta.title_duplicate",
-            "meta",
-            "warning",
+            RuleCategory::Meta,
+            Severity::Warning,
             "title",
         )
     }
@@ -50,8 +51,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
         self.find_duplicates(
             queries::SELECT_DUPLICATE_DESCRIPTIONS,
             "meta.desc_duplicate",
-            "meta",
-            "warning",
+            RuleCategory::Meta,
+            Severity::Warning,
             "meta description",
         )
     }
@@ -61,8 +62,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
         self.find_duplicates(
             queries::SELECT_DUPLICATE_H1S,
             "content.h1_duplicate",
-            "content",
-            "warning",
+            RuleCategory::Content,
+            Severity::Warning,
             "H1",
         )
     }
@@ -74,8 +75,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
         &self,
         sql: &str,
         rule_id: &str,
-        category: &str,
-        severity: &str,
+        category: RuleCategory,
+        severity: Severity,
         field_name: &str,
     ) -> Result<Vec<IssueRow>> {
         let crawl_id = self.crawl_id.to_string();
@@ -107,8 +108,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
                         crawl_id: crawl_id.clone(),
                         page_id,
                         rule_id: rule_id.into(),
-                        severity: severity.into(),
-                        category: category.into(),
+                        severity,
+                        category,
                         message: format!(
                             "Duplicate {}: \"{}\" is shared by {} page(s).",
                             field_name, truncated_value, count
@@ -146,8 +147,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
                     crawl_id: crawl_id.clone(),
                     page_id: source_page,
                     rule_id: "links.broken_internal".into(),
-                    severity: "error".into(),
-                    category: "links".into(),
+                    severity: Severity::Error,
+                    category: RuleCategory::Links,
                     message: format!(
                         "Internal link to \"{}\" returned status {}.",
                         target_url, status_code
@@ -182,8 +183,8 @@ impl<'a> PostCrawlAnalyzer<'a> {
                     crawl_id: crawl_id.clone(),
                     page_id,
                     rule_id: "links.orphan_page".into(),
-                    severity: "warning".into(),
-                    category: "links".into(),
+                    severity: Severity::Warning,
+                    category: RuleCategory::Links,
                     message: format!("Page \"{}\" has no inbound internal links.", url),
                     detail_json: Some(
                         serde_json::json!({
@@ -367,7 +368,7 @@ mod tests {
         let issues = analyzer.find_broken_internal_links().unwrap();
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].rule_id, "links.broken_internal");
-        assert_eq!(issues[0].severity, "error");
+        assert_eq!(issues[0].severity, Severity::Error);
         assert_eq!(issues[0].page_id, source_id);
     }
 

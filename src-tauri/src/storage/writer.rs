@@ -326,8 +326,8 @@ mod tests {
             crawl_id: "test-2".into(),
             page_id: 1,
             rule_id: "meta.title_length".into(),
-            severity: "warning".into(),
-            category: "meta".into(),
+            severity: crate::Severity::Warning,
+            category: crate::RuleCategory::Meta,
             message: "Title too short".into(),
             detail_json: None,
         }]))

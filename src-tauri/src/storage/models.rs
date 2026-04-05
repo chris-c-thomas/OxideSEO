@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::{RuleCategory, Severity};
+
 /// Row in the `crawls` table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,8 +65,8 @@ pub struct IssueRow {
     pub crawl_id: String,
     pub page_id: i64,
     pub rule_id: String,
-    pub severity: String,
-    pub category: String,
+    pub severity: Severity,
+    pub category: RuleCategory,
     pub message: String,
     pub detail_json: Option<String>,
 }

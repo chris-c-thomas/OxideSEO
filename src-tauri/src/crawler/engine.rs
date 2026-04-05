@@ -430,8 +430,8 @@ pub async fn spawn_crawl(
                             crawl_id: task_crawl_id.clone(),
                             page_id: 0, // Resolved by storage writer
                             rule_id: i.rule_id.clone(),
-                            severity: format!("{:?}", i.severity).to_lowercase(),
-                            category: format!("{:?}", i.category).to_lowercase(),
+                            severity: i.severity,
+                            category: i.category,
                             message: i.message.clone(),
                             detail_json: i.detail.as_ref().map(|d| d.to_string()),
                         })

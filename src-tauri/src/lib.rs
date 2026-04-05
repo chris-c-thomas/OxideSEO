@@ -10,6 +10,10 @@ pub mod crawler;
 pub mod rules;
 pub mod storage;
 
+use std::fmt;
+use std::str::FromStr;
+
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -66,6 +70,44 @@ pub enum Severity {
     Info,
 }
 
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+            Severity::Info => "info",
+        };
+        f.write_str(s)
+    }
+}
+
+impl FromStr for Severity {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "error" => Ok(Severity::Error),
+            "warning" => Ok(Severity::Warning),
+            "info" => Ok(Severity::Info),
+            other => Err(format!("unknown severity: {other}")),
+        }
+    }
+}
+
+impl ToSql for Severity {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.to_string()))
+    }
+}
+
+impl FromSql for Severity {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value
+            .as_str()?
+            .parse()
+            .map_err(|e: String| FromSqlError::Other(e.into()))
+    }
+}
+
 /// SEO rule categories for grouping in UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +121,56 @@ pub enum RuleCategory {
     Indexability,
     Structured,
     International,
+}
+
+impl fmt::Display for RuleCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            RuleCategory::Meta => "meta",
+            RuleCategory::Content => "content",
+            RuleCategory::Links => "links",
+            RuleCategory::Images => "images",
+            RuleCategory::Performance => "performance",
+            RuleCategory::Security => "security",
+            RuleCategory::Indexability => "indexability",
+            RuleCategory::Structured => "structured",
+            RuleCategory::International => "international",
+        };
+        f.write_str(s)
+    }
+}
+
+impl FromStr for RuleCategory {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "meta" => Ok(RuleCategory::Meta),
+            "content" => Ok(RuleCategory::Content),
+            "links" => Ok(RuleCategory::Links),
+            "images" => Ok(RuleCategory::Images),
+            "performance" => Ok(RuleCategory::Performance),
+            "security" => Ok(RuleCategory::Security),
+            "indexability" => Ok(RuleCategory::Indexability),
+            "structured" => Ok(RuleCategory::Structured),
+            "international" => Ok(RuleCategory::International),
+            other => Err(format!("unknown rule category: {other}")),
+        }
+    }
+}
+
+impl ToSql for RuleCategory {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.to_string()))
+    }
+}
+
+impl FromSql for RuleCategory {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value
+            .as_str()?
+            .parse()
+            .map_err(|e: String| FromSqlError::Other(e.into()))
+    }
 }
 
 /// Link types stored in the `links` table.
