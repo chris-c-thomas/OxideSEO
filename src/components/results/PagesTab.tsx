@@ -1,3 +1,8 @@
+/**
+ * Pages tab: paginated table of all crawled pages with URL search,
+ * status code, and content type filters.
+ */
+
 import { useCallback, useMemo, useState } from "react";
 import { getCrawlResults } from "@/lib/commands";
 import { useServerData } from "@/hooks/useServerData";
@@ -15,7 +20,6 @@ export function PagesTab({ crawlId, onRowClick }: PagesTabProps) {
   const [filters, setFilters] = useState<PageFilters>({
     urlSearch: null,
     statusCodes: null,
-    minSeverity: null,
     contentType: null,
   });
 

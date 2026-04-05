@@ -15,11 +15,12 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [recentCrawls, setRecentCrawls] = useState<CrawlSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getRecentCrawls(20)
       .then(setRecentCrawls)
-      .catch(console.error)
+      .catch((err) => setError(String(err)))
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -48,7 +49,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {/* Recent crawls */}
       <section>
         <h2 className="mb-4 text-lg font-semibold">Recent Crawls</h2>
-        {isLoading ? (
+        {error && !isLoading ? (
+          <div
+            className="rounded-lg border p-4"
+            style={{ borderColor: "var(--color-severity-error)" }}
+          >
+            <p className="text-sm" style={{ color: "var(--color-severity-error)" }}>
+              Failed to load recent crawls: {error}
+            </p>
+          </div>
+        ) : isLoading ? (
           <p style={{ color: "var(--color-muted-foreground)" }}>Loading...</p>
         ) : recentCrawls.length === 0 ? (
           <div

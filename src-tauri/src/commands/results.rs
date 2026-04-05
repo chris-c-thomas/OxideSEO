@@ -10,6 +10,13 @@ use crate::storage::models::*;
 use crate::storage::queries;
 use crate::{RuleCategory, Severity};
 
+/// Maximum items per page to prevent excessive memory usage from buggy clients.
+const MAX_PAGE_LIMIT: u64 = 1000;
+
+fn clamp_limit(limit: u64) -> u64 {
+    limit.clamp(1, MAX_PAGE_LIMIT)
+}
+
 // ---------------------------------------------------------------------------
 // Pagination & filtering types
 // ---------------------------------------------------------------------------
@@ -35,7 +42,6 @@ pub enum SortDirection {
 pub struct PageFilters {
     pub url_search: Option<String>,
     pub status_codes: Option<Vec<u16>>,
-    pub min_severity: Option<Severity>,
     pub content_type: Option<String>,
 }
 
@@ -97,14 +103,6 @@ pub struct PageDetail {
     pub issues: Vec<IssueRow>,
     pub inbound_links: Vec<LinkRow>,
     pub outbound_links: Vec<LinkRow>,
-    pub redirect_chain: Option<Vec<RedirectHop>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RedirectHop {
-    pub url: String,
-    pub status_code: u16,
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +195,7 @@ pub async fn get_crawl_results(
             conn,
             &crawl_id,
             pagination.offset as i64,
-            pagination.limit as i64,
+            clamp_limit(pagination.limit) as i64,
             pagination.sort_by.as_deref(),
             sort_desc,
             url_search,
@@ -209,7 +207,7 @@ pub async fn get_crawl_results(
             items,
             total: total as u64,
             offset: pagination.offset,
-            limit: pagination.limit,
+            limit: clamp_limit(pagination.limit),
         })
     })
     .map_err(|e| e.to_string())
@@ -256,7 +254,6 @@ pub async fn get_page_detail(
             issues,
             inbound_links,
             outbound_links,
-            redirect_chain: None,
         })
     })
     .map_err(|e| e.to_string())
@@ -288,7 +285,7 @@ pub async fn get_issues(
             conn,
             &crawl_id,
             pagination.offset as i64,
-            pagination.limit as i64,
+            clamp_limit(pagination.limit) as i64,
             pagination.sort_by.as_deref(),
             sort_desc,
             severity_str,
@@ -300,7 +297,7 @@ pub async fn get_issues(
             items,
             total: total as u64,
             offset: pagination.offset,
-            limit: pagination.limit,
+            limit: clamp_limit(pagination.limit),
         })
     })
     .map_err(|e| e.to_string())
@@ -334,7 +331,7 @@ pub async fn get_links(
             conn,
             &crawl_id,
             pagination.offset as i64,
-            pagination.limit as i64,
+            clamp_limit(pagination.limit) as i64,
             pagination.sort_by.as_deref(),
             sort_desc,
             link_type,
@@ -347,7 +344,7 @@ pub async fn get_links(
             items,
             total: total as u64,
             offset: pagination.offset,
-            limit: pagination.limit,
+            limit: clamp_limit(pagination.limit),
         })
     })
     .map_err(|e| e.to_string())

@@ -1,3 +1,8 @@
+/**
+ * Links tab: paginated table of crawled links with link type,
+ * scope, and broken status filters.
+ */
+
 import { useCallback, useMemo, useState } from "react";
 import { getLinks } from "@/lib/commands";
 import { useServerData } from "@/hooks/useServerData";

@@ -1,3 +1,10 @@
+/**
+ * Server-driven data hook for paginated, sorted, and filtered table data.
+ *
+ * Manages infinite-scroll loading, sort/filter state, and request
+ * deduplication for Tauri IPC-backed DataTable components.
+ */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OnChangeFn, SortingState } from "@tanstack/react-table";
 import type { PaginatedResponse, PaginationParams } from "@/types";
@@ -67,6 +74,7 @@ export function useServerData<T, F>(
   useEffect(() => {
     const requestId = ++inFlightRef.current;
     setIsLoading(true);
+    setIsLoadingMore(false);
     setError(null);
 
     fetcher(buildPagination(0), filtersRef.current)
