@@ -54,19 +54,38 @@ pub struct ExportResult {
 fn default_columns(data_type: ExportDataType) -> Vec<String> {
     match data_type {
         ExportDataType::Pages => vec![
-            "url", "statusCode", "title", "metaDesc", "h1", "canonical",
-            "contentType", "responseTimeMs", "bodySize", "depth", "state",
-            "robotsDirectives", "fetchedAt", "errorMessage",
+            "url",
+            "statusCode",
+            "title",
+            "metaDesc",
+            "h1",
+            "canonical",
+            "contentType",
+            "responseTimeMs",
+            "bodySize",
+            "depth",
+            "state",
+            "robotsDirectives",
+            "fetchedAt",
+            "errorMessage",
         ],
         ExportDataType::Issues => vec![
-            "ruleId", "severity", "category", "message", "pageId", "detailJson",
+            "ruleId",
+            "severity",
+            "category",
+            "message",
+            "pageId",
+            "detailJson",
         ],
         ExportDataType::Links => vec![
-            "sourcePage", "targetUrl", "anchorText", "linkType", "isInternal", "nofollow",
+            "sourcePage",
+            "targetUrl",
+            "anchorText",
+            "linkType",
+            "isInternal",
+            "nofollow",
         ],
-        ExportDataType::Images => vec![
-            "sourcePage", "targetUrl", "anchorText", "isInternal",
-        ],
+        ExportDataType::Images => vec!["sourcePage", "targetUrl", "anchorText", "isInternal"],
         ExportDataType::FullReport => vec![],
     }
     .into_iter()
@@ -358,7 +377,8 @@ fn export_html_report_inner(
             .ok_or_else(|| anyhow::anyhow!("Crawl not found: {crawl_id}"))?;
 
         let (errors, warnings, info) = queries::count_issues_by_severity(conn, crawl_id)?;
-        let (s2xx, s3xx, s4xx, s5xx, _other) = queries::count_pages_by_status_group(conn, crawl_id)?;
+        let (s2xx, s3xx, s4xx, s5xx, _other) =
+            queries::count_pages_by_status_group(conn, crawl_id)?;
         let avg_ms = queries::avg_response_time(conn, crawl_id)?;
         let top_issues = queries::select_top_issues_by_rule(conn, crawl_id, 15)?;
 
@@ -367,7 +387,10 @@ fn export_html_report_inner(
         let template = include_str!("../../templates/report.html");
         let html = template
             .replace("{{START_URL}}", &html_escape(&crawl.start_url))
-            .replace("{{STARTED_AT}}", &html_escape(&crawl.started_at.unwrap_or_default()))
+            .replace(
+                "{{STARTED_AT}}",
+                &html_escape(&crawl.started_at.unwrap_or_default()),
+            )
             .replace("{{STATUS}}", &html_escape(&crawl.status))
             .replace("{{TOTAL_PAGES}}", &crawl.urls_crawled.to_string())
             .replace("{{ERRORS}}", &errors.to_string())
@@ -572,10 +595,7 @@ pub async fn open_crawl_file(
     let crawl_id = db
         .with_conn(|conn| {
             let escaped_path = file_path.to_string_lossy().replace('\'', "''");
-            conn.execute_batch(&format!(
-                "ATTACH DATABASE '{}' AS source",
-                escaped_path
-            ))?;
+            conn.execute_batch(&format!("ATTACH DATABASE '{}' AS source", escaped_path))?;
 
             // Get the crawl ID from the source file.
             let crawl_id: String = conn

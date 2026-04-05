@@ -7,6 +7,7 @@ import { IssuesTab } from "./IssuesTab";
 import { LinksTab } from "./LinksTab";
 import { ImagesTab } from "./ImagesTab";
 import { PageDetail } from "./PageDetail";
+import { ExportDialog } from "@/components/export/ExportDialog";
 import { Badge } from "@/components/ui/badge";
 
 interface ResultsExplorerProps {
@@ -27,6 +28,7 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
   const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
   const [summary, setSummary] = useState<CrawlSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   useEffect(() => {
     if (!crawlId) return;
@@ -62,7 +64,7 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
         style={{ borderColor: "var(--color-border)" }}
       >
         <h1 className="text-lg font-bold tracking-tight">Results</h1>
-        <div className="flex gap-1">
+        <div className="flex flex-1 gap-1">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -84,6 +86,13 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setShowExportDialog(true)}
+          className="rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-muted)]"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          Export
+        </button>
       </div>
 
       {/* Summary bar */}
@@ -150,6 +159,14 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
           onClose={() => setSelectedPageId(null)}
         />
       )}
+
+      {/* Export dialog */}
+      <ExportDialog
+        crawlId={crawlId}
+        open={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        activeTab={activeTab}
+      />
     </div>
   );
 }

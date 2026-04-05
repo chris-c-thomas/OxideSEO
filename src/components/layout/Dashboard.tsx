@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import type { AppView } from "@/App";
-import { getRecentCrawls } from "@/lib/commands";
+import { getRecentCrawls, openCrawlFile, saveCrawlFile } from "@/lib/commands";
 import { formatNumber, stateColor } from "@/lib/utils";
 import type { CrawlSummary } from "@/types";
 
@@ -17,12 +17,39 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadCrawls = () => {
+    setIsLoading(true);
+    setError(null);
     getRecentCrawls(20)
       .then(setRecentCrawls)
       .catch((err) => setError(String(err)))
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadCrawls();
   }, []);
+
+  const handleOpenFile = async () => {
+    try {
+      const crawlId = await openCrawlFile();
+      if (crawlId) {
+        loadCrawls();
+        onNavigate("results", crawlId);
+      }
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleSaveCrawl = async (crawlId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await saveCrawlFile(crawlId);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-8">
@@ -34,16 +61,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             Overview of your SEO crawls and audits.
           </p>
         </div>
-        <button
-          onClick={() => onNavigate("crawl-config")}
-          className="rounded-md px-4 py-2 text-sm font-medium"
-          style={{
-            backgroundColor: "var(--color-primary)",
-            color: "var(--color-primary-foreground)",
-          }}
-        >
-          New Crawl
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleOpenFile}
+            className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--color-muted)]"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            Open File
+          </button>
+          <button
+            onClick={() => onNavigate("crawl-config")}
+            className="rounded-md px-4 py-2 text-sm font-medium"
+            style={{
+              backgroundColor: "var(--color-primary)",
+              color: "var(--color-primary-foreground)",
+            }}
+          >
+            New Crawl
+          </button>
+        </div>
       </div>
 
       {/* Recent crawls */}
@@ -134,6 +170,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 >
                   {crawl.status}
                 </span>
+                <button
+                  onClick={(e) => handleSaveCrawl(crawl.crawlId, e)}
+                  className="rounded-md border px-2 py-1 text-xs transition-colors hover:bg-[var(--color-muted)]"
+                  style={{ borderColor: "var(--color-border)" }}
+                  title="Save as .seocrawl file"
+                >
+                  Save
+                </button>
               </button>
             ))}
           </div>

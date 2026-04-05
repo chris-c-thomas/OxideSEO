@@ -95,8 +95,8 @@ pub async fn set_settings(
             .unwrap_or_else(|| "csv".into());
         queries::set_setting(conn, "default_export_format", &export_str)?;
 
-        let config_str = serde_json::to_string(&settings.default_crawl_config)
-            .unwrap_or_else(|_| "{}".into());
+        let config_str =
+            serde_json::to_string(&settings.default_crawl_config).unwrap_or_else(|_| "{}".into());
         queries::set_setting(conn, "default_crawl_config", &config_str)?;
 
         Ok(())
