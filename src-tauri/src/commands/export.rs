@@ -449,22 +449,177 @@ fn build_top_issues_table(issues: &[(String, String, String, i64)]) -> String {
 // ---------------------------------------------------------------------------
 
 /// Save a crawl to a standalone .seocrawl file.
+///
+/// Creates a new SQLite database at the user-chosen path, runs migrations,
+/// then copies the crawl's data from the app DB via ATTACH DATABASE.
+/// Returns the saved file path, or None if the user cancelled the dialog.
 #[tauri::command]
 pub async fn save_crawl_file(
-    _crawl_id: String,
-    _db: State<'_, Arc<Database>>,
-    _app: tauri::AppHandle,
+    crawl_id: String,
+    db: State<'_, Arc<Database>>,
+    app: tauri::AppHandle,
 ) -> Result<Option<String>, String> {
-    // TODO(phase-5): Create new SQLite DB, copy crawl data via ATTACH.
-    Err("Save crawl file not yet implemented".into())
+    let domain = domain_from_crawl(&db, &crawl_id);
+    let filename = format!("{domain}-{crawl_id}.seocrawl");
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("OxideSEO Crawl", &["seocrawl"])
+        .set_file_name(&filename)
+        .set_title("Save Crawl File")
+        .blocking_save_file()
+        .and_then(|fp| fp.into_path().ok());
+
+    let file_path = match file_path {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+
+    // Create a fresh DB at the target path with migrations.
+    let target = Database::create_crawl_db(
+        file_path.parent().unwrap_or(std::path::Path::new(".")),
+        // Use a temp name, then rename — but create_crawl_db builds its own name.
+        // Instead, create the DB directly at the chosen path.
+        &crawl_id,
+    )
+    .map_err(|e| format!("Failed to create crawl file: {e:#}"))?;
+
+    // The file was created at dir/crawl_id.seocrawl — rename to the user's chosen name.
+    let created_path = target.path.clone();
+    drop(target); // Close the connection before renaming.
+    if created_path != file_path {
+        std::fs::rename(&created_path, &file_path)
+            .map_err(|e| format!("Failed to rename crawl file: {e}"))?;
+    }
+
+    // Copy data from the app DB into the target via ATTACH.
+    db.with_conn(|conn| {
+        let escaped_path = file_path.to_string_lossy().replace('\'', "''");
+        conn.execute_batch(&format!("ATTACH DATABASE '{}' AS target", escaped_path))?;
+
+        conn.execute(
+            "INSERT INTO target.crawls SELECT * FROM crawls WHERE id = ?1",
+            rusqlite::params![crawl_id],
+        )?;
+        conn.execute(
+            "INSERT INTO target.pages SELECT * FROM pages WHERE crawl_id = ?1",
+            rusqlite::params![crawl_id],
+        )?;
+        conn.execute(
+            "INSERT INTO target.links SELECT * FROM links WHERE crawl_id = ?1",
+            rusqlite::params![crawl_id],
+        )?;
+        conn.execute(
+            "INSERT INTO target.issues SELECT * FROM issues WHERE crawl_id = ?1",
+            rusqlite::params![crawl_id],
+        )?;
+
+        conn.execute_batch("DETACH DATABASE target")?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to save crawl data: {e:#}"))?;
+
+    let path_str = file_path.to_string_lossy().to_string();
+    tracing::info!(path = %path_str, crawl_id = %crawl_id, "Crawl file saved");
+    Ok(Some(path_str))
 }
 
-/// Open a .seocrawl file and import its crawl data.
+/// Open a .seocrawl file and import its crawl data into the app database.
+///
+/// Attaches the external file, copies all crawl/page/link/issue rows into
+/// the app DB, then detaches. Returns the imported crawl ID, or None if cancelled.
 #[tauri::command]
 pub async fn open_crawl_file(
-    _db: State<'_, Arc<Database>>,
-    _app: tauri::AppHandle,
+    db: State<'_, Arc<Database>>,
+    app: tauri::AppHandle,
 ) -> Result<Option<String>, String> {
-    // TODO(phase-5): Open dialog, validate, import via ATTACH, return crawl_id.
-    Err("Open crawl file not yet implemented".into())
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("OxideSEO Crawl", &["seocrawl"])
+        .set_title("Open Crawl File")
+        .blocking_pick_file()
+        .and_then(|fp| fp.into_path().ok());
+
+    let file_path = match file_path {
+        Some(p) => p,
+        None => return Ok(None),
+    };
+
+    // Validate the file has a crawls table.
+    {
+        let check_conn = rusqlite::Connection::open_with_flags(
+            &file_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|e| format!("Cannot open file: {e}"))?;
+
+        let has_crawls: bool = check_conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='crawls'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        if !has_crawls {
+            return Err("Invalid .seocrawl file: missing crawls table".into());
+        }
+    }
+
+    // Import data via ATTACH.
+    let crawl_id = db
+        .with_conn(|conn| {
+            let escaped_path = file_path.to_string_lossy().replace('\'', "''");
+            conn.execute_batch(&format!(
+                "ATTACH DATABASE '{}' AS source",
+                escaped_path
+            ))?;
+
+            // Get the crawl ID from the source file.
+            let crawl_id: String = conn
+                .query_row("SELECT id FROM source.crawls LIMIT 1", [], |row| row.get(0))
+                .context("No crawl found in .seocrawl file")?;
+
+            // Check if this crawl already exists in the app DB.
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) > 0 FROM crawls WHERE id = ?1",
+                    rusqlite::params![crawl_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if exists {
+                conn.execute_batch("DETACH DATABASE source")?;
+                anyhow::bail!("Crawl {} is already imported", crawl_id);
+            }
+
+            conn.execute(
+                "INSERT INTO crawls SELECT * FROM source.crawls WHERE id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            conn.execute(
+                "INSERT INTO pages SELECT * FROM source.pages WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            conn.execute(
+                "INSERT INTO links SELECT * FROM source.links WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            conn.execute(
+                "INSERT INTO issues SELECT * FROM source.issues WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+
+            conn.execute_batch("DETACH DATABASE source")?;
+
+            Ok(crawl_id)
+        })
+        .map_err(|e| format!("Failed to import crawl: {e:#}"))?;
+
+    let path_str = file_path.to_string_lossy().to_string();
+    tracing::info!(path = %path_str, crawl_id = %crawl_id, "Crawl file imported");
+    Ok(Some(crawl_id))
 }
