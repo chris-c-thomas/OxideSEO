@@ -129,13 +129,17 @@ impl LlmProvider for OpenAiProvider {
         };
 
         let start = Instant::now();
-        let resp = retry_with_backoff(|| {
-            self.client
-                .post("https://api.openai.com/v1/chat/completions")
-                .header("Authorization", format!("Bearer {}", self.api_key))
-                .json(&body)
-                .send()
-        })
+        let resp = super::retry_with_backoff(
+            || {
+                self.client
+                    .post("https://api.openai.com/v1/chat/completions")
+                    .header("Authorization", format!("Bearer {}", self.api_key))
+                    .json(&body)
+                    .send()
+            },
+            &[429],
+            "OpenAI",
+        )
         .await?;
 
         let status = resp.status();
@@ -159,7 +163,8 @@ impl LlmProvider for OpenAiProvider {
             .choices
             .first()
             .and_then(|c| c.message.content.clone())
-            .unwrap_or_default();
+            .filter(|t| !t.is_empty())
+            .ok_or_else(|| anyhow::anyhow!("OpenAI returned empty response content"))?;
 
         Ok(CompletionResponse {
             text,
@@ -178,13 +183,10 @@ impl LlmProvider for OpenAiProvider {
             temperature: 0.0,
             response_format: ResponseFormat::Text,
         };
-        match self.complete(req).await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                tracing::warn!(error = %e, "OpenAI health check failed");
-                Ok(false)
-            }
-        }
+        self.complete(req)
+            .await
+            .context("OpenAI health check failed")?;
+        Ok(true)
     }
 
     fn cost_estimate(&self) -> (f64, f64) {
@@ -197,53 +199,6 @@ impl LlmProvider for OpenAiProvider {
             _ => (0.005, 0.015), // conservative default
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Retry with exponential backoff on 429
-// ---------------------------------------------------------------------------
-
-async fn retry_with_backoff<F, Fut>(mut make_request: F) -> Result<reqwest::Response>
-where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = reqwest::Result<reqwest::Response>>,
-{
-    let delays = [
-        std::time::Duration::from_secs(1),
-        std::time::Duration::from_secs(2),
-        std::time::Duration::from_secs(4),
-    ];
-
-    for (attempt, delay) in delays.iter().enumerate() {
-        let resp = make_request()
-            .await
-            .context("HTTP request to OpenAI failed")?;
-
-        if resp.status().as_u16() != 429 {
-            return Ok(resp);
-        }
-
-        // Respect Retry-After header if present.
-        let wait = resp
-            .headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(std::time::Duration::from_secs)
-            .unwrap_or(*delay);
-
-        tracing::warn!(
-            attempt = attempt + 1,
-            wait_secs = wait.as_secs(),
-            "OpenAI rate limited (429), retrying"
-        );
-        tokio::time::sleep(wait).await;
-    }
-
-    // Final attempt — return whatever we get.
-    make_request()
-        .await
-        .context("HTTP request to OpenAI failed after retries")
 }
 
 #[cfg(test)]

@@ -123,15 +123,20 @@ impl LlmProvider for AnthropicProvider {
         };
 
         let start = Instant::now();
-        let resp = retry_with_backoff(|| {
-            self.client
-                .post("https://api.anthropic.com/v1/messages")
-                .header("x-api-key", &self.api_key)
-                .header("anthropic-version", "2023-06-01")
-                .header("content-type", "application/json")
-                .json(&body)
-                .send()
-        })
+        // Anthropic uses 429 for rate limits and 529 for overloaded.
+        let resp = super::retry_with_backoff(
+            || {
+                self.client
+                    .post("https://api.anthropic.com/v1/messages")
+                    .header("x-api-key", &self.api_key)
+                    .header("anthropic-version", "2023-06-01")
+                    .header("content-type", "application/json")
+                    .json(&body)
+                    .send()
+            },
+            &[429, 529],
+            "Anthropic",
+        )
         .await?;
 
         let status = resp.status();
@@ -155,7 +160,8 @@ impl LlmProvider for AnthropicProvider {
             .content
             .first()
             .and_then(|c| c.text.clone())
-            .unwrap_or_default();
+            .filter(|t| !t.is_empty())
+            .ok_or_else(|| anyhow::anyhow!("Anthropic returned empty response content"))?;
 
         Ok(CompletionResponse {
             text,
@@ -174,13 +180,10 @@ impl LlmProvider for AnthropicProvider {
             temperature: 0.0,
             response_format: ResponseFormat::Text,
         };
-        match self.complete(req).await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                tracing::warn!(error = %e, "Anthropic health check failed");
-                Ok(false)
-            }
-        }
+        self.complete(req)
+            .await
+            .context("Anthropic health check failed")?;
+        Ok(true)
     }
 
     fn cost_estimate(&self) -> (f64, f64) {
@@ -192,54 +195,6 @@ impl LlmProvider for AnthropicProvider {
             _ => (0.003, 0.015), // default to sonnet-tier pricing
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Retry with exponential backoff on 429/529
-// ---------------------------------------------------------------------------
-
-async fn retry_with_backoff<F, Fut>(mut make_request: F) -> Result<reqwest::Response>
-where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = reqwest::Result<reqwest::Response>>,
-{
-    let delays = [
-        std::time::Duration::from_secs(1),
-        std::time::Duration::from_secs(2),
-        std::time::Duration::from_secs(4),
-    ];
-
-    for (attempt, delay) in delays.iter().enumerate() {
-        let resp = make_request()
-            .await
-            .context("HTTP request to Anthropic failed")?;
-
-        let status = resp.status().as_u16();
-        // Anthropic uses 429 for rate limits and 529 for overloaded.
-        if status != 429 && status != 529 {
-            return Ok(resp);
-        }
-
-        let wait = resp
-            .headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(std::time::Duration::from_secs)
-            .unwrap_or(*delay);
-
-        tracing::warn!(
-            attempt = attempt + 1,
-            status,
-            wait_secs = wait.as_secs(),
-            "Anthropic rate limited, retrying"
-        );
-        tokio::time::sleep(wait).await;
-    }
-
-    make_request()
-        .await
-        .context("HTTP request to Anthropic failed after retries")
 }
 
 #[cfg(test)]

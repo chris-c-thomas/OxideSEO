@@ -4,10 +4,8 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use serde::Serialize;
-use tokio::sync::Semaphore;
+use serde::{Deserialize, Serialize};
 
-use crate::commands::ai::BatchAnalysisResult;
 use crate::storage::db::Database;
 use crate::storage::models::{AiAnalysisRow, AiCrawlSummaryRow, PageRow};
 use crate::storage::queries;
@@ -15,11 +13,19 @@ use crate::storage::queries;
 use super::prompts;
 use super::provider::{CompletionResponse, LlmProvider};
 
-/// Maximum concurrent LLM requests.
-const MAX_CONCURRENT_REQUESTS: usize = 3;
-
 /// Delay between requests to avoid bursting (milliseconds).
 const REQUEST_DELAY_MS: u64 = 200;
+
+/// Result summary from batch analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAnalysisResult {
+    pub pages_analyzed: u32,
+    pub total_input_tokens: u64,
+    pub total_output_tokens: u64,
+    pub total_cost_usd: f64,
+    pub errors: u32,
+}
 
 /// AI analysis progress event payload.
 #[derive(Debug, Clone, Serialize)]
@@ -52,23 +58,7 @@ impl AiAnalysisEngine {
     ) -> Result<Vec<AiAnalysisRow>> {
         let mut results = Vec::new();
 
-        // Get body text for the page from the database.
-        let body_text = self
-            .db
-            .with_conn(|conn| {
-                let text: Option<String> = conn
-                    .query_row(
-                        "SELECT body_text FROM pages WHERE crawl_id = ?1 AND id = ?2",
-                        rusqlite::params![crawl_id, page.id],
-                        |r| r.get(0),
-                    )
-                    .ok()
-                    .flatten();
-                Ok(text)
-            })
-            .unwrap_or(None);
-
-        let body_text = body_text.unwrap_or_default();
+        let body_text = page.body_text.as_deref().unwrap_or_default();
         if body_text.is_empty() {
             tracing::warn!(page_id = page.id, "No body text available for AI analysis");
             return Ok(results);
@@ -80,12 +70,9 @@ impl AiAnalysisEngine {
 
         for analysis_type in analysis_types {
             // Check cache first.
-            let cached = self
-                .db
-                .with_conn(|conn| {
-                    queries::select_ai_analysis_by_hash(conn, crawl_id, &hash_bytes, analysis_type)
-                })
-                .unwrap_or(None);
+            let cached = self.db.with_conn(|conn| {
+                queries::select_ai_analysis_by_hash(conn, crawl_id, &hash_bytes, analysis_type)
+            })?;
 
             if let Some(cached_row) = cached {
                 tracing::debug!(page_id = page.id, analysis_type, "Using cached AI analysis");
@@ -96,15 +83,15 @@ impl AiAnalysisEngine {
             // Build prompt and call LLM.
             let request = match analysis_type.as_str() {
                 "content_score" => {
-                    prompts::content_quality_request(&body_text, &page.url, page.title.as_deref())
+                    prompts::content_quality_request(body_text, &page.url, page.title.as_deref())
                 }
                 "meta_desc" => prompts::meta_description_request(
-                    &body_text,
+                    body_text,
                     page.title.as_deref(),
                     page.meta_desc.as_deref(),
                 ),
                 "title_tag" => {
-                    prompts::title_tag_request(&body_text, page.title.as_deref(), &page.url)
+                    prompts::title_tag_request(body_text, page.title.as_deref(), &page.url)
                 }
                 other => {
                     tracing::warn!(analysis_type = other, "Unknown analysis type, skipping");
@@ -174,7 +161,6 @@ impl AiAnalysisEngine {
         use tauri::Emitter;
 
         let total = pages.len() as u32;
-        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS));
         let mut completed = 0u32;
         let mut total_input_tokens = 0u64;
         let mut total_output_tokens = 0u64;
@@ -196,14 +182,8 @@ impl AiAnalysisEngine {
                 break;
             }
 
-            let _permit = semaphore
-                .clone()
-                .acquire_owned()
-                .await
-                .context("Semaphore closed")?;
-
             // Emit progress event.
-            let _ = app_handle.emit(
+            if let Err(e) = app_handle.emit(
                 "ai://progress",
                 BatchProgress {
                     completed,
@@ -212,7 +192,9 @@ impl AiAnalysisEngine {
                     tokens_used,
                     budget_remaining: budget_limit.saturating_sub(tokens_used),
                 },
-            );
+            ) {
+                tracing::warn!(error = %e, "Failed to emit AI progress event");
+            }
 
             match self.analyze_page(crawl_id, page, analysis_types).await {
                 Ok(results) => {
@@ -236,7 +218,7 @@ impl AiAnalysisEngine {
         }
 
         // Final progress event.
-        let _ = app_handle.emit(
+        if let Err(e) = app_handle.emit(
             "ai://progress",
             BatchProgress {
                 completed,
@@ -246,7 +228,9 @@ impl AiAnalysisEngine {
                 budget_remaining: budget_limit
                     .saturating_sub(total_input_tokens + total_output_tokens),
             },
-        );
+        ) {
+            tracing::warn!(error = %e, "Failed to emit final AI progress event");
+        }
 
         Ok(BatchAnalysisResult {
             pages_analyzed: completed,

@@ -8,8 +8,9 @@ pub mod ollama;
 pub mod openai;
 
 use std::fmt;
+use std::time::Duration;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use super::provider::LlmProvider;
@@ -57,6 +58,56 @@ impl Default for AiProviderConfig {
             is_configured: false,
         }
     }
+}
+
+/// Retry an HTTP request with exponential backoff on retryable status codes.
+///
+/// Retries up to 3 times with 1s/2s/4s base delays. Respects `Retry-After`
+/// headers when present. Used by OpenAI and Anthropic adapters.
+pub(crate) async fn retry_with_backoff<F, Fut>(
+    mut make_request: F,
+    retryable_statuses: &[u16],
+    provider_name: &str,
+) -> Result<reqwest::Response>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = reqwest::Result<reqwest::Response>>,
+{
+    let delays = [
+        Duration::from_secs(1),
+        Duration::from_secs(2),
+        Duration::from_secs(4),
+    ];
+
+    for (attempt, delay) in delays.iter().enumerate() {
+        let resp = make_request()
+            .await
+            .with_context(|| format!("HTTP request to {provider_name} failed"))?;
+
+        if !retryable_statuses.contains(&resp.status().as_u16()) {
+            return Ok(resp);
+        }
+
+        let wait = resp
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(Duration::from_secs)
+            .unwrap_or(*delay);
+
+        tracing::warn!(
+            attempt = attempt + 1,
+            status = resp.status().as_u16(),
+            wait_secs = wait.as_secs(),
+            "{provider_name} rate limited, retrying"
+        );
+        tokio::time::sleep(wait).await;
+    }
+
+    make_request()
+        .await
+        .with_context(|| format!("HTTP request to {provider_name} failed after retries"))
 }
 
 /// Create a boxed `LlmProvider` from config and an optional API key.

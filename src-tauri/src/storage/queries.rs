@@ -1129,31 +1129,7 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
 // AI analysis queries (Phase 7)
 // ---------------------------------------------------------------------------
 
-/// Insert an AI analysis result. Uses INSERT OR REPLACE to handle re-analysis.
-pub fn insert_ai_analysis(conn: &Connection, row: &AiAnalysisRow) -> Result<i64> {
-    conn.execute(
-        r#"INSERT OR REPLACE INTO ai_analyses
-           (crawl_id, page_id, analysis_type, content_hash, provider, model,
-            result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))"#,
-        params![
-            row.crawl_id,
-            row.page_id,
-            row.analysis_type,
-            Vec::<u8>::new(), // content_hash is set by caller via separate param
-            row.provider,
-            row.model,
-            row.result_json,
-            row.input_tokens,
-            row.output_tokens,
-            row.cost_usd,
-            row.latency_ms,
-        ],
-    )?;
-    Ok(conn.last_insert_rowid())
-}
-
-/// Insert an AI analysis with a specific content hash for caching.
+/// Insert an AI analysis with a content hash for caching.
 pub fn insert_ai_analysis_with_hash(
     conn: &Connection,
     row: &AiAnalysisRow,

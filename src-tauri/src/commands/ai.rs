@@ -25,16 +25,8 @@ pub struct BatchAnalysisFilter {
     pub max_pages: u32,
 }
 
-/// Result summary from batch analysis.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchAnalysisResult {
-    pub pages_analyzed: u32,
-    pub total_input_tokens: u64,
-    pub total_output_tokens: u64,
-    pub total_cost_usd: f64,
-    pub errors: u32,
-}
+// Re-export from engine to maintain public API.
+pub use crate::ai::engine::BatchAnalysisResult;
 
 // ---------------------------------------------------------------------------
 // Provider configuration commands
@@ -106,20 +98,16 @@ pub async fn test_ai_connection(db: State<'_, Arc<Database>>) -> Result<String, 
 
     let provider = create_provider(&config, api_key.as_deref()).map_err(|e| format!("{e:#}"))?;
 
-    let healthy = provider
+    provider
         .health_check()
         .await
         .map_err(|e| format!("{e:#}"))?;
 
-    if healthy {
-        Ok(format!(
-            "Connected to {} (model: {})",
-            provider.name(),
-            config.model
-        ))
-    } else {
-        Err(format!("Failed to connect to {}", provider.name()))
-    }
+    Ok(format!(
+        "Connected to {} (model: {})",
+        provider.name(),
+        config.model
+    ))
 }
 
 // ---------------------------------------------------------------------------

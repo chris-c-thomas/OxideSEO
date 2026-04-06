@@ -163,6 +163,7 @@ function AiProviderSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     getAiConfig()
@@ -170,15 +171,16 @@ function AiProviderSection() {
         setConfig(cfg);
         setKeyStored(cfg.isConfigured);
       })
-      .catch(console.error);
+      .catch((err) => setLoadError(String(err)));
   }, []);
 
   const refreshKeyStatus = async (provider: AiProviderType) => {
     try {
       const has = await hasApiKey(provider);
       setKeyStored(has);
-    } catch {
+    } catch (err) {
       setKeyStored(false);
+      setMessage(`Warning: could not check key status: ${err}`);
     }
   };
 
@@ -248,6 +250,22 @@ function AiProviderSection() {
       setIsTesting(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">AI Providers</h2>
+        <div
+          className="rounded-lg border p-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <p className="text-sm" style={{ color: "var(--color-severity-error, red)" }}>
+            Failed to load AI configuration: {loadError}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   if (!config) return null;
 

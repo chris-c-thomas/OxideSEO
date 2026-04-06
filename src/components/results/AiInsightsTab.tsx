@@ -31,16 +31,18 @@ export function AiInsightsTab({ crawlId }: AiInsightsTabProps) {
   const [summary, setSummary] = useState<AiCrawlSummaryRow | null>(null);
   const [usage, setUsage] = useState<AiUsageRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
+    setLoadError(null);
     Promise.all([getAiConfig(), getCrawlAiSummary(crawlId), getAiUsage(crawlId)])
-      .then(([cfg, sum, use]) => {
+      .then(([cfg, sum, usg]) => {
         setConfig(cfg);
         setSummary(sum);
-        setUsage(use);
+        setUsage(usg);
       })
-      .catch(console.error)
+      .catch((err) => setLoadError(String(err)))
       .finally(() => setIsLoading(false));
   }, [crawlId]);
 
@@ -51,6 +53,19 @@ export function AiInsightsTab({ crawlId }: AiInsightsTabProps) {
           className="h-6 w-6 animate-spin"
           style={{ color: "var(--color-muted-foreground)" }}
         />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-12">
+        <p className="text-sm" style={{ color: "var(--color-severity-error)" }}>
+          Failed to load AI configuration
+        </p>
+        <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+          {loadError}
+        </p>
       </div>
     );
   }

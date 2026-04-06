@@ -567,21 +567,27 @@ pub fn count_words(text: &str) -> u32 {
     text.split_whitespace().count() as u32
 }
 
-/// Truncate body text to at most 8000 characters for AI analysis storage.
+/// Truncate body text to at most 8000 bytes for AI analysis storage.
 /// Returns `None` if the text is empty after trimming.
+/// Truncates at a word boundary and respects UTF-8 char boundaries.
 fn truncate_body_text(text: &str) -> Option<String> {
     // Normalize whitespace: collapse runs of whitespace into single spaces.
     let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if normalized.is_empty() {
         return None;
     }
-    const MAX_BODY_TEXT_CHARS: usize = 8000;
-    if normalized.len() <= MAX_BODY_TEXT_CHARS {
+    const MAX_BODY_TEXT_BYTES: usize = 8000;
+    if normalized.len() <= MAX_BODY_TEXT_BYTES {
         Some(normalized)
     } else {
-        // Truncate at a word boundary near the limit.
-        let truncated = &normalized[..MAX_BODY_TEXT_CHARS];
-        let end = truncated.rfind(' ').unwrap_or(MAX_BODY_TEXT_CHARS);
+        // Find a safe byte offset that does not split a multi-byte UTF-8 character.
+        let mut end = MAX_BODY_TEXT_BYTES;
+        while !normalized.is_char_boundary(end) {
+            end -= 1;
+        }
+        // Prefer truncation at a word boundary.
+        let truncated = &normalized[..end];
+        let end = truncated.rfind(' ').unwrap_or(end);
         Some(normalized[..end].to_string())
     }
 }
