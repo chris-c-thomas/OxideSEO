@@ -22,7 +22,7 @@ use crate::crawler::robots::RobotsCache;
 use crate::rules::engine::RuleRegistry;
 use crate::rules::rule::CrawlContext;
 use crate::storage::db::Database;
-use crate::storage::models::{IssueRow, LinkRow, PageRow, StorageCommand};
+use crate::storage::models::{IssueRow, LinkRow, PageRow, SitemapUrlRow, StorageCommand};
 use crate::storage::writer::spawn_storage_writer;
 
 /// Handle to a running crawl. Used to control lifecycle from Tauri commands.
@@ -184,6 +184,78 @@ pub async fn spawn_crawl(
     let started_at = handle.started_at;
     tokio::spawn(async move {
         tracing::info!(%crawl_id, "Crawl orchestrator started");
+
+        // --- Sitemap discovery (before main crawl loop) ---
+        if config.enable_sitemap_discovery {
+            // Ensure robots.txt is fetched so we can extract Sitemap: directives.
+            {
+                let mut rc = robots_cache.lock().await;
+                if !rc.has_cached(&root_domain) {
+                    rc.fetch_and_cache_with_scheme(&root_domain, &seed_scheme, fetcher.client())
+                        .await
+                        .ok();
+                }
+            }
+
+            let robots_sitemaps = {
+                let rc = robots_cache.lock().await;
+                rc.sitemaps(&root_domain)
+            };
+
+            let sitemap_urls = crate::crawler::sitemap::discover_sitemaps(
+                &root_domain,
+                &seed_scheme,
+                fetcher.client(),
+                &robots_sitemaps,
+            )
+            .await;
+
+            if !sitemap_urls.is_empty() {
+                let entries =
+                    crate::crawler::sitemap::fetch_all_sitemaps(&sitemap_urls, fetcher.client())
+                        .await;
+
+                tracing::info!(count = entries.len(), "Sitemap entries discovered");
+
+                // Store sitemap URLs in the database.
+                let sitemap_rows: Vec<SitemapUrlRow> = entries
+                    .iter()
+                    .map(|e| SitemapUrlRow {
+                        id: 0,
+                        crawl_id: crawl_id.clone(),
+                        url: e.url.clone(),
+                        lastmod: e.lastmod.clone(),
+                        changefreq: e.changefreq.clone(),
+                        priority: e.priority,
+                        source: "sitemap_xml".into(),
+                    })
+                    .collect();
+
+                if !sitemap_rows.is_empty() {
+                    let _ = storage_tx
+                        .send(StorageCommand::InsertSitemapUrls(sitemap_rows))
+                        .await;
+                }
+
+                // Seed frontier with sitemap URLs at elevated priority.
+                let mut f = frontier.lock().await;
+                for entry in &entries {
+                    if let Ok(normalized) = normalize_url(&entry.url, true) {
+                        // Apply include/exclude filters to sitemap URLs too.
+                        if let Some(final_url) = compiled_patterns.filter_and_rewrite(&normalized) {
+                            let hash = hash_url(&final_url);
+                            f.push(FrontierEntry {
+                                url: final_url,
+                                url_hash: hash,
+                                depth: 0,
+                                priority: 150, // Higher than default 100 - depth
+                                source_page_id: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
 
         let mut last_emit = Instant::now();
         let mut last_emit_count = 0u64;

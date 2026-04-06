@@ -12,6 +12,7 @@ pub mod frontier;
 pub mod parser;
 pub mod politeness;
 pub mod robots;
+pub mod sitemap;
 
 use serde::{Deserialize, Serialize};
 

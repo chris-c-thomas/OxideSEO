@@ -329,3 +329,58 @@ pub async fn get_links(
     })
     .map_err(|e| e.to_string())
 }
+
+/// Sitemap cross-reference report entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SitemapReportEntry {
+    pub url: String,
+    /// "in_sitemap_not_crawled", "crawled_not_in_sitemap", or "ok"
+    pub status: String,
+    pub page_status_code: Option<i32>,
+}
+
+/// Fetch sitemap cross-reference report for a crawl.
+#[tauri::command]
+pub async fn get_sitemap_report(
+    crawl_id: String,
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<SitemapReportEntry>, String> {
+    use rusqlite::params;
+
+    db.with_conn(|conn| {
+        let mut report = Vec::new();
+
+        // URLs in sitemap but not crawled (or non-200).
+        {
+            let mut stmt = conn.prepare(queries::SELECT_SITEMAP_NOT_CRAWLED)?;
+            let mut rows = stmt.query(params![crawl_id])?;
+            while let Some(row) = rows.next()? {
+                let url: String = row.get(0)?;
+                report.push(SitemapReportEntry {
+                    url,
+                    status: "in_sitemap_not_crawled".into(),
+                    page_status_code: None,
+                });
+            }
+        }
+
+        // Pages crawled but not in sitemap.
+        {
+            let mut stmt = conn.prepare(queries::SELECT_CRAWLED_NOT_IN_SITEMAP)?;
+            let mut rows = stmt.query(params![crawl_id])?;
+            while let Some(row) = rows.next()? {
+                let _page_id: i64 = row.get(0)?;
+                let url: String = row.get(1)?;
+                report.push(SitemapReportEntry {
+                    url,
+                    status: "crawled_not_in_sitemap".into(),
+                    page_status_code: Some(200),
+                });
+            }
+        }
+
+        Ok(report)
+    })
+    .map_err(|e| e.to_string())
+}

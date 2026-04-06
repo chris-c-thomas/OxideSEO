@@ -23,6 +23,7 @@ import type {
   PaginatedResponse,
   PaginationParams,
   RuleConfigOverride,
+  SitemapReportEntry,
 } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -97,6 +98,11 @@ export function getIssues(
     pagination,
     filters: filters ?? null,
   });
+}
+
+/** Fetch sitemap cross-reference report for a crawl. */
+export function getSitemapReport(crawlId: string): Promise<SitemapReportEntry[]> {
+  return invoke<SitemapReportEntry[]>("get_sitemap_report", { crawlId });
 }
 
 /** Fetch paginated links for a crawl. */

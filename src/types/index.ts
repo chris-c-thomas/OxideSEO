@@ -152,6 +152,12 @@ export interface ExternalLinkRow {
   checkedAt: string | null;
 }
 
+export interface SitemapReportEntry {
+  url: string;
+  status: string;
+  pageStatusCode: number | null;
+}
+
 export type Severity = "error" | "warning" | "info";
 
 export type RuleCategory =

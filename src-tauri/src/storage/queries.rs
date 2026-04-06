@@ -208,6 +208,30 @@ pub const SELECT_BROKEN_INTERNAL_LINKS: &str = r#"
       AND p_target.status_code >= 400
 "#;
 
+/// URLs in sitemap but not found (or non-200) during crawl.
+pub const SELECT_SITEMAP_NOT_CRAWLED: &str = r#"
+    SELECT su.url FROM sitemap_urls su
+    LEFT JOIN pages p ON p.crawl_id = su.crawl_id AND p.url = su.url
+    WHERE su.crawl_id = ?1 AND (p.id IS NULL OR p.status_code != 200)
+"#;
+
+/// Pages crawled with 200 status but absent from sitemap.
+pub const SELECT_CRAWLED_NOT_IN_SITEMAP: &str = r#"
+    SELECT p.id, p.url FROM pages p
+    LEFT JOIN sitemap_urls su ON su.crawl_id = p.crawl_id AND su.url = p.url
+    WHERE p.crawl_id = ?1 AND p.status_code = 200 AND su.id IS NULL
+"#;
+
+/// Count sitemap URLs for a crawl (used to decide whether to run cross-reference).
+pub const COUNT_SITEMAP_URLS: &str = r#"
+    SELECT COUNT(*) FROM sitemap_urls WHERE crawl_id = ?1
+"#;
+
+/// Count sitemap URLs for a crawl.
+pub fn count_sitemap_urls(conn: &Connection, crawl_id: &str) -> Result<i64> {
+    Ok(conn.query_row(COUNT_SITEMAP_URLS, params![crawl_id], |row| row.get(0))?)
+}
+
 // ---------------------------------------------------------------------------
 // Write execution functions
 // ---------------------------------------------------------------------------
