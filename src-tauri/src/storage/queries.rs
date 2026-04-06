@@ -1240,6 +1240,25 @@ fn row_to_ai_analysis(row: &rusqlite::Row) -> rusqlite::Result<AiAnalysisRow> {
     })
 }
 
+/// Iterate all AI analyses for a crawl, calling `f` for each row.
+pub fn for_each_ai_analysis<F>(conn: &Connection, crawl_id: &str, mut f: F) -> Result<()>
+where
+    F: FnMut(AiAnalysisRow) -> Result<()>,
+{
+    let mut stmt = conn.prepare(
+        r#"SELECT id, crawl_id, page_id, analysis_type, provider, model,
+                  result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at
+           FROM ai_analyses
+           WHERE crawl_id = ?1
+           ORDER BY page_id, analysis_type"#,
+    )?;
+    let mut rows = stmt.query(params![crawl_id])?;
+    while let Some(row) = rows.next()? {
+        f(row_to_ai_analysis(row)?)?;
+    }
+    Ok(())
+}
+
 /// Upsert AI usage tracking for a crawl/provider/model combination.
 pub fn upsert_ai_usage(
     conn: &Connection,

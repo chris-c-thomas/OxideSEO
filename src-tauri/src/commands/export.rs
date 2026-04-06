@@ -25,6 +25,7 @@ pub enum ExportDataType {
     Issues,
     Links,
     Images,
+    AiAnalyses,
     FullReport,
 }
 
@@ -86,6 +87,18 @@ fn default_columns(data_type: ExportDataType) -> Vec<String> {
             "nofollow",
         ],
         ExportDataType::Images => vec!["sourcePage", "targetUrl", "anchorText", "isInternal"],
+        ExportDataType::AiAnalyses => vec![
+            "pageId",
+            "analysisType",
+            "provider",
+            "model",
+            "resultJson",
+            "inputTokens",
+            "outputTokens",
+            "costUsd",
+            "latencyMs",
+            "createdAt",
+        ],
         ExportDataType::FullReport => vec![],
     }
     .into_iter()
@@ -99,6 +112,7 @@ fn data_type_label(data_type: ExportDataType) -> &'static str {
         ExportDataType::Issues => "issues",
         ExportDataType::Links => "links",
         ExportDataType::Images => "images",
+        ExportDataType::AiAnalyses => "ai-analyses",
         ExportDataType::FullReport => "report",
     }
 }
@@ -251,6 +265,13 @@ fn export_csv(
                     Ok(())
                 })?;
             }
+            ExportDataType::AiAnalyses => {
+                queries::for_each_ai_analysis(conn, &crawl_id, |analysis| {
+                    write_csv_row(&mut writer, &analysis, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
             ExportDataType::FullReport => {
                 anyhow::bail!("Use HTML format for full report export");
             }
@@ -328,6 +349,13 @@ fn export_ndjson(
             ExportDataType::Images => {
                 queries::for_each_image(conn, &crawl_id, |img| {
                     write_ndjson_row(&mut writer, &img, &columns)?;
+                    rows_exported += 1;
+                    Ok(())
+                })?;
+            }
+            ExportDataType::AiAnalyses => {
+                queries::for_each_ai_analysis(conn, &crawl_id, |analysis| {
+                    write_ndjson_row(&mut writer, &analysis, &columns)?;
                     rows_exported += 1;
                     Ok(())
                 })?;

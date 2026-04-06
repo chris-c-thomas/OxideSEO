@@ -246,7 +246,13 @@ export interface LinkFilters {
 // Export
 // ---------------------------------------------------------------------------
 
-export type ExportDataType = "pages" | "issues" | "links" | "images" | "full_report";
+export type ExportDataType =
+  | "pages"
+  | "issues"
+  | "links"
+  | "images"
+  | "ai_analyses"
+  | "full_report";
 
 export interface ExportRequest {
   crawlId: string;
