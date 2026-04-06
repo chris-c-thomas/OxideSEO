@@ -384,3 +384,31 @@ pub async fn get_sitemap_report(
     })
     .map_err(|e| e.to_string())
 }
+
+/// Fetch paginated external link check results.
+#[tauri::command]
+pub async fn get_external_links(
+    crawl_id: String,
+    pagination: PaginationParams,
+    is_broken: Option<bool>,
+    db: State<'_, Arc<Database>>,
+) -> Result<PaginatedResponse<ExternalLinkRow>, String> {
+    db.with_conn(|conn| {
+        let total = queries::count_external_links(conn, &crawl_id, is_broken)?;
+        let items = queries::select_external_links(
+            conn,
+            &crawl_id,
+            pagination.offset as i64,
+            clamp_limit(pagination.limit) as i64,
+            is_broken,
+        )?;
+
+        Ok(PaginatedResponse {
+            items,
+            total: total as u64,
+            offset: pagination.offset,
+            limit: clamp_limit(pagination.limit),
+        })
+    })
+    .map_err(|e| e.to_string())
+}

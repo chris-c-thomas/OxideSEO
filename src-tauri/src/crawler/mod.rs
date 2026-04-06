@@ -7,6 +7,7 @@
 //! - **Storage Writer** (dedicated thread): batched SQLite writes
 
 pub mod engine;
+pub mod external_checker;
 pub mod fetcher;
 pub mod frontier;
 pub mod parser;

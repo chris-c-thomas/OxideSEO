@@ -37,8 +37,8 @@ pub const UPDATE_CRAWL_STATS: &str = r#"
 pub const UPSERT_PAGE: &str = r#"
     INSERT INTO pages (crawl_id, url, url_hash, depth, status_code, content_type,
                        response_time_ms, body_size, title, meta_desc, h1, canonical,
-                       robots_directives, state, fetched_at, error_message)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                       robots_directives, state, fetched_at, error_message, custom_extractions)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
     ON CONFLICT(crawl_id, url_hash) DO UPDATE SET
         status_code = excluded.status_code,
         content_type = excluded.content_type,
@@ -51,7 +51,8 @@ pub const UPSERT_PAGE: &str = r#"
         robots_directives = excluded.robots_directives,
         state = excluded.state,
         fetched_at = excluded.fetched_at,
-        error_message = excluded.error_message
+        error_message = excluded.error_message,
+        custom_extractions = excluded.custom_extractions
 "#;
 
 /// Insert a link record.
@@ -87,7 +88,7 @@ pub const COUNT_PAGES: &str = r#"
 pub const SELECT_PAGES_BASE: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
-           robots_directives, state, fetched_at, error_message
+           robots_directives, state, fetched_at, error_message, custom_extractions
     FROM pages
     WHERE crawl_id = ?1
 "#;
@@ -96,7 +97,7 @@ pub const SELECT_PAGES_BASE: &str = r#"
 pub const SELECT_PAGE_BY_ID: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
-           robots_directives, state, fetched_at, error_message
+           robots_directives, state, fetched_at, error_message, custom_extractions
     FROM pages
     WHERE crawl_id = ?1 AND id = ?2
 "#;
@@ -286,6 +287,7 @@ pub fn upsert_page(conn: &Connection, page: &PageRow, url_hash: &[u8]) -> Result
             page.state,
             page.fetched_at,
             page.error_message,
+            page.custom_extractions,
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -348,6 +350,7 @@ fn row_to_page(row: &rusqlite::Row) -> rusqlite::Result<PageRow> {
         state: row.get(13)?,
         fetched_at: row.get(14)?,
         error_message: row.get(15)?,
+        custom_extractions: row.get(16)?,
     })
 }
 
@@ -1009,6 +1012,82 @@ pub fn insert_external_link(conn: &Connection, row: &ExternalLinkRow) -> Result<
         ],
     )?;
     Ok(())
+}
+
+/// Base query for paginated external links.
+pub const SELECT_EXTERNAL_LINKS_BASE: &str = r#"
+    SELECT id, crawl_id, source_page, target_url, status_code,
+           response_time_ms, error_message, checked_at
+    FROM external_links
+    WHERE crawl_id = ?1
+"#;
+
+/// Helper to read an ExternalLinkRow from a rusqlite Row.
+fn row_to_external_link(row: &rusqlite::Row) -> rusqlite::Result<ExternalLinkRow> {
+    Ok(ExternalLinkRow {
+        id: row.get(0)?,
+        crawl_id: row.get(1)?,
+        source_page: row.get(2)?,
+        target_url: row.get(3)?,
+        status_code: row.get(4)?,
+        response_time_ms: row.get(5)?,
+        error_message: row.get(6)?,
+        checked_at: row.get(7)?,
+    })
+}
+
+/// Fetch paginated external links for a crawl.
+pub fn select_external_links(
+    conn: &Connection,
+    crawl_id: &str,
+    offset: i64,
+    limit: i64,
+    is_broken: Option<bool>,
+) -> Result<Vec<ExternalLinkRow>> {
+    let mut filter = String::new();
+    if let Some(broken) = is_broken {
+        if broken {
+            filter.push_str(" AND (status_code >= 400 OR error_message IS NOT NULL)");
+        } else {
+            filter.push_str(" AND status_code < 400 AND error_message IS NULL");
+        }
+    }
+
+    let query = format!(
+        "{}{} ORDER BY id LIMIT ?2 OFFSET ?3",
+        SELECT_EXTERNAL_LINKS_BASE, filter
+    );
+
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt
+        .query_map(params![crawl_id, limit, offset], row_to_external_link)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Count external links with optional broken filter.
+pub fn count_external_links(
+    conn: &Connection,
+    crawl_id: &str,
+    is_broken: Option<bool>,
+) -> Result<i64> {
+    let mut filter = String::new();
+    if let Some(broken) = is_broken {
+        if broken {
+            filter.push_str(" AND (status_code >= 400 OR error_message IS NOT NULL)");
+        } else {
+            filter.push_str(" AND status_code < 400 AND error_message IS NULL");
+        }
+    }
+
+    let query = format!(
+        "SELECT COUNT(*) FROM external_links WHERE crawl_id = ?1{}",
+        filter
+    );
+
+    let mut stmt = conn.prepare(&query)?;
+    let count: i64 = stmt.query_row(params![crawl_id], |row| row.get(0))?;
+    Ok(count)
 }
 
 // ---------------------------------------------------------------------------

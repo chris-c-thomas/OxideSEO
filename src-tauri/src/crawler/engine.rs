@@ -165,6 +165,27 @@ pub async fn spawn_crawl(
     let (storage_tx, storage_rx) = tokio::sync::mpsc::channel::<StorageCommand>(5000);
     let _writer_handle = spawn_storage_writer(db.clone(), storage_rx, 200);
 
+    // External link checker channel (only active when enabled).
+    let external_checker_tx: Option<
+        tokio::sync::mpsc::Sender<crate::crawler::external_checker::ExternalLinkEntry>,
+    > = if config.enable_external_link_check {
+        let (ext_tx, ext_rx) = tokio::sync::mpsc::channel(5000);
+        let ext_storage_tx = storage_tx.clone();
+        let ext_concurrency = config.external_link_concurrency;
+        tokio::spawn(async move {
+            crate::crawler::external_checker::run_external_checker(
+                ext_rx,
+                ext_storage_tx,
+                ext_concurrency,
+            )
+            .await;
+            tracing::info!("External link checker finished");
+        });
+        Some(ext_tx)
+    } else {
+        None
+    };
+
     let global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
     let in_flight = Arc::new(AtomicU64::new(0));
 
@@ -365,6 +386,7 @@ pub async fn spawn_crawl(
             let task_in_flight = in_flight.clone();
             let task_stats = stats.clone();
             let task_patterns = compiled_patterns.clone();
+            let task_ext_tx = external_checker_tx.clone();
 
             tokio::spawn(async move {
                 let _permit = permit;
@@ -397,6 +419,7 @@ pub async fn spawn_crawl(
                                     state: "errored".into(),
                                     fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                     error_message: Some(e.to_string()),
+                                    custom_extractions: None,
                                 }),
                                 url_hash,
                             })
@@ -468,6 +491,20 @@ pub async fn spawn_crawl(
                         }
                     }
 
+                    // --- Custom CSS extraction (second parse, only when selectors configured) ---
+                    let custom_extractions = if !task_config.custom_css_selectors.is_empty() {
+                        let selectors = task_config.custom_css_selectors.clone();
+                        let body_for_css = fetch_result.body_bytes.clone();
+                        let (css_tx, css_rx) = tokio::sync::oneshot::channel();
+                        rayon::spawn(move || {
+                            let result = parser::extract_custom_css(&body_for_css, &selectors);
+                            let _ = css_tx.send(result);
+                        });
+                        css_rx.await.ok().map(|v| v.to_string())
+                    } else {
+                        None
+                    };
+
                     // --- Send to storage ---
                     let url_hash = entry.url_hash.to_vec();
                     let page_row = PageRow {
@@ -487,6 +524,7 @@ pub async fn spawn_crawl(
                         state: "analyzed".into(),
                         fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                         error_message: None,
+                        custom_extractions,
                     };
 
                     // Build link rows.
@@ -520,6 +558,21 @@ pub async fn spawn_crawl(
                         })
                         .collect();
 
+                    // Send external links to the checker (if enabled).
+                    if let Some(ref ext_tx) = task_ext_tx {
+                        for link in &parsed_page.links {
+                            if !link.is_internal {
+                                let _ = ext_tx
+                                    .send(crate::crawler::external_checker::ExternalLinkEntry {
+                                        crawl_id: task_crawl_id.clone(),
+                                        source_page_id: 0, // Will be resolved by checker after page insert
+                                        target_url: link.href.clone(),
+                                    })
+                                    .await;
+                            }
+                        }
+                    }
+
                     // Send page + links + issues together so writer can resolve page ID.
                     let _ = task_storage_tx
                         .send(StorageCommand::StorePage {
@@ -551,6 +604,7 @@ pub async fn spawn_crawl(
                                 state: "fetched".into(),
                                 fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                 error_message: None,
+                                custom_extractions: None,
                             }),
                             url_hash,
                         })
@@ -595,6 +649,9 @@ pub async fn spawn_crawl(
         }
 
         // --- Crawl complete ---
+        // Close the external checker channel so it drains remaining work.
+        drop(external_checker_tx);
+
         // Persist frontier for potential resume.
         {
             let f = frontier.lock().await;

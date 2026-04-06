@@ -107,6 +107,7 @@ export interface PageRow {
   state: string;
   fetchedAt: string | null;
   errorMessage: string | null;
+  customExtractions: string | null;
 }
 
 export interface LinkRow {

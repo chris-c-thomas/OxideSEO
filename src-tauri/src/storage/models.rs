@@ -41,6 +41,8 @@ pub struct PageRow {
     pub state: String,
     pub fetched_at: Option<String>,
     pub error_message: Option<String>,
+    /// JSON blob of custom CSS selector extraction results.
+    pub custom_extractions: Option<String>,
 }
 
 /// Row in the `links` table.
