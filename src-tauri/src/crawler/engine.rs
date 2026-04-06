@@ -145,6 +145,14 @@ pub async fn spawn_crawl(
     let parsed_seed = Url::parse(&seed_url)?;
     let root_domain = parsed_seed.host_str().unwrap_or("").to_string();
     let seed_scheme = parsed_seed.scheme().to_string();
+    // Authority includes port (e.g. "127.0.0.1:8080") for sitemap well-known paths.
+    let seed_authority = parsed_seed
+        .host_str()
+        .map(|h| match parsed_seed.port() {
+            Some(p) => format!("{}:{}", h, p),
+            None => h.to_string(),
+        })
+        .unwrap_or_default();
 
     // Compile URL patterns for filtering and rewriting.
     let compiled_patterns =
@@ -241,7 +249,7 @@ pub async fn spawn_crawl(
             };
 
             let sitemap_urls = crate::crawler::sitemap::discover_sitemaps(
-                &root_domain,
+                &seed_authority,
                 &seed_scheme,
                 fetcher.client(),
                 &robots_sitemaps,

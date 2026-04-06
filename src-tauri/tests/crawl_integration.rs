@@ -602,3 +602,283 @@ async fn test_post_crawl_analysis() {
         .unwrap();
     assert_eq!(status, "completed");
 }
+
+// ---------------------------------------------------------------------------
+// Phase 6 integration tests
+// ---------------------------------------------------------------------------
+
+/// Helper: start a test server with a /sitemap.xml route that references the dynamic port.
+async fn start_server_with_sitemap() -> (String, tokio::task::JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://127.0.0.1:{}", addr.port());
+    let sitemap_base = base.clone();
+
+    let app = base_routes().route(
+        "/sitemap.xml",
+        get(move || {
+            let b = sitemap_base.clone();
+            async move {
+                let xml = format!(
+                    r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{}/</loc></url>
+  <url><loc>{}/about</loc></url>
+  <url><loc>{}/contact</loc></url>
+</urlset>"#,
+                    b, b, b
+                );
+                (StatusCode::OK, [("content-type", "application/xml")], xml)
+            }
+        }),
+    );
+
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    (base, handle)
+}
+
+#[tokio::test]
+async fn test_sitemap_discovery_seeds_frontier() {
+    let (base_url, _server) = start_server_with_sitemap().await;
+    let db = Arc::new(Database::new_in_memory().unwrap());
+    let emitter: Arc<dyn oxide_seo_lib::crawler::engine::ProgressEmitter> = Arc::new(NoopEmitter);
+
+    let crawl_id = "sitemap-discovery-test".to_string();
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &oxide_seo_lib::storage::models::CrawlRow {
+                id: crawl_id.clone(),
+                start_url: base_url.clone(),
+                config_json: "{}".into(),
+                status: "running".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .unwrap();
+
+    let mut config = test_config(&base_url);
+    config.enable_sitemap_discovery = true;
+    config.respect_robots_txt = false;
+
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
+        .await
+        .unwrap();
+
+    wait_for_completion(&handle, 30).await;
+
+    // Verify sitemap URLs were stored.
+    let sitemap_count = db
+        .with_conn(|conn| queries::count_sitemap_urls(conn, &crawl_id))
+        .unwrap();
+    assert!(
+        sitemap_count >= 3,
+        "Expected at least 3 sitemap URLs, got {}",
+        sitemap_count
+    );
+
+    // Verify the sitemap-listed pages were crawled.
+    let page_count = db
+        .with_conn(|conn| queries::count_pages(conn, &crawl_id))
+        .unwrap();
+    assert!(
+        page_count >= 3,
+        "Expected at least 3 pages from sitemap seeding, got {}",
+        page_count
+    );
+}
+
+#[tokio::test]
+async fn test_include_patterns_filter_urls() {
+    let (base_url, _server) = start_test_server().await;
+    let db = Arc::new(Database::new_in_memory().unwrap());
+    let emitter: Arc<dyn oxide_seo_lib::crawler::engine::ProgressEmitter> = Arc::new(NoopEmitter);
+
+    let crawl_id = "include-pattern-test".to_string();
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &oxide_seo_lib::storage::models::CrawlRow {
+                id: crawl_id.clone(),
+                start_url: base_url.clone(),
+                config_json: "{}".into(),
+                status: "running".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .unwrap();
+
+    let mut config = test_config(&base_url);
+    // Only allow URLs matching /about — other discovered links should be filtered out.
+    config.include_patterns = vec!["/about".into()];
+
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
+        .await
+        .unwrap();
+
+    wait_for_completion(&handle, 30).await;
+
+    // The seed URL is always crawled (it bypasses include filter since it's
+    // pushed before the filter is applied). Links from the seed to non-matching
+    // URLs should be filtered out.
+    let pages = db
+        .with_conn(|conn| {
+            queries::select_pages(conn, &crawl_id, 0, 100, None, false, None, None, None)
+        })
+        .unwrap();
+
+    // Only the seed (which was pushed before filtering) and /about should be crawled.
+    // Pages like /products, /contact, /blog should be filtered out.
+    let non_seed_non_about: Vec<_> = pages
+        .iter()
+        .filter(|p| {
+            !p.url.ends_with('/')
+                && !p.url.contains("/about")
+                && p.content_type.as_deref() == Some("text/html")
+        })
+        .collect();
+
+    assert!(
+        non_seed_non_about.is_empty(),
+        "Expected only seed and /about pages, but found: {:?}",
+        non_seed_non_about
+            .iter()
+            .map(|p| &p.url)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn test_exclude_patterns_filter_urls() {
+    let (base_url, _server) = start_test_server().await;
+    let db = Arc::new(Database::new_in_memory().unwrap());
+    let emitter: Arc<dyn oxide_seo_lib::crawler::engine::ProgressEmitter> = Arc::new(NoopEmitter);
+
+    let crawl_id = "exclude-pattern-test".to_string();
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &oxide_seo_lib::storage::models::CrawlRow {
+                id: crawl_id.clone(),
+                start_url: base_url.clone(),
+                config_json: "{}".into(),
+                status: "running".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .unwrap();
+
+    let mut config = test_config(&base_url);
+    // Exclude /blog and /products — they should not be crawled.
+    config.exclude_patterns = vec!["/blog".into(), "/products".into()];
+
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
+        .await
+        .unwrap();
+
+    wait_for_completion(&handle, 30).await;
+
+    let pages = db
+        .with_conn(|conn| {
+            queries::select_pages(conn, &crawl_id, 0, 100, None, false, None, None, None)
+        })
+        .unwrap();
+
+    let excluded: Vec<_> = pages
+        .iter()
+        .filter(|p| p.url.contains("/blog") || p.url.contains("/products"))
+        .collect();
+
+    assert!(
+        excluded.is_empty(),
+        "Excluded pages should not be crawled: {:?}",
+        excluded.iter().map(|p| &p.url).collect::<Vec<_>>()
+    );
+
+    // But other pages should still be crawled.
+    let page_count = db
+        .with_conn(|conn| queries::count_pages(conn, &crawl_id))
+        .unwrap();
+    assert!(
+        page_count >= 2,
+        "Expected at least seed + some non-excluded pages, got {}",
+        page_count
+    );
+}
+
+#[tokio::test]
+async fn test_url_rewrite_rules() {
+    // Set up a server where /old-path redirects would normally fail,
+    // but rewrite rules transform them to /about.
+    let (base_url, _server) = start_test_server().await;
+    let db = Arc::new(Database::new_in_memory().unwrap());
+    let emitter: Arc<dyn oxide_seo_lib::crawler::engine::ProgressEmitter> = Arc::new(NoopEmitter);
+
+    let crawl_id = "rewrite-test".to_string();
+    db.with_conn(|conn| {
+        queries::insert_crawl(
+            conn,
+            &oxide_seo_lib::storage::models::CrawlRow {
+                id: crawl_id.clone(),
+                start_url: base_url.clone(),
+                config_json: "{}".into(),
+                status: "running".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+    })
+    .unwrap();
+
+    let mut config = test_config(&base_url);
+    // Rewrite /contact to /about — both should resolve to /about.
+    config.url_rewrite_rules = vec![("/contact".into(), "/about".into())];
+    config.max_depth = 1;
+
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
+        .await
+        .unwrap();
+
+    wait_for_completion(&handle, 30).await;
+
+    let pages = db
+        .with_conn(|conn| {
+            queries::select_pages(conn, &crawl_id, 0, 100, None, false, None, None, None)
+        })
+        .unwrap();
+
+    // /contact should have been rewritten to /about, so no /contact page.
+    let contact_pages: Vec<_> = pages
+        .iter()
+        .filter(|p| p.url.contains("/contact"))
+        .collect();
+    assert!(
+        contact_pages.is_empty(),
+        "Rewrite should have transformed /contact to /about, but found: {:?}",
+        contact_pages.iter().map(|p| &p.url).collect::<Vec<_>>()
+    );
+
+    // /about should exist (either from rewrite or direct link).
+    let about_pages: Vec<_> = pages.iter().filter(|p| p.url.contains("/about")).collect();
+    assert!(
+        !about_pages.is_empty(),
+        "Expected /about page to exist after rewrite"
+    );
+}

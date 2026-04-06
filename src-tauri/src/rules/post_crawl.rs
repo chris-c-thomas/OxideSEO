@@ -604,4 +604,92 @@ mod tests {
         assert_eq!(broken, 1); // Link to /gone (410)
         assert_eq!(orphans, 1); // /orphan has no inbound internal links
     }
+
+    // --- Sitemap cross-reference tests ---
+
+    fn insert_sitemap_url(db: &Database, crawl_id: &str, url: &str) {
+        use crate::storage::models::SitemapUrlRow;
+        db.with_conn(|conn| {
+            queries::insert_sitemap_url(
+                conn,
+                &SitemapUrlRow {
+                    id: 0,
+                    crawl_id: crawl_id.into(),
+                    url: url.into(),
+                    lastmod: None,
+                    changefreq: None,
+                    priority: None,
+                    source: "sitemap_xml".into(),
+                },
+            )
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_sitemap_url_not_crawled() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        // A page that was crawled with 200.
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        // Sitemap declares two URLs: one that was crawled, one that was not.
+        insert_sitemap_url(&db, "c1", "https://example.com/");
+        insert_sitemap_url(&db, "c1", "https://example.com/missing-page");
+
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+
+        let not_crawled: Vec<_> = issues
+            .iter()
+            .filter(|i| i.rule_id == "sitemap.url_not_crawled")
+            .collect();
+        assert_eq!(not_crawled.len(), 1);
+        assert!(not_crawled[0].message.contains("missing-page"));
+    }
+
+    #[test]
+    fn test_sitemap_page_not_in_sitemap() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        // Two pages crawled with 200.
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        let p2 = make_page("c1", "https://example.com/unlisted");
+        insert_page(&db, "c1", "https://example.com/unlisted", p2);
+
+        // Sitemap only declares the root — /unlisted is missing.
+        insert_sitemap_url(&db, "c1", "https://example.com/");
+
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+
+        let not_in_sitemap: Vec<_> = issues
+            .iter()
+            .filter(|i| i.rule_id == "sitemap.page_not_in_sitemap")
+            .collect();
+        assert_eq!(not_in_sitemap.len(), 1);
+        assert!(not_in_sitemap[0].message.contains("unlisted"));
+    }
+
+    #[test]
+    fn test_sitemap_no_data_skips_analysis() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        // No sitemap URLs inserted — analysis should return empty.
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+        assert!(issues.is_empty());
+    }
 }
