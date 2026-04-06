@@ -117,6 +117,9 @@ pub struct AiAnalysisRow {
     pub crawl_id: String,
     pub page_id: i64,
     pub analysis_type: String,
+    /// blake3 hash of the input content, used for cache invalidation.
+    #[serde(skip)]
+    pub content_hash: Vec<u8>,
     pub provider: String,
     pub model: String,
     pub result_json: String,

@@ -53,6 +53,7 @@ fn make_ai_analysis(
         crawl_id: crawl_id.to_string(),
         page_id,
         analysis_type: analysis_type.to_string(),
+        content_hash: Vec::new(), // Set per-test via blake3
         provider: "openai".to_string(),
         model: "gpt-4o".to_string(),
         result_json: result_json.to_string(),
@@ -75,11 +76,11 @@ fn test_insert_and_retrieve_ai_analysis() {
     insert_test_crawl(&db, crawl_id, "https://example.com");
     insert_test_page(&db, crawl_id, 1, "https://example.com/", "Hello world");
 
-    let row = make_ai_analysis(crawl_id, 1, "content_score", r#"{"overallScore": 75}"#);
-    let content_hash = blake3::hash(b"Hello world").as_bytes().to_vec();
+    let mut row = make_ai_analysis(crawl_id, 1, "content_score", r#"{"overallScore": 75}"#);
+    row.content_hash = blake3::hash(b"Hello world").as_bytes().to_vec();
 
     db.with_conn(|conn| {
-        queries::insert_ai_analysis_with_hash(conn, &row, &content_hash)?;
+        queries::insert_ai_analysis(conn, &row)?;
         Ok(())
     })
     .unwrap();
@@ -103,11 +104,12 @@ fn test_cache_lookup_by_content_hash() {
     insert_test_crawl(&db, crawl_id, "https://example.com");
     insert_test_page(&db, crawl_id, 1, "https://example.com/", "Some content");
 
-    let row = make_ai_analysis(crawl_id, 1, "meta_desc", r#"{"suggested": "A great page"}"#);
+    let mut row = make_ai_analysis(crawl_id, 1, "meta_desc", r#"{"suggested": "A great page"}"#);
     let content_hash = blake3::hash(b"Some content").as_bytes().to_vec();
+    row.content_hash = content_hash.clone();
 
     db.with_conn(|conn| {
-        queries::insert_ai_analysis_with_hash(conn, &row, &content_hash)?;
+        queries::insert_ai_analysis(conn, &row)?;
         Ok(())
     })
     .unwrap();
@@ -342,12 +344,14 @@ fn test_for_each_ai_analysis_streaming() {
     let content_hash = blake3::hash(b"Content").as_bytes().to_vec();
 
     // Insert two analyses for the page.
-    let row1 = make_ai_analysis(crawl_id, 1, "content_score", r#"{"score": 80}"#);
-    let row2 = make_ai_analysis(crawl_id, 1, "meta_desc", r#"{"suggested": "Desc"}"#);
+    let mut row1 = make_ai_analysis(crawl_id, 1, "content_score", r#"{"score": 80}"#);
+    row1.content_hash = content_hash.clone();
+    let mut row2 = make_ai_analysis(crawl_id, 1, "meta_desc", r#"{"suggested": "Desc"}"#);
+    row2.content_hash = content_hash.clone();
 
     db.with_conn(|conn| {
-        queries::insert_ai_analysis_with_hash(conn, &row1, &content_hash)?;
-        queries::insert_ai_analysis_with_hash(conn, &row2, &content_hash)?;
+        queries::insert_ai_analysis(conn, &row1)?;
+        queries::insert_ai_analysis(conn, &row2)?;
         Ok(())
     })
     .unwrap();

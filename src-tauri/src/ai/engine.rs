@@ -25,6 +25,8 @@ pub struct BatchAnalysisResult {
     pub total_output_tokens: u64,
     pub total_cost_usd: f64,
     pub errors: u32,
+    /// Whether the batch stopped early because the token budget was exhausted.
+    pub budget_exhausted: bool,
 }
 
 /// AI analysis progress event payload.
@@ -105,6 +107,16 @@ impl AiAnalysisEngine {
                 .await
                 .context("LLM completion failed")?;
 
+            // Validate JSON before caching — LLMs sometimes return malformed output.
+            if serde_json::from_str::<serde_json::Value>(&response.text).is_err() {
+                tracing::warn!(
+                    page_id = page.id,
+                    analysis_type = analysis_type.as_str(),
+                    "LLM returned invalid JSON, skipping cache"
+                );
+                continue;
+            }
+
             let (input_cost, output_cost) = self.provider.cost_estimate();
             let cost = (response.input_tokens as f64 * input_cost
                 + response.output_tokens as f64 * output_cost)
@@ -115,6 +127,7 @@ impl AiAnalysisEngine {
                 crawl_id: crawl_id.to_string(),
                 page_id: page.id,
                 analysis_type: analysis_type.clone(),
+                content_hash: hash_bytes.clone(),
                 provider: self.provider.name().to_string(),
                 model: response.model.clone(),
                 result_json: response.text.clone(),
@@ -127,7 +140,7 @@ impl AiAnalysisEngine {
 
             // Store result and update usage.
             self.db.with_conn(|conn| {
-                queries::insert_ai_analysis_with_hash(conn, &row, &hash_bytes)?;
+                queries::insert_ai_analysis(conn, &row)?;
                 queries::upsert_ai_usage(
                     conn,
                     crawl_id,
@@ -166,6 +179,7 @@ impl AiAnalysisEngine {
         let mut total_output_tokens = 0u64;
         let mut total_cost = 0.0f64;
         let mut errors = 0u32;
+        let mut budget_exhausted = false;
 
         // Budget limit at 90% to leave room for summary.
         let budget_limit = (budget_tokens as f64 * 0.9) as u64;
@@ -179,6 +193,7 @@ impl AiAnalysisEngine {
                     budget_limit,
                     "Token budget exhausted, stopping batch analysis"
                 );
+                budget_exhausted = true;
                 break;
             }
 
@@ -238,6 +253,7 @@ impl AiAnalysisEngine {
             total_output_tokens,
             total_cost_usd: total_cost,
             errors,
+            budget_exhausted,
         })
     }
 

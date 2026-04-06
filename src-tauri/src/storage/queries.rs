@@ -1129,12 +1129,8 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
 // AI analysis queries (Phase 7)
 // ---------------------------------------------------------------------------
 
-/// Insert an AI analysis with a content hash for caching.
-pub fn insert_ai_analysis_with_hash(
-    conn: &Connection,
-    row: &AiAnalysisRow,
-    content_hash: &[u8],
-) -> Result<i64> {
+/// Insert an AI analysis result. Uses the row's `content_hash` for cache keying.
+pub fn insert_ai_analysis(conn: &Connection, row: &AiAnalysisRow) -> Result<i64> {
     conn.execute(
         r#"INSERT OR REPLACE INTO ai_analyses
            (crawl_id, page_id, analysis_type, content_hash, provider, model,
@@ -1144,7 +1140,7 @@ pub fn insert_ai_analysis_with_hash(
             row.crawl_id,
             row.page_id,
             row.analysis_type,
-            content_hash,
+            row.content_hash,
             row.provider,
             row.model,
             row.result_json,
@@ -1205,6 +1201,7 @@ fn row_to_ai_analysis(row: &rusqlite::Row) -> rusqlite::Result<AiAnalysisRow> {
         crawl_id: row.get(1)?,
         page_id: row.get(2)?,
         analysis_type: row.get(3)?,
+        content_hash: Vec::new(), // Not selected in read queries; populated on insert path.
         provider: row.get(4)?,
         model: row.get(5)?,
         result_json: row.get(6)?,

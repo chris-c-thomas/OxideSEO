@@ -17,6 +17,7 @@ import type {
   AiCrawlSummaryRow,
   BatchProgress,
   BatchAnalysisResult,
+  CrawlSummaryResult,
 } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -136,14 +137,9 @@ function CrawlSummarySection({
     }
   };
 
-  const parseSummary = (json: string) => {
+  const parseSummary = (json: string): Partial<CrawlSummaryResult> | null => {
     try {
-      return JSON.parse(json) as {
-        summary?: string;
-        topActions?: string[];
-        overallHealth?: string;
-        keyFindings?: string[];
-      };
+      return JSON.parse(json) as Partial<CrawlSummaryResult>;
     } catch {
       return null;
     }
@@ -384,6 +380,14 @@ function BatchAnalysisSection({
                 </p>
               </div>
             </div>
+            {result.budgetExhausted && (
+              <p
+                className="mt-1 text-xs"
+                style={{ color: "var(--color-severity-warning)" }}
+              >
+                Token budget exhausted — some pages were not analyzed.
+              </p>
+            )}
             {result.errors > 0 && (
               <p
                 className="mt-1 text-xs"

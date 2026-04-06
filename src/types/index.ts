@@ -280,18 +280,13 @@ export interface AiProviderConfig {
   isConfigured: boolean;
 }
 
-export type AnalysisType =
-  | "content_score"
-  | "meta_desc"
-  | "title_tag"
-  | "structured_data"
-  | "accessibility";
+export type AnalysisType = "content_score" | "meta_desc" | "title_tag";
 
 export interface AiAnalysisRow {
   id: number;
   crawlId: string;
   pageId: number;
-  analysisType: string;
+  analysisType: AnalysisType;
   provider: string;
   model: string;
   resultJson: string;
@@ -338,6 +333,7 @@ export interface BatchAnalysisResult {
   totalOutputTokens: number;
   totalCostUsd: number;
   errors: number;
+  budgetExhausted: boolean;
 }
 
 export interface BatchProgress {
@@ -369,4 +365,13 @@ export interface MetaDescResult {
 export interface TitleTagResult {
   suggestions: { title: string; charCount: number }[];
   reasoning: string;
+}
+
+/** Parsed result from crawl summary generation. */
+export interface CrawlSummaryResult {
+  summary: string;
+  topActions: string[];
+  overallHealth: "good" | "fair" | "poor";
+  criticalIssuesCount: number;
+  keyFindings: string[];
 }

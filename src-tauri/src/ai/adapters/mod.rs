@@ -44,7 +44,8 @@ pub struct AiProviderConfig {
     pub ollama_endpoint: Option<String>,
     /// Maximum tokens to spend per crawl analysis session.
     pub max_tokens_per_crawl: u32,
-    /// Whether the provider has a valid API key stored.
+    /// Whether the provider has a valid API key stored (computed from keyring, not persisted).
+    #[serde(skip_deserializing, default)]
     pub is_configured: bool,
 }
 
