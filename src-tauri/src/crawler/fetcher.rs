@@ -1,8 +1,10 @@
 //! HTTP fetcher: configurable reqwest client with redirect chain tracking.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, HeaderValue};
 
 use crate::commands::crawl::CrawlConfig;
@@ -38,6 +40,17 @@ impl Fetcher {
             }
         }
 
+        // Pre-seed a cookie jar from config.cookies for the seed URL's domain.
+        let jar = Arc::new(Jar::default());
+        if !config.cookies.is_empty() {
+            if let Ok(seed_url) = config.start_url.parse::<url::Url>() {
+                for (name, value) in &config.cookies {
+                    let cookie_str = format!("{}={}", name, value);
+                    jar.add_cookie_str(&cookie_str, &seed_url);
+                }
+            }
+        }
+
         let client = reqwest::Client::builder()
             .user_agent(user_agent)
             .timeout(Duration::from_secs(config.request_timeout_secs as u64))
@@ -50,6 +63,7 @@ impl Fetcher {
             .gzip(true)
             .brotli(true)
             .default_headers(default_headers)
+            .cookie_provider(jar)
             .build()?;
 
         Ok(Self {

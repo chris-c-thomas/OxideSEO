@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use regex::Regex;
 use tokio::sync::{Mutex, Semaphore, watch};
 use url::Url;
 
@@ -143,6 +144,10 @@ pub async fn spawn_crawl(
     let parsed_seed = Url::parse(&seed_url)?;
     let root_domain = parsed_seed.host_str().unwrap_or("").to_string();
     let seed_scheme = parsed_seed.scheme().to_string();
+
+    // Compile URL patterns for filtering and rewriting.
+    let compiled_patterns =
+        Arc::new(CompiledPatterns::from_config(&config).context("Failed to compile URL patterns")?);
 
     // Seed the frontier.
     {
@@ -287,6 +292,7 @@ pub async fn spawn_crawl(
             let task_config = config.clone();
             let task_in_flight = in_flight.clone();
             let task_stats = stats.clone();
+            let task_patterns = compiled_patterns.clone();
 
             tokio::spawn(async move {
                 let _permit = permit;
@@ -372,14 +378,19 @@ pub async fn spawn_crawl(
                         for link in &parsed_page.links {
                             if link.is_internal && !link.is_nofollow {
                                 if let Ok(normalized) = normalize_url(&link.href, true) {
-                                    let hash = hash_url(&normalized);
-                                    f.push(FrontierEntry {
-                                        url: normalized,
-                                        url_hash: hash,
-                                        depth: entry.depth + 1,
-                                        priority: 100i32.saturating_sub(entry.depth as i32 + 1),
-                                        source_page_id: None,
-                                    });
+                                    // Apply URL rewrite rules, then include/exclude filters.
+                                    let url_to_enqueue =
+                                        task_patterns.filter_and_rewrite(&normalized);
+                                    if let Some(final_url) = url_to_enqueue {
+                                        let hash = hash_url(&final_url);
+                                        f.push(FrontierEntry {
+                                            url: final_url,
+                                            url_hash: hash,
+                                            depth: entry.depth + 1,
+                                            priority: 100i32.saturating_sub(entry.depth as i32 + 1),
+                                            source_page_id: None,
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -634,6 +645,85 @@ pub async fn spawn_crawl(
     });
 
     Ok(handle)
+}
+
+/// Pre-compiled regex patterns for URL filtering and rewriting.
+#[derive(Clone)]
+struct CompiledPatterns {
+    include: Vec<Regex>,
+    exclude: Vec<Regex>,
+    rewrite_rules: Vec<(Regex, String)>,
+}
+
+impl CompiledPatterns {
+    /// Compile patterns from config. Logs warnings for invalid regexes and skips them.
+    fn from_config(config: &CrawlConfig) -> Result<Self> {
+        let include = config
+            .include_patterns
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    tracing::warn!(pattern = %p, error = %e, "Invalid include pattern, skipping");
+                    None
+                }
+            })
+            .collect();
+
+        let exclude = config
+            .exclude_patterns
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    tracing::warn!(pattern = %p, error = %e, "Invalid exclude pattern, skipping");
+                    None
+                }
+            })
+            .collect();
+
+        let rewrite_rules = config
+            .url_rewrite_rules
+            .iter()
+            .filter_map(|(pattern, replacement)| match Regex::new(pattern) {
+                Ok(r) => Some((r, replacement.clone())),
+                Err(e) => {
+                    tracing::warn!(pattern = %pattern, error = %e, "Invalid rewrite pattern, skipping");
+                    None
+                }
+            })
+            .collect();
+
+        Ok(Self {
+            include,
+            exclude,
+            rewrite_rules,
+        })
+    }
+
+    /// Apply rewrite rules to a URL, then check include/exclude filters.
+    /// Returns `Some(rewritten_url)` if the URL should be crawled, `None` if filtered out.
+    fn filter_and_rewrite(&self, url: &str) -> Option<String> {
+        // Apply rewrite rules in order.
+        let mut result = url.to_string();
+        for (regex, replacement) in &self.rewrite_rules {
+            result = regex
+                .replace_all(&result, replacement.as_str())
+                .into_owned();
+        }
+
+        // Check include patterns: if non-empty, URL must match at least one.
+        if !self.include.is_empty() && !self.include.iter().any(|r| r.is_match(&result)) {
+            return None;
+        }
+
+        // Check exclude patterns: URL must not match any.
+        if self.exclude.iter().any(|r| r.is_match(&result)) {
+            return None;
+        }
+
+        Some(result)
+    }
 }
 
 /// Extract the hostname from a URL string.
