@@ -25,6 +25,17 @@ export interface CrawlConfig {
   customHeaders: [string, string][];
   perHostConcurrency: number;
   maxPages: number;
+  // Phase 6: Advanced crawl features
+  enableJsRendering: boolean;
+  jsRenderMaxConcurrent: number;
+  jsRenderPatterns: string[];
+  jsNeverRenderPatterns: string[];
+  enableSitemapDiscovery: boolean;
+  enableExternalLinkCheck: boolean;
+  externalLinkConcurrency: number;
+  urlRewriteRules: [string, string][];
+  cookies: [string, string][];
+  customCssSelectors: [string, string][];
 }
 
 export type CrawlState =
@@ -118,6 +129,27 @@ export interface IssueRow {
   category: RuleCategory;
   message: string;
   detailJson: string | null;
+}
+
+export interface SitemapUrlRow {
+  id: number;
+  crawlId: string;
+  url: string;
+  lastmod: string | null;
+  changefreq: string | null;
+  priority: number | null;
+  source: string;
+}
+
+export interface ExternalLinkRow {
+  id: number;
+  crawlId: string;
+  sourcePage: number;
+  targetUrl: string;
+  statusCode: number | null;
+  responseTimeMs: number | null;
+  errorMessage: string | null;
+  checkedAt: string | null;
 }
 
 export type Severity = "error" | "warning" | "info";

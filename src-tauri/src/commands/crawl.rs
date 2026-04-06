@@ -59,6 +59,38 @@ pub struct CrawlConfig {
     pub per_host_concurrency: u32,
     /// Maximum number of pages to crawl (0 = unlimited).
     pub max_pages: u32,
+
+    // --- Phase 6: Advanced crawl features ---
+    /// Enable JavaScript rendering for SPA detection.
+    #[serde(default)]
+    pub enable_js_rendering: bool,
+    /// Maximum concurrent JS render webviews (default 2).
+    #[serde(default = "default_js_render_max_concurrent")]
+    pub js_render_max_concurrent: u32,
+    /// URL patterns that should always be JS-rendered.
+    #[serde(default)]
+    pub js_render_patterns: Vec<String>,
+    /// URL patterns that should never be JS-rendered.
+    #[serde(default)]
+    pub js_never_render_patterns: Vec<String>,
+    /// Enable sitemap auto-discovery and parsing (default true).
+    #[serde(default = "default_true")]
+    pub enable_sitemap_discovery: bool,
+    /// Enable external link checking via HEAD requests.
+    #[serde(default)]
+    pub enable_external_link_check: bool,
+    /// Global concurrency for external link checks (default 5).
+    #[serde(default = "default_external_link_concurrency")]
+    pub external_link_concurrency: u32,
+    /// URL rewrite rules as (regex, replacement) pairs.
+    #[serde(default)]
+    pub url_rewrite_rules: Vec<(String, String)>,
+    /// Cookies to inject as (name, value) pairs.
+    #[serde(default)]
+    pub cookies: Vec<(String, String)>,
+    /// Custom CSS selectors for data extraction as (label, selector) pairs.
+    #[serde(default)]
+    pub custom_css_selectors: Vec<(String, String)>,
 }
 
 impl Default for CrawlConfig {
@@ -79,8 +111,30 @@ impl Default for CrawlConfig {
             custom_headers: Vec::new(),
             per_host_concurrency: 2,
             max_pages: 0,
+            enable_js_rendering: false,
+            js_render_max_concurrent: 2,
+            js_render_patterns: Vec::new(),
+            js_never_render_patterns: Vec::new(),
+            enable_sitemap_discovery: true,
+            enable_external_link_check: false,
+            external_link_concurrency: 5,
+            url_rewrite_rules: Vec::new(),
+            cookies: Vec::new(),
+            custom_css_selectors: Vec::new(),
         }
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_js_render_max_concurrent() -> u32 {
+    2
+}
+
+fn default_external_link_concurrency() -> u32 {
+    5
 }
 
 fn num_cpus() -> u32 {

@@ -169,6 +169,28 @@ fn flush_batch(db: &Database, batch: &mut Vec<StorageCommand>) -> bool {
                         );
                     }
                 }
+                StorageCommand::InsertSitemapUrls(urls) => {
+                    for url in &urls {
+                        if let Err(e) = queries::insert_sitemap_url(&tx, url) {
+                            tracing::warn!(
+                                url = %url.url,
+                                error = %e,
+                                "Failed to insert sitemap URL"
+                            );
+                        }
+                    }
+                }
+                StorageCommand::InsertExternalLinks(links) => {
+                    for link in &links {
+                        if let Err(e) = queries::insert_external_link(&tx, link) {
+                            tracing::warn!(
+                                target_url = %link.target_url,
+                                error = %e,
+                                "Failed to insert external link"
+                            );
+                        }
+                    }
+                }
                 StorageCommand::Flush | StorageCommand::FlushAck(_) | StorageCommand::Shutdown => {
                     // Already handled at the receive level; shouldn't appear in batch.
                 }

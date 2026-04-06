@@ -7,7 +7,7 @@
 use anyhow::Result;
 use rusqlite::{Connection, params, types::Value};
 
-use super::models::{CrawlRow, IssueRow, LinkRow, PageRow};
+use super::models::{CrawlRow, ExternalLinkRow, IssueRow, LinkRow, PageRow, SitemapUrlRow};
 
 // ---------------------------------------------------------------------------
 // SQL constants
@@ -932,6 +932,59 @@ pub fn avg_response_time(conn: &Connection, crawl_id: &str) -> Result<Option<f64
     let mut stmt = conn.prepare(sql)?;
     let avg: Option<f64> = stmt.query_row(params![crawl_id], |row| row.get(0))?;
     Ok(avg)
+}
+
+// ---------------------------------------------------------------------------
+// Sitemap URL queries
+// ---------------------------------------------------------------------------
+
+/// Insert a sitemap URL record (ignore duplicates).
+pub const INSERT_SITEMAP_URL: &str = r#"
+    INSERT OR IGNORE INTO sitemap_urls (crawl_id, url, lastmod, changefreq, priority, source)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+"#;
+
+/// Insert a single sitemap URL record.
+pub fn insert_sitemap_url(conn: &Connection, row: &SitemapUrlRow) -> Result<()> {
+    conn.execute(
+        INSERT_SITEMAP_URL,
+        params![
+            row.crawl_id,
+            row.url,
+            row.lastmod,
+            row.changefreq,
+            row.priority,
+            row.source,
+        ],
+    )?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// External link queries
+// ---------------------------------------------------------------------------
+
+/// Insert an external link check result.
+pub const INSERT_EXTERNAL_LINK: &str = r#"
+    INSERT INTO external_links (crawl_id, source_page, target_url, status_code,
+                                response_time_ms, error_message, checked_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
+"#;
+
+/// Insert a single external link check result.
+pub fn insert_external_link(conn: &Connection, row: &ExternalLinkRow) -> Result<()> {
+    conn.execute(
+        INSERT_EXTERNAL_LINK,
+        params![
+            row.crawl_id,
+            row.source_page,
+            row.target_url,
+            row.status_code,
+            row.response_time_ms,
+            row.error_message,
+        ],
+    )?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
