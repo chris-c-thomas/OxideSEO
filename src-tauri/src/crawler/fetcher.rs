@@ -43,10 +43,19 @@ impl Fetcher {
         // Pre-seed a cookie jar from config.cookies for the seed URL's domain.
         let jar = Arc::new(Jar::default());
         if !config.cookies.is_empty() {
-            if let Ok(seed_url) = config.start_url.parse::<url::Url>() {
-                for (name, value) in &config.cookies {
-                    let cookie_str = format!("{}={}", name, value);
-                    jar.add_cookie_str(&cookie_str, &seed_url);
+            match config.start_url.parse::<url::Url>() {
+                Ok(seed_url) => {
+                    for (name, value) in &config.cookies {
+                        let cookie_str = format!("{}={}", name, value);
+                        jar.add_cookie_str(&cookie_str, &seed_url);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        url = %config.start_url,
+                        error = %e,
+                        "Failed to parse start URL for cookie injection, cookies will not be set"
+                    );
                 }
             }
         }

@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::{Semaphore, mpsc};
 
+use crate::storage::db::Database;
 use crate::storage::models::{ExternalLinkRow, IssueRow, StorageCommand};
 use crate::{RuleCategory, Severity};
 
@@ -18,7 +19,8 @@ use crate::{RuleCategory, Severity};
 #[derive(Debug, Clone)]
 pub struct ExternalLinkEntry {
     pub crawl_id: String,
-    pub source_page_id: i64,
+    /// URL of the source page (resolved to page ID via DB lookup before insert).
+    pub source_page_url: String,
     pub target_url: String,
 }
 
@@ -29,15 +31,22 @@ pub struct ExternalLinkEntry {
 pub async fn run_external_checker(
     mut rx: mpsc::Receiver<ExternalLinkEntry>,
     storage_tx: mpsc::Sender<StorageCommand>,
+    db: Arc<Database>,
     concurrency: u32,
 ) {
-    let client = reqwest::Client::builder()
+    let client = match reqwest::Client::builder()
         .user_agent("OxideSEO/0.1 (external-link-check)")
         .timeout(Duration::from_secs(10))
         .connect_timeout(Duration::from_secs(5))
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
-        .unwrap_or_else(|_| reqwest::Client::new());
+    {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to build external checker HTTP client, using default");
+            reqwest::Client::new()
+        }
+    };
 
     let semaphore = Arc::new(Semaphore::new(concurrency as usize));
     let mut seen: HashSet<String> = HashSet::new();
@@ -60,25 +69,56 @@ pub async fn run_external_checker(
         let client = client.clone();
         let stx = storage_tx.clone();
         let delays = domain_delays.clone();
+        let task_db = db.clone();
 
         tasks.push(tokio::spawn(async move {
             let _permit = permit;
 
             // Per-domain politeness: 2-second minimum between requests.
+            // Compute sleep duration while holding the lock, then release before sleeping.
             let domain = url::Url::parse(&entry.target_url)
                 .ok()
                 .and_then(|u| u.host_str().map(|h| h.to_string()))
                 .unwrap_or_default();
 
-            {
+            let sleep_duration = {
                 let mut map = delays.lock().await;
-                if let Some(last) = map.get(&domain) {
-                    let elapsed = last.elapsed();
-                    if elapsed < Duration::from_secs(2) {
-                        tokio::time::sleep(Duration::from_secs(2) - elapsed).await;
-                    }
-                }
+                let duration = map
+                    .get(&domain)
+                    .and_then(|last| {
+                        let elapsed = last.elapsed();
+                        (elapsed < Duration::from_secs(2))
+                            .then(|| Duration::from_secs(2) - elapsed)
+                    });
                 map.insert(domain, Instant::now());
+                duration
+            };
+            if let Some(d) = sleep_duration {
+                tokio::time::sleep(d).await;
+            }
+
+            // Resolve source page ID from the database by URL.
+            let source_page_id = task_db
+                .with_conn(|conn| {
+                    let id: Option<i64> = conn
+                        .query_row(
+                            "SELECT id FROM pages WHERE crawl_id = ?1 AND url = ?2",
+                            rusqlite::params![entry.crawl_id, entry.source_page_url],
+                            |r| r.get(0),
+                        )
+                        .ok();
+                    Ok(id)
+                })
+                .unwrap_or(None)
+                .unwrap_or(0);
+
+            if source_page_id == 0 {
+                tracing::warn!(
+                    source_url = %entry.source_page_url,
+                    target_url = %entry.target_url,
+                    "Could not resolve source page ID for external link, skipping"
+                );
+                return;
             }
 
             let start = Instant::now();
@@ -91,18 +131,21 @@ pub async fn run_external_checker(
             let is_broken = error_message.is_some() || status_code.is_some_and(|code| code >= 400);
 
             // Store the external link result.
-            let _ = stx
+            if let Err(e) = stx
                 .send(StorageCommand::InsertExternalLinks(vec![ExternalLinkRow {
                     id: 0,
                     crawl_id: entry.crawl_id.clone(),
-                    source_page: entry.source_page_id,
+                    source_page: source_page_id,
                     target_url: entry.target_url.clone(),
                     status_code,
                     response_time_ms: Some(response_time_ms),
                     error_message: error_message.clone(),
                     checked_at: None, // Set by SQL datetime('now')
                 }]))
-                .await;
+                .await
+            {
+                tracing::error!(target_url = %entry.target_url, error = %e, "Failed to send external link result to storage");
+            }
 
             // If broken, also report as an issue.
             if is_broken {
@@ -116,11 +159,11 @@ pub async fn run_external_checker(
                     )
                 };
 
-                let _ = stx
+                if let Err(e) = stx
                     .send(StorageCommand::InsertIssues(vec![IssueRow {
                         id: 0,
                         crawl_id: entry.crawl_id,
-                        page_id: entry.source_page_id,
+                        page_id: source_page_id,
                         rule_id: "links.broken_external".into(),
                         severity: Severity::Warning,
                         category: RuleCategory::Links,
@@ -134,13 +177,18 @@ pub async fn run_external_checker(
                             .to_string(),
                         ),
                     }]))
-                    .await;
+                    .await
+                {
+                    tracing::error!(error = %e, "Failed to send broken external link issue to storage");
+                }
             }
         }));
     }
 
     // Wait for all in-flight checks to complete.
     for task in tasks {
-        let _ = task.await;
+        if let Err(e) = task.await {
+            tracing::error!(error = %e, "External link check task panicked");
+        }
     }
 }

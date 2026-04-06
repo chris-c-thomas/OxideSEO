@@ -196,11 +196,13 @@ pub async fn spawn_crawl(
     > = if config.enable_external_link_check {
         let (ext_tx, ext_rx) = tokio::sync::mpsc::channel(5000);
         let ext_storage_tx = storage_tx.clone();
+        let ext_db = db.clone();
         let ext_concurrency = config.external_link_concurrency;
         tokio::spawn(async move {
             crate::crawler::external_checker::run_external_checker(
                 ext_rx,
                 ext_storage_tx,
+                ext_db,
                 ext_concurrency,
             )
             .await;
@@ -278,9 +280,12 @@ pub async fn spawn_crawl(
                     .collect();
 
                 if !sitemap_rows.is_empty() {
-                    let _ = storage_tx
+                    if let Err(e) = storage_tx
                         .send(StorageCommand::InsertSitemapUrls(sitemap_rows))
-                        .await;
+                        .await
+                    {
+                        tracing::error!(error = %e, "Failed to send sitemap URLs to storage");
+                    }
                 }
 
                 // Seed frontier with sitemap URLs at elevated priority.
@@ -426,7 +431,7 @@ pub async fn spawn_crawl(
                         task_stats.urls_errored.fetch_add(1, Ordering::SeqCst);
 
                         let url_hash = entry.url_hash.to_vec();
-                        let _ = task_storage_tx
+                        if let Err(send_err) = task_storage_tx
                             .send(StorageCommand::UpsertPage {
                                 page: Box::new(PageRow {
                                     id: 0,
@@ -450,7 +455,10 @@ pub async fn spawn_crawl(
                                 }),
                                 url_hash,
                             })
-                            .await;
+                            .await
+                        {
+                            tracing::error!(url = %entry.url, error = %send_err, "Failed to send errored page to storage");
+                        }
 
                         task_in_flight.fetch_sub(1, Ordering::SeqCst);
                         return;
@@ -639,30 +647,36 @@ pub async fn spawn_crawl(
                     if let Some(ref ext_tx) = task_ext_tx {
                         for link in &parsed_page.links {
                             if !link.is_internal {
-                                let _ = ext_tx
+                                if let Err(e) = ext_tx
                                     .send(crate::crawler::external_checker::ExternalLinkEntry {
                                         crawl_id: task_crawl_id.clone(),
-                                        source_page_id: 0, // Will be resolved by checker after page insert
+                                        source_page_url: entry.url.clone(),
                                         target_url: link.href.clone(),
                                     })
-                                    .await;
+                                    .await
+                                {
+                                    tracing::error!(target_url = %link.href, error = %e, "Failed to send external link to checker");
+                                }
                             }
                         }
                     }
 
                     // Send page + links + issues together so writer can resolve page ID.
-                    let _ = task_storage_tx
+                    if let Err(e) = task_storage_tx
                         .send(StorageCommand::StorePage {
                             page: Box::new(page_row),
                             url_hash,
                             links: link_rows,
                             issues: issue_rows,
                         })
-                        .await;
+                        .await
+                    {
+                        tracing::error!(url = %entry.url, error = %e, "Failed to send page to storage");
+                    }
                 } else {
                     // Non-HTML resource or error status — record metadata only.
                     let url_hash = entry.url_hash.to_vec();
-                    let _ = task_storage_tx
+                    if let Err(e) = task_storage_tx
                         .send(StorageCommand::UpsertPage {
                             page: Box::new(PageRow {
                                 id: 0,
@@ -686,7 +700,10 @@ pub async fn spawn_crawl(
                             }),
                             url_hash,
                         })
-                        .await;
+                        .await
+                    {
+                        tracing::error!(url = %entry.url, error = %e, "Failed to send non-HTML page to storage");
+                    }
                 }
 
                 task_in_flight.fetch_sub(1, Ordering::SeqCst);
@@ -865,67 +882,45 @@ pub(crate) struct CompiledPatterns {
 }
 
 impl CompiledPatterns {
-    /// Compile patterns from config. Logs warnings for invalid regexes and skips them.
+    /// Compile patterns from config. Returns an error if any regex is invalid.
+    ///
+    /// Invalid patterns must fail the crawl rather than being silently skipped,
+    /// because skipping an include/exclude filter could cause the crawl to run
+    /// with unintended scope.
     fn from_config(config: &CrawlConfig) -> Result<Self> {
         let include = config
             .include_patterns
             .iter()
-            .filter_map(|p| match Regex::new(p) {
-                Ok(r) => Some(r),
-                Err(e) => {
-                    tracing::warn!(pattern = %p, error = %e, "Invalid include pattern, skipping");
-                    None
-                }
-            })
-            .collect();
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid include pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
 
         let exclude = config
             .exclude_patterns
             .iter()
-            .filter_map(|p| match Regex::new(p) {
-                Ok(r) => Some(r),
-                Err(e) => {
-                    tracing::warn!(pattern = %p, error = %e, "Invalid exclude pattern, skipping");
-                    None
-                }
-            })
-            .collect();
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid exclude pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
 
         let rewrite_rules = config
             .url_rewrite_rules
             .iter()
-            .filter_map(|(pattern, replacement)| match Regex::new(pattern) {
-                Ok(r) => Some((r, replacement.clone())),
-                Err(e) => {
-                    tracing::warn!(pattern = %pattern, error = %e, "Invalid rewrite pattern, skipping");
-                    None
-                }
+            .map(|(pattern, replacement)| {
+                Regex::new(pattern)
+                    .map(|r| (r, replacement.clone()))
+                    .with_context(|| format!("Invalid rewrite pattern: {pattern}"))
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         let js_always = config
             .js_render_patterns
             .iter()
-            .filter_map(|p| match Regex::new(p) {
-                Ok(r) => Some(r),
-                Err(e) => {
-                    tracing::warn!(pattern = %p, error = %e, "Invalid JS render pattern, skipping");
-                    None
-                }
-            })
-            .collect();
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid JS render pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
 
         let js_never = config
             .js_never_render_patterns
             .iter()
-            .filter_map(|p| match Regex::new(p) {
-                Ok(r) => Some(r),
-                Err(e) => {
-                    tracing::warn!(pattern = %p, error = %e, "Invalid JS never-render pattern, skipping");
-                    None
-                }
-            })
-            .collect();
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid JS never-render pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             include,

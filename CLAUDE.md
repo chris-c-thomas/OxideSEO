@@ -108,7 +108,7 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Dashboard "Open File" and per-crawl "Save" buttons
 - See `.claude/plans/seo-crawler-development-plan.pdf` for Phases 6-8 roadmap
 
-**Phase 6 — Advanced Crawl Features (in progress):**
+**Phase 6 — Advanced Crawl Features:** ~~All work units implemented~~ ✅
 - See `.claude/plans/phase-6.md` for full plan (13 work units across 7 batches)
 - ~~WU-1: Schema migration 002_advanced_crawl.sql~~ ✅ (sitemap_urls, external_links tables; is_js_rendered, custom_extractions columns on pages)
 - ~~WU-2: CrawlConfig expanded with 10 new fields~~ ✅ (JS rendering, sitemap, external links, cookies, rewrite rules, CSS selectors)
@@ -118,11 +118,11 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - ~~WU-6: Sitemap auto-discovery and parsing~~ ✅ (quick-xml + flate2, crawler/sitemap.rs)
 - ~~WU-7: Sitemap vs. crawl cross-reference rules~~ ✅ (sitemap.url_not_crawled, sitemap.page_not_in_sitemap)
 - ~~WU-8: External link checking~~ ✅ (crawler/external_checker.rs, HEAD-only, dedup, per-domain rate limiting)
+- ~~WU-9: JavaScript rendering pipeline~~ ✅ (experimental — hidden Tauri webviews, `__TAURI_INTERNALS__` fallback)
 - ~~WU-10: Custom CSS extraction~~ ✅ (parser::extract_custom_css via scraper, stored as JSON blob)
-- WU-9: JavaScript rendering pipeline — **not yet implemented** (highest complexity, uses hidden Tauri webviews)
-- WU-11: Frontend advanced config form sections — **not yet implemented**
-- WU-12: Frontend sitemap & external links tabs — **not yet implemented**
-- WU-13: Tests — **not yet implemented**
+- ~~WU-11: Frontend advanced config form sections~~ ✅ (7 collapsible AdvancedSection components in CrawlConfig)
+- ~~WU-12: Frontend sitemap & external links tabs~~ ✅ (SitemapTab, ExternalLinksTab in ResultsExplorer)
+- ~~WU-13: Tests~~ ✅ (4 integration tests: sitemap discovery, include/exclude patterns, URL rewrite rules)
 
 ## Architecture Invariants
 
@@ -200,6 +200,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 |---|---|---|
 | `crawler/sitemap.rs` | Sitemap XML parser (quick-xml), discovery, recursive fetch | Complete |
 | `crawler/external_checker.rs` | External link HEAD checker with dedup + rate limiting | Complete |
+| `crawler/js_renderer.rs` | JS rendering via hidden Tauri webviews (experimental) | Complete |
 | `migrations/002_advanced_crawl.sql` | sitemap_urls, external_links tables; pages column additions | Complete |
 
 ### Frontend (`src/`)

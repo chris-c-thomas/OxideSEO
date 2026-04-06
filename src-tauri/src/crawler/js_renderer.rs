@@ -3,6 +3,10 @@
 //! For pages detected as potentially JS-rendered (low word count + multiple scripts),
 //! creates a hidden webview to execute JavaScript, then extracts the rendered HTML
 //! for re-parsing with lol_html.
+//!
+//! **Experimental:** This relies on Tauri's IPC bridge (`__TAURI_INTERNALS__`) being
+//! available in webviews navigating to external URLs. If the target page's CSP blocks
+//! injected scripts, rendering will timeout and fall back to the static parse.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -104,13 +108,29 @@ impl JsRenderer {
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Inject script that extracts the rendered HTML and emits it as a Tauri event.
+        // External pages won't have `window.__TAURI__` (the high-level JS API), but
+        // Tauri v2 injects `__TAURI_INTERNALS__` into all managed webviews.
         let inject_js = format!(
             r#"
-            if (window.__TAURI__) {{
-                window.__TAURI__.event.emit('{}', document.documentElement.outerHTML);
-            }}
+            (function() {{
+                try {{
+                    var html = document.documentElement.outerHTML;
+                    if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.emit) {{
+                        window.__TAURI__.event.emit('{event}', html);
+                    }} else if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) {{
+                        window.__TAURI_INTERNALS__.invoke('plugin:event|emit', {{
+                            event: '{event}',
+                            payload: html
+                        }});
+                    }} else {{
+                        console.warn('[OxideSEO] Tauri IPC bridge not available for HTML extraction');
+                    }}
+                }} catch(e) {{
+                    console.error('[OxideSEO] HTML extraction error:', e);
+                }}
+            }})();
             "#,
-            event_name
+            event = event_name
         );
 
         window
@@ -141,7 +161,11 @@ impl JsRenderer {
                 anyhow::bail!("JS render event channel dropped for URL: {}", url)
             }
             Err(_) => {
-                anyhow::bail!("JS render timed out for URL: {}", url)
+                anyhow::bail!(
+                    "JS render timed out for URL: {} — Tauri IPC bridge may not be \
+                     available in this webview context (CSP or navigation issue)",
+                    url
+                )
             }
         }
     }
