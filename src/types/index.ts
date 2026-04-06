@@ -168,13 +168,13 @@ export interface PageDetail {
 export interface AppSettings {
   defaultCrawlConfig: Record<string, unknown>;
   theme: "system" | "light" | "dark";
-  defaultExportFormat: "csv" | "json" | "html" | "xlsx";
+  defaultExportFormat: "csv" | "json" | "html";
 }
 
 export interface RuleConfigOverride {
   ruleId: string;
   enabled: boolean | null;
-  severity: string | null;
+  severity: Severity | null;
   params: Record<string, unknown> | null;
 }
 
@@ -199,4 +199,22 @@ export interface LinkFilters {
   isInternal: boolean | null;
   isBroken: boolean | null;
   anchorTextMissing: boolean | null;
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+export type ExportDataType = "pages" | "issues" | "links" | "images" | "full_report";
+
+export interface ExportRequest {
+  crawlId: string;
+  format: "csv" | "json" | "html";
+  dataType: ExportDataType;
+  columns: string[] | null;
+}
+
+export interface ExportResult {
+  filePath: string;
+  rowsExported: number;
 }

@@ -5,5 +5,6 @@
 //! serde deserialization; all outputs are serialized to JSON automatically.
 
 pub mod crawl;
+pub mod export;
 pub mod results;
 pub mod settings;

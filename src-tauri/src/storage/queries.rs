@@ -803,3 +803,156 @@ pub fn count_links(
     let count: i64 = stmt.query_row(rusqlite::params_from_iter(&param_values), |row| row.get(0))?;
     Ok(count)
 }
+
+// ---------------------------------------------------------------------------
+// Streaming export functions (unbounded, for CSV/NDJSON export)
+// ---------------------------------------------------------------------------
+
+/// Iterate all pages for a crawl, calling `f` for each row.
+/// Uses cursor-based iteration — memory stays constant regardless of crawl size.
+pub fn for_each_page<F>(conn: &Connection, crawl_id: &str, mut f: F) -> Result<()>
+where
+    F: FnMut(PageRow) -> Result<()>,
+{
+    let sql = format!("{} ORDER BY id", SELECT_PAGES_BASE);
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query(params![crawl_id])?;
+    while let Some(row) = rows.next()? {
+        f(row_to_page(row)?)?;
+    }
+    Ok(())
+}
+
+/// Iterate all issues for a crawl, calling `f` for each row.
+pub fn for_each_issue<F>(conn: &Connection, crawl_id: &str, mut f: F) -> Result<()>
+where
+    F: FnMut(IssueRow) -> Result<()>,
+{
+    let sql = format!("{} ORDER BY severity, category, id", SELECT_ISSUES_BASE);
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query(params![crawl_id])?;
+    while let Some(row) = rows.next()? {
+        f(row_to_issue(row)?)?;
+    }
+    Ok(())
+}
+
+/// Iterate all links for a crawl, calling `f` for each row.
+pub fn for_each_link<F>(conn: &Connection, crawl_id: &str, mut f: F) -> Result<()>
+where
+    F: FnMut(LinkRow) -> Result<()>,
+{
+    let sql = format!("{} ORDER BY id", SELECT_LINKS_BASE);
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query(params![crawl_id])?;
+    while let Some(row) = rows.next()? {
+        f(row_to_link(row)?)?;
+    }
+    Ok(())
+}
+
+/// Iterate image links (link_type = 'img') for a crawl, calling `f` for each row.
+pub fn for_each_image<F>(conn: &Connection, crawl_id: &str, mut f: F) -> Result<()>
+where
+    F: FnMut(LinkRow) -> Result<()>,
+{
+    let sql = format!("{} AND link_type = 'img' ORDER BY id", SELECT_LINKS_BASE);
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query(params![crawl_id])?;
+    while let Some(row) = rows.next()? {
+        f(row_to_link(row)?)?;
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate queries (for HTML report generation)
+// ---------------------------------------------------------------------------
+
+/// Count pages grouped by status code range. Returns (2xx, 3xx, 4xx, 5xx, other).
+pub fn count_pages_by_status_group(
+    conn: &Connection,
+    crawl_id: &str,
+) -> Result<(u64, u64, u64, u64, u64)> {
+    let sql = r#"
+        SELECT
+            COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status_code >= 500 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status_code IS NULL OR status_code < 200 THEN 1 ELSE 0 END), 0)
+        FROM pages WHERE crawl_id = ?1
+    "#;
+    let mut stmt = conn.prepare(sql)?;
+    let row = stmt.query_row(params![crawl_id], |row| {
+        Ok((
+            row.get::<_, i64>(0)? as u64,
+            row.get::<_, i64>(1)? as u64,
+            row.get::<_, i64>(2)? as u64,
+            row.get::<_, i64>(3)? as u64,
+            row.get::<_, i64>(4)? as u64,
+        ))
+    })?;
+    Ok(row)
+}
+
+/// Top issues grouped by rule_id, ordered by severity then count descending.
+pub fn select_top_issues_by_rule(
+    conn: &Connection,
+    crawl_id: &str,
+    limit: u32,
+) -> Result<Vec<(String, String, String, i64)>> {
+    let sql = r#"
+        SELECT rule_id, severity, category, COUNT(*) as cnt
+        FROM issues
+        WHERE crawl_id = ?1
+        GROUP BY rule_id
+        ORDER BY
+            CASE severity WHEN 'error' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+            cnt DESC
+        LIMIT ?2
+    "#;
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt
+        .query_map(params![crawl_id, limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Average response time in milliseconds for a crawl.
+pub fn avg_response_time(conn: &Connection, crawl_id: &str) -> Result<Option<f64>> {
+    let sql = "SELECT AVG(response_time_ms) FROM pages WHERE crawl_id = ?1 AND response_time_ms IS NOT NULL";
+    let mut stmt = conn.prepare(sql)?;
+    let avg: Option<f64> = stmt.query_row(params![crawl_id], |row| row.get(0))?;
+    Ok(avg)
+}
+
+// ---------------------------------------------------------------------------
+// Settings persistence
+// ---------------------------------------------------------------------------
+
+/// Get a single setting value by key.
+pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+    match stmt.query_row(params![key], |row| row.get(0)) {
+        Ok(value) => Ok(Some(value)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Upsert a setting key-value pair.
+pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        params![key, value],
+    )?;
+    Ok(())
+}
