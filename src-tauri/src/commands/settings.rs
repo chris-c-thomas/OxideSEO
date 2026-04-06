@@ -6,9 +6,9 @@ use tauri::State;
 
 use std::sync::Arc;
 
+use crate::Severity;
 use crate::storage::db::Database;
 use crate::storage::queries;
-use crate::Severity;
 
 /// Application-level settings persisted across sessions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
