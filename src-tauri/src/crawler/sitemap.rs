@@ -51,15 +51,32 @@ pub async fn discover_sitemaps(
         }
     }
 
-    // Verify each URL exists with a HEAD request.
+    // Verify each URL exists. Prefer HEAD, but fall back to a lightweight GET
+    // because many servers reject HEAD for sitemap endpoints (405/403) while serving GET.
     let mut valid = Vec::new();
     for url in &urls {
-        match client.head(url).send().await {
-            Ok(resp) if resp.status().is_success() => {
+        let head_ok = match client.head(url).send().await {
+            Ok(resp) => resp.status().is_success(),
+            Err(_) => false,
+        };
+
+        if head_ok {
+            valid.push(url.clone());
+            continue;
+        }
+
+        // HEAD failed — try GET with Range header to minimize bandwidth.
+        match client
+            .get(url)
+            .header(reqwest::header::RANGE, "bytes=0-0")
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() || resp.status().as_u16() == 206 => {
                 valid.push(url.clone());
             }
             _ => {
-                tracing::debug!(url = %url, "Sitemap URL not found or inaccessible");
+                tracing::debug!(url = %url, "Sitemap URL not found via HEAD or GET");
             }
         }
     }

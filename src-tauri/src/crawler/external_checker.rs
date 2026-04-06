@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio::sync::{Semaphore, mpsc};
+use tokio::task::JoinSet;
 
 use crate::storage::db::Database;
 use crate::storage::models::{ExternalLinkRow, IssueRow, StorageCommand};
@@ -27,7 +28,8 @@ pub struct ExternalLinkEntry {
 /// Spawn the external link checker as a tokio task.
 ///
 /// Receives entries via `rx`, deduplicates by target URL, performs HEAD requests,
-/// and sends results to `storage_tx`. Returns when the channel is closed.
+/// and sends results to `storage_tx`. Returns when the channel is closed and all
+/// in-flight checks complete.
 pub async fn run_external_checker(
     mut rx: mpsc::Receiver<ExternalLinkEntry>,
     storage_tx: mpsc::Sender<StorageCommand>,
@@ -51,11 +53,13 @@ pub async fn run_external_checker(
     let semaphore = Arc::new(Semaphore::new(concurrency as usize));
     let mut seen: HashSet<String> = HashSet::new();
 
-    // Per-domain last-request tracking for politeness (2s delay).
-    let domain_delays: Arc<tokio::sync::Mutex<std::collections::HashMap<String, Instant>>> =
+    // Per-domain scheduling: stores the earliest allowed time for the next request.
+    // Using Instant-based scheduling ensures concurrent tasks for the same domain
+    // serialize correctly with the intended 2s gap.
+    let domain_schedule: Arc<tokio::sync::Mutex<std::collections::HashMap<String, Instant>>> =
         Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
 
-    let mut tasks = Vec::new();
+    let mut tasks: JoinSet<()> = JoinSet::new();
 
     while let Some(entry) = rx.recv().await {
         // Deduplicate by target URL.
@@ -68,33 +72,34 @@ pub async fn run_external_checker(
 
         let client = client.clone();
         let stx = storage_tx.clone();
-        let delays = domain_delays.clone();
+        let schedule = domain_schedule.clone();
         let task_db = db.clone();
 
-        tasks.push(tokio::spawn(async move {
+        tasks.spawn(async move {
             let _permit = permit;
 
             // Per-domain politeness: 2-second minimum between requests.
-            // Compute sleep duration while holding the lock, then release before sleeping.
+            // Compute sleep-until time while holding the lock, then release before sleeping.
             let domain = url::Url::parse(&entry.target_url)
                 .ok()
                 .and_then(|u| u.host_str().map(|h| h.to_string()))
                 .unwrap_or_default();
 
-            let sleep_duration = {
-                let mut map = delays.lock().await;
-                let duration = map
+            let sleep_until = {
+                let mut map = schedule.lock().await;
+                let now = Instant::now();
+                let next_allowed = map
                     .get(&domain)
-                    .and_then(|last| {
-                        let elapsed = last.elapsed();
-                        (elapsed < Duration::from_secs(2))
-                            .then(|| Duration::from_secs(2) - elapsed)
-                    });
-                map.insert(domain, Instant::now());
-                duration
+                    .copied()
+                    .map(|t| t.max(now))
+                    .unwrap_or(now);
+                // Record when the NEXT task for this domain should run.
+                map.insert(domain, next_allowed + Duration::from_secs(2));
+                next_allowed
             };
-            if let Some(d) = sleep_duration {
-                tokio::time::sleep(d).await;
+            let now = Instant::now();
+            if sleep_until > now {
+                tokio::time::sleep(sleep_until - now).await;
             }
 
             // Resolve source page ID from the database by URL.
@@ -182,12 +187,19 @@ pub async fn run_external_checker(
                     tracing::error!(error = %e, "Failed to send broken external link issue to storage");
                 }
             }
-        }));
+        });
+
+        // Reap completed tasks to keep memory bounded.
+        while let Some(result) = tasks.try_join_next() {
+            if let Err(e) = result {
+                tracing::error!(error = %e, "External link check task panicked");
+            }
+        }
     }
 
-    // Wait for all in-flight checks to complete.
-    for task in tasks {
-        if let Err(e) = task.await {
+    // Wait for all remaining in-flight checks to complete.
+    while let Some(result) = tasks.join_next().await {
+        if let Err(e) = result {
             tracing::error!(error = %e, "External link check task panicked");
         }
     }

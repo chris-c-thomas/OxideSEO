@@ -357,10 +357,11 @@ pub async fn get_sitemap_report(
             let mut rows = stmt.query(params![crawl_id])?;
             while let Some(row) = rows.next()? {
                 let url: String = row.get(0)?;
+                let status_code: Option<i32> = row.get(1)?;
                 report.push(SitemapReportEntry {
                     url,
                     status: "in_sitemap_not_crawled".into(),
-                    page_status_code: None,
+                    page_status_code: status_code,
                 });
             }
         }

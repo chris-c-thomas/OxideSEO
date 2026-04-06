@@ -19,12 +19,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 type ExportFormat = "csv" | "json" | "html";
 
+/** Union of all tab IDs used by ResultsExplorer. */
+type ResultsTab = "pages" | "issues" | "links" | "images" | "sitemap" | "external";
+
 interface ExportDialogProps {
   crawlId: string;
   open: boolean;
   onClose: () => void;
   /** Pre-select data type based on the active results tab. */
-  activeTab?: string;
+  activeTab?: ResultsTab;
 }
 
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; description: string }[] = [
@@ -81,9 +84,10 @@ const COLUMNS_BY_TYPE: Record<string, { key: string; label: string }[]> = {
   ],
 };
 
-function tabToDataType(tab?: string): ExportDataType {
+function tabToDataType(tab?: ResultsTab): ExportDataType {
   if (tab === "pages" || tab === "issues" || tab === "links" || tab === "images")
     return tab;
+  // "sitemap" and "external" tabs don't have a matching export type — default to pages.
   return "pages";
 }
 

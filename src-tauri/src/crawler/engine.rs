@@ -190,15 +190,16 @@ pub async fn spawn_crawl(
     let (storage_tx, storage_rx) = tokio::sync::mpsc::channel::<StorageCommand>(5000);
     let _writer_handle = spawn_storage_writer(db.clone(), storage_rx, 200);
 
-    // External link checker channel (only active when enabled).
-    let external_checker_tx: Option<
-        tokio::sync::mpsc::Sender<crate::crawler::external_checker::ExternalLinkEntry>,
-    > = if config.enable_external_link_check {
+    // External link checker channel + task handle (only active when enabled).
+    let (external_checker_tx, external_checker_handle): (
+        Option<tokio::sync::mpsc::Sender<crate::crawler::external_checker::ExternalLinkEntry>>,
+        Option<tokio::task::JoinHandle<()>>,
+    ) = if config.enable_external_link_check {
         let (ext_tx, ext_rx) = tokio::sync::mpsc::channel(5000);
         let ext_storage_tx = storage_tx.clone();
         let ext_db = db.clone();
         let ext_concurrency = config.external_link_concurrency;
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             crate::crawler::external_checker::run_external_checker(
                 ext_rx,
                 ext_storage_tx,
@@ -208,9 +209,9 @@ pub async fn spawn_crawl(
             .await;
             tracing::info!("External link checker finished");
         });
-        Some(ext_tx)
+        (Some(ext_tx), Some(handle))
     } else {
-        None
+        (None, None)
     };
 
     let global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
@@ -744,8 +745,15 @@ pub async fn spawn_crawl(
         }
 
         // --- Crawl complete ---
-        // Close the external checker channel so it drains remaining work.
+        // Close the external checker channel so it drains remaining work,
+        // then await its completion to ensure all results are sent to storage
+        // before we flush and run post-crawl analysis.
         drop(external_checker_tx);
+        if let Some(handle) = external_checker_handle {
+            if let Err(e) = handle.await {
+                tracing::error!(error = %e, "External link checker task panicked");
+            }
+        }
 
         // Persist frontier for potential resume.
         {

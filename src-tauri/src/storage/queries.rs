@@ -215,7 +215,7 @@ pub const SELECT_BROKEN_INTERNAL_LINKS: &str = r#"
 
 /// URLs in sitemap but not found (or non-200) during crawl.
 pub const SELECT_SITEMAP_NOT_CRAWLED: &str = r#"
-    SELECT su.url FROM sitemap_urls su
+    SELECT su.url, p.status_code FROM sitemap_urls su
     LEFT JOIN pages p ON p.crawl_id = su.crawl_id AND p.url = su.url
     WHERE su.crawl_id = ?1 AND (p.id IS NULL OR p.status_code != 200)
 "#;
