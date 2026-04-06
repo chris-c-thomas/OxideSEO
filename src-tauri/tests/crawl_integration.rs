@@ -148,7 +148,7 @@ async fn test_full_crawl() {
     .unwrap();
 
     let config = test_config(&base_url);
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -239,7 +239,7 @@ async fn test_robots_txt_enforcement() {
     //
     // For this test, we just verify the crawl completes successfully
     // with robots.txt enabled and the non-admin pages are crawled.
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -298,7 +298,7 @@ async fn test_max_depth_limit() {
     let mut config = test_config(&base_url);
     config.max_depth = 1; // Only crawl seed + depth 1
 
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -355,7 +355,7 @@ async fn test_max_pages_limit() {
     let mut config = test_config(&base_url);
     config.max_pages = 3;
 
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -400,7 +400,7 @@ async fn test_pause_and_stop() {
     .unwrap();
 
     let config = test_config(&base_url);
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -459,7 +459,7 @@ async fn test_parser_extracts_seo_data() {
     let mut config = test_config(&base_url);
     config.max_depth = 0; // Only crawl the seed page
 
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 
@@ -550,7 +550,7 @@ async fn test_post_crawl_analysis() {
     config.max_depth = 2;
     config.respect_robots_txt = false;
 
-    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter)
+    let handle = spawn_crawl(crawl_id.clone(), config, db.clone(), emitter, None)
         .await
         .unwrap();
 

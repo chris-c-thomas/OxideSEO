@@ -222,11 +222,16 @@ pub async fn start_crawl(
     .map_err(|e| e.to_string())?;
 
     // Spawn the crawl engine.
-    let emitter = Arc::new(TauriEmitter::new(app));
-    let handle =
-        crate::crawler::engine::spawn_crawl(crawl_id.clone(), config, db.inner().clone(), emitter)
-            .await
-            .map_err(|e| e.to_string())?;
+    let emitter = Arc::new(TauriEmitter::new(app.clone()));
+    let handle = crate::crawler::engine::spawn_crawl(
+        crawl_id.clone(),
+        config,
+        db.inner().clone(),
+        emitter,
+        Some(app),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     // Store the handle for lifecycle control.
     handles.lock().await.insert(crawl_id.clone(), handle);

@@ -37,8 +37,9 @@ pub const UPDATE_CRAWL_STATS: &str = r#"
 pub const UPSERT_PAGE: &str = r#"
     INSERT INTO pages (crawl_id, url, url_hash, depth, status_code, content_type,
                        response_time_ms, body_size, title, meta_desc, h1, canonical,
-                       robots_directives, state, fetched_at, error_message, custom_extractions)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                       robots_directives, state, fetched_at, error_message,
+                       custom_extractions, is_js_rendered)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
     ON CONFLICT(crawl_id, url_hash) DO UPDATE SET
         status_code = excluded.status_code,
         content_type = excluded.content_type,
@@ -52,7 +53,8 @@ pub const UPSERT_PAGE: &str = r#"
         state = excluded.state,
         fetched_at = excluded.fetched_at,
         error_message = excluded.error_message,
-        custom_extractions = excluded.custom_extractions
+        custom_extractions = excluded.custom_extractions,
+        is_js_rendered = excluded.is_js_rendered
 "#;
 
 /// Insert a link record.
@@ -88,7 +90,8 @@ pub const COUNT_PAGES: &str = r#"
 pub const SELECT_PAGES_BASE: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
-           robots_directives, state, fetched_at, error_message, custom_extractions
+           robots_directives, state, fetched_at, error_message,
+           custom_extractions, is_js_rendered
     FROM pages
     WHERE crawl_id = ?1
 "#;
@@ -97,7 +100,8 @@ pub const SELECT_PAGES_BASE: &str = r#"
 pub const SELECT_PAGE_BY_ID: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
-           robots_directives, state, fetched_at, error_message, custom_extractions
+           robots_directives, state, fetched_at, error_message,
+           custom_extractions, is_js_rendered
     FROM pages
     WHERE crawl_id = ?1 AND id = ?2
 "#;
@@ -288,6 +292,7 @@ pub fn upsert_page(conn: &Connection, page: &PageRow, url_hash: &[u8]) -> Result
             page.fetched_at,
             page.error_message,
             page.custom_extractions,
+            page.is_js_rendered,
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -351,6 +356,7 @@ fn row_to_page(row: &rusqlite::Row) -> rusqlite::Result<PageRow> {
         fetched_at: row.get(14)?,
         error_message: row.get(15)?,
         custom_extractions: row.get(16)?,
+        is_js_rendered: row.get(17)?,
     })
 }
 

@@ -108,6 +108,7 @@ export interface PageRow {
   fetchedAt: string | null;
   errorMessage: string | null;
   customExtractions: string | null;
+  isJsRendered: boolean;
 }
 
 export interface LinkRow {

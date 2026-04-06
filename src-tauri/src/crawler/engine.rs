@@ -108,6 +108,7 @@ pub async fn spawn_crawl(
     config: CrawlConfig,
     db: Arc<Database>,
     emitter: Arc<dyn ProgressEmitter>,
+    app_handle: Option<tauri::AppHandle>,
 ) -> Result<CrawlHandle> {
     let (state_tx, state_rx) = watch::channel(CrawlState::Running);
 
@@ -148,6 +149,22 @@ pub async fn spawn_crawl(
     // Compile URL patterns for filtering and rewriting.
     let compiled_patterns =
         Arc::new(CompiledPatterns::from_config(&config).context("Failed to compile URL patterns")?);
+
+    // JS renderer (only created when enabled and app_handle is available).
+    let js_renderer: Option<Arc<crate::crawler::js_renderer::JsRenderer>> =
+        if config.enable_js_rendering {
+            if let Some(ref handle) = app_handle {
+                Some(Arc::new(crate::crawler::js_renderer::JsRenderer::new(
+                    handle.clone(),
+                    config.js_render_max_concurrent,
+                )))
+            } else {
+                tracing::warn!("JS rendering enabled but no AppHandle available (test mode?)");
+                None
+            }
+        } else {
+            None
+        };
 
     // Seed the frontier.
     {
@@ -387,6 +404,7 @@ pub async fn spawn_crawl(
             let task_stats = stats.clone();
             let task_patterns = compiled_patterns.clone();
             let task_ext_tx = external_checker_tx.clone();
+            let task_js_renderer = js_renderer.clone();
 
             tokio::spawn(async move {
                 let _permit = permit;
@@ -420,6 +438,7 @@ pub async fn spawn_crawl(
                                     fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                     error_message: Some(e.to_string()),
                                     custom_extractions: None,
+                                    is_js_rendered: false,
                                 }),
                                 url_hash,
                             })
@@ -465,6 +484,55 @@ pub async fn spawn_crawl(
                     let Ok((parsed_page, issues)) = rx.await else {
                         task_in_flight.fetch_sub(1, Ordering::SeqCst);
                         return;
+                    };
+
+                    // --- JS rendering (if heuristic triggers) ---
+                    let (parsed_page, issues, is_js_rendered) = if let Some(ref renderer) =
+                        task_js_renderer
+                    {
+                        if crate::crawler::js_renderer::should_js_render(
+                            &parsed_page,
+                            &task_config,
+                            &task_patterns,
+                        ) {
+                            match renderer.render(&entry.url).await {
+                                Ok(rendered_html) => {
+                                    tracing::info!(url = %entry.url, "JS-rendered page, re-parsing");
+                                    let rd = task_root_domain.clone();
+                                    let final_url2 = fetch_result.final_url.clone();
+                                    let registry2 = task_rule_registry.clone();
+                                    let fetch_body_size2 = fetch_result.body_size;
+                                    let fetch_response_time2 = fetch_result.response_time_ms;
+
+                                    let (tx2, rx2) = tokio::sync::oneshot::channel();
+                                    rayon::spawn(move || {
+                                        let mut page =
+                                            parser::parse_html(&rendered_html, &final_url2, &rd);
+                                        page.body_size = Some(fetch_body_size2);
+                                        page.response_time_ms = Some(fetch_response_time2);
+                                        let ctx = CrawlContext {
+                                            root_domain: rd,
+                                            cross_page_available: false,
+                                        };
+                                        let issues = registry2.evaluate_page(&page, &ctx);
+                                        let _ = tx2.send((page, issues));
+                                    });
+
+                                    match rx2.await {
+                                        Ok((page, issues)) => (page, issues, true),
+                                        Err(_) => (parsed_page, issues, false),
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(url = %entry.url, error = %e, "JS render failed, using static parse");
+                                    (parsed_page, issues, false)
+                                }
+                            }
+                        } else {
+                            (parsed_page, issues, false)
+                        }
+                    } else {
+                        (parsed_page, issues, false)
                     };
 
                     // --- Enqueue discovered links ---
@@ -525,6 +593,7 @@ pub async fn spawn_crawl(
                         fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                         error_message: None,
                         custom_extractions,
+                        is_js_rendered,
                     };
 
                     // Build link rows.
@@ -605,6 +674,7 @@ pub async fn spawn_crawl(
                                 fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                 error_message: None,
                                 custom_extractions: None,
+                                is_js_rendered: false,
                             }),
                             url_hash,
                         })
@@ -778,10 +848,12 @@ pub async fn spawn_crawl(
 
 /// Pre-compiled regex patterns for URL filtering and rewriting.
 #[derive(Clone)]
-struct CompiledPatterns {
+pub(crate) struct CompiledPatterns {
     include: Vec<Regex>,
     exclude: Vec<Regex>,
     rewrite_rules: Vec<(Regex, String)>,
+    pub(crate) js_always: Vec<Regex>,
+    pub(crate) js_never: Vec<Regex>,
 }
 
 impl CompiledPatterns {
@@ -823,10 +895,36 @@ impl CompiledPatterns {
             })
             .collect();
 
+        let js_always = config
+            .js_render_patterns
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    tracing::warn!(pattern = %p, error = %e, "Invalid JS render pattern, skipping");
+                    None
+                }
+            })
+            .collect();
+
+        let js_never = config
+            .js_never_render_patterns
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    tracing::warn!(pattern = %p, error = %e, "Invalid JS never-render pattern, skipping");
+                    None
+                }
+            })
+            .collect();
+
         Ok(Self {
             include,
             exclude,
             rewrite_rules,
+            js_always,
+            js_never,
         })
     }
 

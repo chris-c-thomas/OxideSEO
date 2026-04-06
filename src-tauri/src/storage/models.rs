@@ -43,6 +43,8 @@ pub struct PageRow {
     pub error_message: Option<String>,
     /// JSON blob of custom CSS selector extraction results.
     pub custom_extractions: Option<String>,
+    /// Whether the page was re-parsed after JavaScript rendering.
+    pub is_js_rendered: bool,
 }
 
 /// Row in the `links` table.

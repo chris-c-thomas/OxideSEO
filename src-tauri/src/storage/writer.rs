@@ -241,6 +241,7 @@ mod tests {
             fetched_at: Some("2026-04-03T00:00:00Z".into()),
             error_message: None,
             custom_extractions: None,
+            is_js_rendered: false,
         }
     }
 

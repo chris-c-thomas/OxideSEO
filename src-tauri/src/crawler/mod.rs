@@ -10,6 +10,7 @@ pub mod engine;
 pub mod external_checker;
 pub mod fetcher;
 pub mod frontier;
+pub mod js_renderer;
 pub mod parser;
 pub mod politeness;
 pub mod robots;
