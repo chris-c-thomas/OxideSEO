@@ -109,6 +109,7 @@ export interface PageRow {
   errorMessage: string | null;
   customExtractions: string | null;
   isJsRendered: boolean;
+  bodyText: string | null;
 }
 
 export interface LinkRow {
@@ -245,7 +246,13 @@ export interface LinkFilters {
 // Export
 // ---------------------------------------------------------------------------
 
-export type ExportDataType = "pages" | "issues" | "links" | "images" | "full_report";
+export type ExportDataType =
+  | "pages"
+  | "issues"
+  | "links"
+  | "images"
+  | "ai_analyses"
+  | "full_report";
 
 export interface ExportRequest {
   crawlId: string;
@@ -257,4 +264,114 @@ export interface ExportRequest {
 export interface ExportResult {
   filePath: string;
   rowsExported: number;
+}
+
+// ---------------------------------------------------------------------------
+// AI analysis (Phase 7)
+// ---------------------------------------------------------------------------
+
+export type AiProviderType = "open_ai" | "anthropic" | "ollama";
+
+export interface AiProviderConfig {
+  providerType: AiProviderType;
+  model: string;
+  ollamaEndpoint: string | null;
+  maxTokensPerCrawl: number;
+  isConfigured: boolean;
+}
+
+export type AnalysisType = "content_score" | "meta_desc" | "title_tag";
+
+export interface AiAnalysisRow {
+  id: number;
+  crawlId: string;
+  pageId: number;
+  analysisType: AnalysisType;
+  provider: string;
+  model: string;
+  resultJson: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  latencyMs: number;
+  createdAt: string;
+}
+
+export interface AiUsageRow {
+  id: number;
+  crawlId: string;
+  provider: string;
+  model: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  requestCount: number;
+  updatedAt: string;
+}
+
+export interface AiCrawlSummaryRow {
+  id: number;
+  crawlId: string;
+  provider: string;
+  model: string;
+  summaryJson: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  createdAt: string;
+}
+
+export interface BatchAnalysisFilter {
+  onlyWithIssues: boolean;
+  onlyMissingMeta: boolean;
+  maxPages: number;
+}
+
+export interface BatchAnalysisResult {
+  pagesAnalyzed: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  errors: number;
+  budgetExhausted: boolean;
+}
+
+export interface BatchProgress {
+  completed: number;
+  total: number;
+  currentUrl: string;
+  tokensUsed: number;
+  budgetRemaining: number;
+}
+
+/** Parsed result from content quality scoring. */
+export interface ContentScoreResult {
+  overallScore: number;
+  relevanceScore: number;
+  readabilityScore: number;
+  depthScore: number;
+  reasoning: string;
+  suggestions: string[];
+}
+
+/** Parsed result from meta description generation. */
+export interface MetaDescResult {
+  suggested: string;
+  charCount: number;
+  reasoning: string;
+}
+
+/** Parsed result from title tag suggestion. */
+export interface TitleTagResult {
+  suggestions: { title: string; charCount: number }[];
+  reasoning: string;
+}
+
+/** Parsed result from crawl summary generation. */
+export interface CrawlSummaryResult {
+  summary: string;
+  topActions: string[];
+  overallHealth: "good" | "fair" | "poor";
+  criticalIssuesCount: number;
+  keyFindings: string[];
 }

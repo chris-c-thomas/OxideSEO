@@ -453,6 +453,7 @@ pub async fn spawn_crawl(
                                     error_message: Some(e.to_string()),
                                     custom_extractions: None,
                                     is_js_rendered: false,
+                                    body_text: None,
                                 }),
                                 url_hash,
                             })
@@ -611,6 +612,7 @@ pub async fn spawn_crawl(
                         error_message: None,
                         custom_extractions,
                         is_js_rendered,
+                        body_text: parsed_page.body_text.clone(),
                     };
 
                     // Build link rows.
@@ -698,6 +700,7 @@ pub async fn spawn_crawl(
                                 error_message: None,
                                 custom_extractions: None,
                                 is_js_rendered: false,
+                                body_text: None,
                             }),
                             url_hash,
                         })

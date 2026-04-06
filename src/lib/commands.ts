@@ -7,7 +7,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AiAnalysisRow,
+  AiCrawlSummaryRow,
+  AiProviderConfig,
+  AiProviderType,
+  AiUsageRow,
+  AnalysisType,
   AppSettings,
+  BatchAnalysisFilter,
+  BatchAnalysisResult,
   CrawlConfig,
   CrawlStatus,
   CrawlSummary,
@@ -173,4 +181,87 @@ export function saveCrawlFile(crawlId: string): Promise<string | null> {
 /** Open a .seocrawl file and import its data. Returns the imported crawl ID or null if cancelled. */
 export function openCrawlFile(): Promise<string | null> {
   return invoke<string | null>("open_crawl_file");
+}
+
+// ---------------------------------------------------------------------------
+// AI analysis
+// ---------------------------------------------------------------------------
+
+/** Get AI provider configuration (without API key). */
+export function getAiConfig(): Promise<AiProviderConfig> {
+  return invoke<AiProviderConfig>("get_ai_config");
+}
+
+/** Save AI provider configuration. */
+export function setAiConfig(config: AiProviderConfig): Promise<void> {
+  return invoke<void>("set_ai_config", { config });
+}
+
+/** Store an API key in the OS keychain. */
+export function setApiKey(provider: AiProviderType, key: string): Promise<void> {
+  return invoke<void>("set_api_key", { provider, key });
+}
+
+/** Delete an API key from the OS keychain. */
+export function deleteApiKey(provider: AiProviderType): Promise<void> {
+  return invoke<void>("delete_api_key", { provider });
+}
+
+/** Check if a provider has a stored API key. */
+export function hasApiKey(provider: AiProviderType): Promise<boolean> {
+  return invoke<boolean>("has_api_key", { provider });
+}
+
+/** Test connectivity to the configured AI provider. Returns model info on success. */
+export function testAiConnection(): Promise<string> {
+  return invoke<string>("test_ai_connection");
+}
+
+/** Analyze a single page with the configured AI provider. */
+export function analyzePage(
+  crawlId: string,
+  pageId: number,
+  analysisTypes: AnalysisType[],
+): Promise<AiAnalysisRow[]> {
+  return invoke<AiAnalysisRow[]>("analyze_page", {
+    crawlId,
+    pageId,
+    analysisTypes,
+  });
+}
+
+/** Batch analyze pages for a crawl. */
+export function batchAnalyzePages(
+  crawlId: string,
+  filter: BatchAnalysisFilter,
+  analysisTypes: AnalysisType[],
+): Promise<BatchAnalysisResult> {
+  return invoke<BatchAnalysisResult>("batch_analyze_pages", {
+    crawlId,
+    filter,
+    analysisTypes,
+  });
+}
+
+/** Generate an AI summary for a completed crawl. */
+export function generateCrawlSummary(crawlId: string): Promise<AiCrawlSummaryRow> {
+  return invoke<AiCrawlSummaryRow>("generate_crawl_summary", { crawlId });
+}
+
+/** Get cached AI analyses for a page. */
+export function getPageAnalyses(
+  crawlId: string,
+  pageId: number,
+): Promise<AiAnalysisRow[]> {
+  return invoke<AiAnalysisRow[]>("get_page_analyses", { crawlId, pageId });
+}
+
+/** Get AI usage/cost stats for a crawl. */
+export function getAiUsage(crawlId: string): Promise<AiUsageRow[]> {
+  return invoke<AiUsageRow[]>("get_ai_usage", { crawlId });
+}
+
+/** Get cached AI crawl summary. */
+export function getCrawlAiSummary(crawlId: string): Promise<AiCrawlSummaryRow | null> {
+  return invoke<AiCrawlSummaryRow | null>("get_crawl_ai_summary", { crawlId });
 }

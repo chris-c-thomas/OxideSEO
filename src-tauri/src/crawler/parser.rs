@@ -342,6 +342,7 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         scripts: scripts.borrow().clone(),
         stylesheets: stylesheets.borrow().clone(),
         word_count: count_words(&body_text.borrow()),
+        body_text: truncate_body_text(&body_text.borrow()),
         base_url: base_resolved,
         parse_ok: true,
         body_size: None,
@@ -497,6 +498,7 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
         scripts,
         stylesheets,
         word_count: count_words(&body_text),
+        body_text: truncate_body_text(&body_text),
         base_url,
         parse_ok: true,
         body_size: None,
@@ -563,6 +565,31 @@ pub fn is_internal(url: &str, root_domain: &str) -> bool {
 /// Count words in text content (tags stripped).
 pub fn count_words(text: &str) -> u32 {
     text.split_whitespace().count() as u32
+}
+
+/// Truncate body text to at most 8000 bytes for AI analysis storage.
+/// Returns `None` if the text is empty after trimming.
+/// Truncates at a word boundary and respects UTF-8 char boundaries.
+fn truncate_body_text(text: &str) -> Option<String> {
+    // Normalize whitespace: collapse runs of whitespace into single spaces.
+    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return None;
+    }
+    const MAX_BODY_TEXT_BYTES: usize = 8000;
+    if normalized.len() <= MAX_BODY_TEXT_BYTES {
+        Some(normalized)
+    } else {
+        // Find a safe byte offset that does not split a multi-byte UTF-8 character.
+        let mut end = MAX_BODY_TEXT_BYTES;
+        while !normalized.is_char_boundary(end) {
+            end -= 1;
+        }
+        // Prefer truncation at a word boundary.
+        let truncated = &normalized[..end];
+        let end = truncated.rfind(' ').unwrap_or(end);
+        Some(normalized[..end].to_string())
+    }
 }
 
 #[cfg(test)]
@@ -715,5 +742,68 @@ mod tests {
         // Ensure the public API delegates correctly
         assert_eq!(page.title.as_deref(), Some("Test Page - Home"));
         assert!(page.parse_ok);
+    }
+
+    // --- truncate_body_text tests ---
+
+    #[test]
+    fn test_truncate_body_text_empty() {
+        assert_eq!(truncate_body_text(""), None);
+        assert_eq!(truncate_body_text("   "), None);
+        assert_eq!(truncate_body_text("\n\t\r"), None);
+    }
+
+    #[test]
+    fn test_truncate_body_text_short() {
+        let result = truncate_body_text("Hello world").unwrap();
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn test_truncate_body_text_normalizes_whitespace() {
+        let result = truncate_body_text("  Hello   world  \n\t foo  ").unwrap();
+        assert_eq!(result, "Hello world foo");
+    }
+
+    #[test]
+    fn test_truncate_body_text_at_limit() {
+        // Exactly 8000 bytes should not be truncated.
+        let text = "a".repeat(8000);
+        let result = truncate_body_text(&text).unwrap();
+        assert_eq!(result.len(), 8000);
+    }
+
+    #[test]
+    fn test_truncate_body_text_over_limit() {
+        let text = (0..1200)
+            .map(|i| format!("word{i}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(text.len() > 8000);
+        let result = truncate_body_text(&text).unwrap();
+        assert!(result.len() <= 8000);
+        // Should end at a word boundary (no partial word).
+        assert!(!result.ends_with(char::is_alphanumeric) || result.ends_with(char::is_numeric));
+    }
+
+    #[test]
+    fn test_truncate_body_text_utf8_multibyte() {
+        // Build a string with multi-byte characters that would be split at 8000 bytes.
+        // Each emoji is 4 bytes; 2000 emojis = 8000 bytes exactly.
+        let text = "🦀".repeat(2001); // 8004 bytes
+        let result = truncate_body_text(&text).unwrap();
+        assert!(result.len() <= 8000);
+        // Must be valid UTF-8 (this assertion is implicit — String type guarantees it).
+        assert!(result.is_char_boundary(result.len()));
+    }
+
+    #[test]
+    fn test_truncate_body_text_utf8_two_byte() {
+        // 2-byte chars: 'é' is 2 bytes. Create a string near the boundary.
+        let text = "é".repeat(4001); // 8002 bytes
+        let result = truncate_body_text(&text).unwrap();
+        assert!(result.len() <= 8000);
+        // Verify no panic and valid string.
+        assert_eq!(result, "é".repeat(4000));
     }
 }

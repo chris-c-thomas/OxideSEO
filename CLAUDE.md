@@ -56,7 +56,7 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - `SeoRule` trait with full contract (`id`, `name`, `category`, `default_severity`, `evaluate`, `config_schema`, `configure`)
 - `RuleRegistry` with `register_builtins()`, config overlay, and `evaluate_page()`
 - 20 built-in rules implemented across meta, content, links, images, performance, security (all per-page rules fully implemented; 5 cross-page rules via PostCrawlAnalyzer)
-- `LlmProvider` async trait for Phase 7
+- `LlmProvider` async trait with OpenAI, Anthropic, and Ollama adapters (Phase 7 complete)
 - Full React frontend shell: App, Sidebar, Dashboard, CrawlConfig, CrawlMonitor, ResultsExplorer, SettingsView
 - Typed Tauri IPC wrappers in `src/lib/commands.ts`
 - Zustand stores for crawl state and settings
@@ -123,6 +123,21 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - ~~WU-11: Frontend advanced config form sections~~ ✅ (7 collapsible AdvancedSection components in CrawlConfig)
 - ~~WU-12: Frontend sitemap & external links tabs~~ ✅ (SitemapTab, ExternalLinksTab in ResultsExplorer)
 - ~~WU-13: Tests~~ ✅ (4 integration tests: sitemap discovery, include/exclude patterns, URL rewrite rules)
+
+**Phase 7 — AI Integration (BYOK):** ~~All work units implemented~~ ✅
+- See `.claude/plans/ticklish-waddling-spindle.md` for full plan (14 work units across 8 batches)
+- ~~WU-1: Schema migration 003_ai_analysis.sql~~ ✅ (ai_analyses, ai_usage, ai_crawl_summaries tables; body_text column on pages)
+- ~~WU-2: Provider adapters (OpenAI, Anthropic, Ollama)~~ ✅ (LlmProvider trait implementations, AiProviderType/AiProviderConfig, create_provider factory)
+- ~~WU-3: API key storage layer~~ ✅ (keyring crate, OS-native credential storage)
+- ~~WU-4: AI Tauri commands~~ ✅ (12 IPC commands: config, key management, analysis, batch, summary, usage)
+- ~~WU-5: Prompt templates + analysis engine~~ ✅ (content_quality, meta_desc, title_tag, crawl_summary prompts; AiAnalysisEngine with caching, rate limiting, budget enforcement)
+- ~~WU-6: Storage layer for AI data~~ ✅ (AiAnalysisRow, AiUsageRow, AiCrawlSummaryRow; insert/select/upsert queries)
+- ~~WU-7: Capture body text during crawl~~ ✅ (body_text on ParsedPage/PageRow, first 8000 chars of visible text)
+- ~~WU-8: TypeScript types and command wrappers~~ ✅ (AI types in types/index.ts, 12 command wrappers)
+- ~~WU-9: AI provider settings UI~~ ✅ (provider selector, API key management, model/endpoint/budget config, test connection)
+- ~~WU-10: AI analysis in Page Detail~~ ✅ (content score, meta desc, title suggestions with copy-to-clipboard)
+- ~~WU-11: AI Insights tab~~ ✅ (crawl summary, batch analysis controls with progress bar, cost tracking dashboard)
+- ~~WU-12: AI progress events~~ ✅ (ai://progress Tauri events, useAiProgress hook)
 
 ## Architecture Invariants
 
@@ -192,7 +207,15 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `storage/queries.rs` | SQL statements + execution functions | Complete (paginated queries with dynamic filtering for pages, issues, links) |
 | `storage/writer.rs` | Batched storage writer thread | Complete with tests |
 | `commands/export.rs` | Export commands: CSV, NDJSON, HTML report, .seocrawl save/open | Complete |
-| `ai/provider.rs` | LlmProvider trait | Complete (Phase 7) |
+| `ai/provider.rs` | LlmProvider trait + CompletionRequest/Response types | Complete |
+| `ai/adapters/mod.rs` | AiProviderType, AiProviderConfig, create_provider() | Complete |
+| `ai/adapters/openai.rs` | OpenAI Chat Completions adapter | Complete |
+| `ai/adapters/anthropic.rs` | Anthropic Messages API adapter | Complete |
+| `ai/adapters/ollama.rs` | Ollama local inference adapter | Complete |
+| `ai/keystore.rs` | OS-native API key storage (keyring crate) | Complete |
+| `ai/prompts.rs` | Prompt templates for AI analysis types | Complete |
+| `ai/engine.rs` | AiAnalysisEngine with caching + rate limiting | Complete |
+| `commands/ai.rs` | 12 AI IPC commands (config, keys, analysis, batch, summary) | Complete |
 
 ### Phase 6 New Files
 
@@ -202,6 +225,19 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `crawler/external_checker.rs` | External link HEAD checker with dedup + rate limiting | Complete |
 | `crawler/js_renderer.rs` | JS rendering via hidden Tauri webviews (experimental) | Complete |
 | `migrations/002_advanced_crawl.sql` | sitemap_urls, external_links tables; pages column additions | Complete |
+
+### Phase 7 New Files
+
+| File | Purpose | Status |
+|---|---|---|
+| `ai/adapters/openai.rs` | OpenAI Chat Completions adapter | Complete |
+| `ai/adapters/anthropic.rs` | Anthropic Messages API adapter | Complete |
+| `ai/adapters/ollama.rs` | Ollama local inference adapter | Complete |
+| `ai/keystore.rs` | OS-native credential storage via keyring crate | Complete |
+| `ai/prompts.rs` | Prompt templates for content scoring, meta desc, title tags, crawl summary | Complete |
+| `ai/engine.rs` | AI analysis engine with caching, rate limiting, budget enforcement | Complete |
+| `commands/ai.rs` | 12 Tauri IPC commands for AI configuration and analysis | Complete |
+| `migrations/003_ai_analysis.sql` | ai_analyses, ai_usage, ai_crawl_summaries tables; body_text column | Complete |
 
 ### Frontend (`src/`)
 
@@ -231,7 +267,9 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `components/results/columns/*.tsx` | Column definitions for each tab | Complete |
 | `components/results/filters/*.tsx` | Filter toolbar components per tab | Complete |
 | `components/export/ExportDialog.tsx` | Export dialog with format/type/column selection | Complete |
-| `components/settings/SettingsView.tsx` | Settings page | Complete |
+| `components/settings/SettingsView.tsx` | Settings page + AI provider config | Complete |
+| `components/results/AiInsightsTab.tsx` | AI Insights tab (summary, batch, cost tracking) | Complete |
+| `hooks/useAiProgress.ts` | AI batch analysis progress event subscription | Complete |
 
 ## Testing Approach
 
@@ -311,6 +349,7 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **quick-xml v0.36** — Streaming XML parser for sitemap XML. Uses `Reader::from_reader` with event-based parsing.
 - **flate2 v1** — Gzip decompression for `.xml.gz` sitemaps. Uses `GzDecoder`.
 - **regex v1** — URL include/exclude pattern matching and rewrite rules. Compiled once at crawl start via `CompiledPatterns`.
+- **keyring v3** — OS-native credential storage for AI provider API keys. Uses macOS Keychain, Windows Credential Manager, or Linux Secret Service. Keys are never stored in plaintext files.
 
 ## Gotchas
 
@@ -323,7 +362,9 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Production build requires `@types/node`** — `tsc -b` (used by `npm run build`) needs Node type definitions for `vite.config.ts`. Install with `npm i -D @types/node`.
 - **Cargo commands require `src-tauri/` CWD** — `cargo check`, `cargo test`, `cargo fmt`, `cargo clippy` must run from `src-tauri/`, not the project root. There is no workspace `Cargo.toml` at the root.
 - **Run Prettier via npx** — `npx prettier --write <file>` for formatting. It is not installed globally. The pre-commit hook (husky + lint-staged) runs Prettier automatically on staged `.ts`/`.tsx` files.
+- **Run `npx prettier --write` on new/modified `.tsx` files before committing** — `npm run typecheck` and `npm run lint` do not check Prettier formatting. The pre-commit hook will reject unformatted files.
 - **Use `.clamp()` not `.min().max()`** — Clippy's `manual_clamp` lint rejects the `.min(max).max(min)` pattern. Use `value.clamp(min, max)`.
 - **`Severity` and `RuleCategory` have `Display`/`FromStr`/`ToSql`/`FromSql`** — Use these enums directly in `IssueRow`, SQLite params, and string formatting. No manual `format!("{:?}").to_lowercase()` conversion needed.
-- **Adding a field to `PageRow` touches many locations** — Update: `storage/models.rs` (struct), `queries.rs` (UPSERT_PAGE SQL + all SELECT queries + `row_to_page` mapper), `types/index.ts` (TS interface), and every `PageRow { ... }` construction including test helpers in `writer.rs` and `post_crawl.rs`.
+- **Adding a field to `PageRow` touches many locations** — Update: `storage/models.rs` (struct), `queries.rs` (UPSERT_PAGE SQL + all SELECT queries + `row_to_page` mapper), `types/index.ts` (TS interface), and every `PageRow { ... }` construction including test helpers in `writer.rs`, `post_crawl.rs`, and the two non-HTML/errored page constructions in `engine.rs`.
+- **`ResultsTab` type is duplicated** — `ResultsExplorer.tsx` and `ExportDialog.tsx` each define their own `ResultsTab` union type. Adding a new tab requires updating both. The ExportDialog copy is easy to miss.
 - **`tauri-plugin-dialog` Rust API** — Import `use tauri_plugin_dialog::DialogExt;`. Use `app.dialog().file().add_filter(...).blocking_save_file()` which returns `Option<FilePath>`. Call `.into_path()` for `PathBuf`. `blocking_*` methods are safe from async Tauri commands (they run on tokio worker threads, not the main thread).

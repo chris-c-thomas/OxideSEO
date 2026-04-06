@@ -60,6 +60,8 @@ pub struct ParsedPage {
     pub scripts: Vec<String>,
     pub stylesheets: Vec<String>,
     pub word_count: u32,
+    /// First ~8000 characters of visible text, stripped of HTML.
+    pub body_text: Option<String>,
     pub base_url: Option<String>,
     /// Whether the parse completed successfully.
     pub parse_ok: bool,
