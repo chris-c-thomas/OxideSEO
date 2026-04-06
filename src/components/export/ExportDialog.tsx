@@ -3,7 +3,7 @@
  * Supports format selection, data type selection, and column filtering (CSV).
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { exportData } from "@/lib/commands";
 import type { ExportDataType, ExportResult } from "@/types";
 import {
@@ -30,7 +30,7 @@ interface ExportDialogProps {
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; description: string }[] = [
   { value: "csv", label: "CSV", description: "Spreadsheet-compatible data" },
   { value: "json", label: "JSON Lines", description: "Line-delimited JSON" },
-  { value: "html", label: "HTML Report", description: "Summary report with charts" },
+  { value: "html", label: "HTML Report", description: "Summary report with stats" },
 ];
 
 const DATA_TYPE_OPTIONS: { value: ExportDataType; label: string }[] = [
@@ -97,6 +97,17 @@ export function ExportDialog({ crawlId, open, onClose, activeTab }: ExportDialog
   const [result, setResult] = useState<ExportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync dataType with activeTab when the dialog opens.
+  useEffect(() => {
+    if (open) {
+      const dt = tabToDataType(activeTab);
+      setDataType(dt);
+      setSelectedColumns(new Set(COLUMNS_BY_TYPE[dt]?.map((c) => c.key) ?? []));
+      setResult(null);
+      setError(null);
+    }
+  }, [open, activeTab]);
+
   const isReport = format === "html";
   const showColumns = format === "csv";
   const availableColumns = COLUMNS_BY_TYPE[dataType] ?? [];
@@ -148,7 +159,10 @@ export function ExportDialog({ crawlId, open, onClose, activeTab }: ExportDialog
       });
       setResult(res);
     } catch (err) {
-      setError(String(err));
+      const message = String(err);
+      if (!message.toLowerCase().includes("cancelled")) {
+        setError(message);
+      }
     } finally {
       setIsExporting(false);
     }

@@ -181,7 +181,6 @@ pub async fn export_data(
         ExportFormat::Csv => export_csv(&request, &db, &app),
         ExportFormat::Json => export_ndjson(&request, &db, &app),
         ExportFormat::Html => export_html_report_inner(&request, &db, &app),
-        ExportFormat::Xlsx => Err(anyhow::anyhow!("XLSX export is not yet implemented")),
     };
     result.map_err(|e| format!("{e:#}"))
 }
@@ -473,9 +472,10 @@ fn build_top_issues_table(issues: &[(String, String, String, i64)]) -> String {
 
 /// Save a crawl to a standalone .seocrawl file.
 ///
-/// Creates a new SQLite database at the user-chosen path, runs migrations,
-/// then copies the crawl's data from the app DB via ATTACH DATABASE.
-/// Returns the saved file path, or None if the user cancelled the dialog.
+/// Creates a new SQLite database via `create_crawl_db`, renames it to the
+/// user-chosen path, then copies the crawl's data from the app DB via
+/// ATTACH DATABASE. Returns the saved file path, or None if the user
+/// cancelled the dialog.
 #[tauri::command]
 pub async fn save_crawl_file(
     crawl_id: String,
@@ -499,11 +499,10 @@ pub async fn save_crawl_file(
         None => return Ok(None),
     };
 
-    // Create a fresh DB at the target path with migrations.
+    // create_crawl_db builds its filename as {crawl_id}.seocrawl,
+    // so we create it there and rename to the user-chosen path below.
     let target = Database::create_crawl_db(
         file_path.parent().unwrap_or(std::path::Path::new(".")),
-        // Use a temp name, then rename — but create_crawl_db builds its own name.
-        // Instead, create the DB directly at the chosen path.
         &crawl_id,
     )
     .map_err(|e| format!("Failed to create crawl file: {e:#}"))?;

@@ -168,13 +168,13 @@ export interface PageDetail {
 export interface AppSettings {
   defaultCrawlConfig: Record<string, unknown>;
   theme: "system" | "light" | "dark";
-  defaultExportFormat: "csv" | "json" | "html" | "xlsx";
+  defaultExportFormat: "csv" | "json" | "html";
 }
 
 export interface RuleConfigOverride {
   ruleId: string;
   enabled: boolean | null;
-  severity: string | null;
+  severity: Severity | null;
   params: Record<string, unknown> | null;
 }
 
@@ -209,7 +209,7 @@ export type ExportDataType = "pages" | "issues" | "links" | "images" | "full_rep
 
 export interface ExportRequest {
   crawlId: string;
-  format: "csv" | "json" | "html" | "xlsx";
+  format: "csv" | "json" | "html";
   dataType: ExportDataType;
   columns: string[] | null;
 }
