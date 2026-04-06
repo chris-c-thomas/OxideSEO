@@ -24,7 +24,7 @@ interface ExportDialogProps {
   open: boolean;
   onClose: () => void;
   /** Pre-select data type based on the active results tab. */
-  activeTab?: "pages" | "issues" | "links" | "images";
+  activeTab?: string;
 }
 
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; description: string }[] = [

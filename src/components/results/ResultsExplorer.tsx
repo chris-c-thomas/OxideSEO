@@ -6,6 +6,8 @@ import { PagesTab } from "./PagesTab";
 import { IssuesTab } from "./IssuesTab";
 import { LinksTab } from "./LinksTab";
 import { ImagesTab } from "./ImagesTab";
+import { SitemapTab } from "./SitemapTab";
+import { ExternalLinksTab } from "./ExternalLinksTab";
 import { PageDetail } from "./PageDetail";
 import { ExportDialog } from "@/components/export/ExportDialog";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +16,15 @@ interface ResultsExplorerProps {
   crawlId: string | null;
 }
 
-type ResultsTab = "pages" | "issues" | "links" | "images";
+type ResultsTab = "pages" | "issues" | "links" | "images" | "sitemap" | "external";
 
 const TABS: { id: ResultsTab; label: string }[] = [
   { id: "pages", label: "All Pages" },
   { id: "issues", label: "Issues" },
   { id: "links", label: "Links" },
   { id: "images", label: "Images" },
+  { id: "sitemap", label: "Sitemap" },
+  { id: "external", label: "External Links" },
 ];
 
 export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
@@ -148,6 +152,8 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
         )}
         {activeTab === "links" && <LinksTab crawlId={crawlId} />}
         {activeTab === "images" && <ImagesTab crawlId={crawlId} />}
+        {activeTab === "sitemap" && <SitemapTab crawlId={crawlId} />}
+        {activeTab === "external" && <ExternalLinksTab crawlId={crawlId} />}
       </div>
 
       {/* Page detail sheet */}
