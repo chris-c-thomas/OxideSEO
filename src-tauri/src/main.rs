@@ -57,6 +57,8 @@ fn main() {
             commands::results::get_page_detail,
             commands::results::get_issues,
             commands::results::get_links,
+            commands::results::get_sitemap_report,
+            commands::results::get_external_links,
             // Settings
             commands::settings::get_settings,
             commands::settings::set_settings,

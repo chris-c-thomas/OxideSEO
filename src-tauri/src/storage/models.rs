@@ -41,6 +41,10 @@ pub struct PageRow {
     pub state: String,
     pub fetched_at: Option<String>,
     pub error_message: Option<String>,
+    /// JSON blob of custom CSS selector extraction results.
+    pub custom_extractions: Option<String>,
+    /// Whether the page was re-parsed after JavaScript rendering.
+    pub is_js_rendered: bool,
 }
 
 /// Row in the `links` table.
@@ -69,6 +73,34 @@ pub struct IssueRow {
     pub category: RuleCategory,
     pub message: String,
     pub detail_json: Option<String>,
+}
+
+/// Row in the `sitemap_urls` table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SitemapUrlRow {
+    pub id: i64,
+    pub crawl_id: String,
+    pub url: String,
+    pub lastmod: Option<String>,
+    pub changefreq: Option<String>,
+    pub priority: Option<f64>,
+    /// How this URL was discovered: `robots_txt`, `sitemap_index`, or `sitemap_xml`.
+    pub source: String,
+}
+
+/// Row in the `external_links` table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalLinkRow {
+    pub id: i64,
+    pub crawl_id: String,
+    pub source_page: i64,
+    pub target_url: String,
+    pub status_code: Option<i32>,
+    pub response_time_ms: Option<i32>,
+    pub error_message: Option<String>,
+    pub checked_at: Option<String>,
 }
 
 /// Batch of items to write to the database.
@@ -102,6 +134,10 @@ pub enum StorageCommand {
     },
     /// Mark the crawl as completed.
     CompleteCrawl { crawl_id: String, status: String },
+    /// Insert sitemap URL records.
+    InsertSitemapUrls(Vec<SitemapUrlRow>),
+    /// Insert external link check results.
+    InsertExternalLinks(Vec<ExternalLinkRow>),
     /// Flush current batch and commit transaction.
     Flush,
     /// Flush current batch and acknowledge completion via oneshot sender.

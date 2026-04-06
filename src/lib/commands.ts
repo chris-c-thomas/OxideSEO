@@ -23,6 +23,8 @@ import type {
   PaginatedResponse,
   PaginationParams,
   RuleConfigOverride,
+  ExternalLinkRow,
+  SitemapReportEntry,
 } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,24 @@ export function getIssues(
     crawlId,
     pagination,
     filters: filters ?? null,
+  });
+}
+
+/** Fetch sitemap cross-reference report for a crawl. */
+export function getSitemapReport(crawlId: string): Promise<SitemapReportEntry[]> {
+  return invoke<SitemapReportEntry[]>("get_sitemap_report", { crawlId });
+}
+
+/** Fetch paginated external link check results. */
+export function getExternalLinks(
+  crawlId: string,
+  pagination: PaginationParams,
+  isBroken?: boolean,
+): Promise<PaginatedResponse<ExternalLinkRow>> {
+  return invoke<PaginatedResponse<ExternalLinkRow>>("get_external_links", {
+    crawlId,
+    pagination,
+    isBroken: isBroken ?? null,
   });
 }
 

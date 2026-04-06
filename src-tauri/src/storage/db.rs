@@ -11,10 +11,16 @@ use rusqlite::Connection;
 use tauri::Manager;
 
 /// Embedded migration SQL files, ordered by version.
-const MIGRATIONS: &[(&str, &str)] = &[(
-    "001_initial",
-    include_str!("../../migrations/001_initial.sql"),
-)];
+const MIGRATIONS: &[(&str, &str)] = &[
+    (
+        "001_initial",
+        include_str!("../../migrations/001_initial.sql"),
+    ),
+    (
+        "002_advanced_crawl",
+        include_str!("../../migrations/002_advanced_crawl.sql"),
+    ),
+];
 
 /// Application database handle.
 ///

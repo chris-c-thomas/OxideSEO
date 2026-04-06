@@ -504,6 +504,41 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
     })
 }
 
+/// Extract data from HTML using user-defined CSS selectors.
+///
+/// Uses `scraper` for full DOM CSS selection. Returns a JSON object
+/// where keys are the user-provided labels and values are arrays of
+/// matched text content.
+///
+/// This is a second parse pass, only run when `custom_css_selectors` is non-empty.
+pub fn extract_custom_css(html_bytes: &[u8], selectors: &[(String, String)]) -> serde_json::Value {
+    use scraper::{Html, Selector};
+
+    let html_str = String::from_utf8_lossy(html_bytes);
+    let document = Html::parse_document(&html_str);
+
+    let mut result = serde_json::Map::new();
+
+    for (label, css) in selectors {
+        match Selector::parse(css) {
+            Ok(selector) => {
+                let matches: Vec<String> = document
+                    .select(&selector)
+                    .map(|el| el.text().collect::<String>().trim().to_string())
+                    .filter(|t| !t.is_empty())
+                    .collect();
+                result.insert(label.clone(), serde_json::json!(matches));
+            }
+            Err(e) => {
+                tracing::warn!(label = %label, selector = %css, error = ?e, "Invalid CSS selector");
+                result.insert(label.clone(), serde_json::json!(null));
+            }
+        }
+    }
+
+    serde_json::Value::Object(result)
+}
+
 /// Resolve a potentially relative URL against a base URL.
 pub fn resolve_url(href: &str, base: &str) -> Option<String> {
     match Url::parse(href) {

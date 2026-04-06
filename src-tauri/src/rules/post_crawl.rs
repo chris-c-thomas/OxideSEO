@@ -32,6 +32,7 @@ impl<'a> PostCrawlAnalyzer<'a> {
         issues.extend(self.find_duplicate_h1s()?);
         issues.extend(self.find_broken_internal_links()?);
         issues.extend(self.find_orphan_pages()?);
+        issues.extend(self.find_sitemap_cross_references()?);
         Ok(issues)
     }
 
@@ -197,6 +198,116 @@ impl<'a> PostCrawlAnalyzer<'a> {
             Ok(issues)
         })
     }
+
+    /// Check sitemap vs. crawl cross-references.
+    ///
+    /// Only runs if sitemap_urls has entries for this crawl. Produces two rule types:
+    /// - `sitemap.url_not_crawled`: URL in sitemap but not found/non-200 during crawl
+    /// - `sitemap.page_not_in_sitemap`: 200-status page crawled but absent from sitemap
+    fn find_sitemap_cross_references(&self) -> Result<Vec<IssueRow>> {
+        let crawl_id = self.crawl_id.to_string();
+
+        // Only run if we have sitemap data.
+        let sitemap_count = self
+            .db
+            .with_conn(|conn| queries::count_sitemap_urls(conn, &crawl_id))?;
+
+        if sitemap_count == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut issues = Vec::new();
+
+        // URLs in sitemap but not crawled (or non-200).
+        self.db.with_conn(|conn| {
+            let mut stmt = conn.prepare(queries::SELECT_SITEMAP_NOT_CRAWLED)?;
+            let mut rows = stmt.query(params![crawl_id])?;
+            while let Some(row) = rows.next()? {
+                let url: String = row.get(0)?;
+
+                // Find the page ID if it exists (for associating the issue).
+                let page_id: i64 = conn
+                    .query_row(
+                        "SELECT id FROM pages WHERE crawl_id = ?1 AND url = ?2",
+                        params![crawl_id, url],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+
+                // Skip URLs with no associated page — we need a valid page_id for issues.
+                if page_id == 0 {
+                    // For URLs not in pages at all, use the seed page (id=1) as anchor.
+                    let seed_id: i64 = conn
+                        .query_row(
+                            "SELECT MIN(id) FROM pages WHERE crawl_id = ?1",
+                            params![crawl_id],
+                            |r| r.get(0),
+                        )
+                        .unwrap_or(0);
+
+                    if seed_id == 0 {
+                        continue;
+                    }
+
+                    issues.push(IssueRow {
+                        id: 0,
+                        crawl_id: crawl_id.clone(),
+                        page_id: seed_id,
+                        rule_id: "sitemap.url_not_crawled".into(),
+                        severity: Severity::Warning,
+                        category: RuleCategory::Indexability,
+                        message: format!(
+                            "URL \"{}\" is in the sitemap but was not found during crawl.",
+                            url
+                        ),
+                        detail_json: Some(serde_json::json!({ "url": url }).to_string()),
+                    });
+                } else {
+                    issues.push(IssueRow {
+                        id: 0,
+                        crawl_id: crawl_id.clone(),
+                        page_id,
+                        rule_id: "sitemap.url_not_crawled".into(),
+                        severity: Severity::Warning,
+                        category: RuleCategory::Indexability,
+                        message: format!(
+                            "URL \"{}\" is in the sitemap but returned a non-200 status.",
+                            url
+                        ),
+                        detail_json: Some(serde_json::json!({ "url": url }).to_string()),
+                    });
+                }
+            }
+            Ok(())
+        })?;
+
+        // Pages crawled with 200 but not in sitemap.
+        self.db.with_conn(|conn| {
+            let mut stmt = conn.prepare(queries::SELECT_CRAWLED_NOT_IN_SITEMAP)?;
+            let mut rows = stmt.query(params![crawl_id])?;
+            while let Some(row) = rows.next()? {
+                let page_id: i64 = row.get(0)?;
+                let url: String = row.get(1)?;
+
+                issues.push(IssueRow {
+                    id: 0,
+                    crawl_id: crawl_id.clone(),
+                    page_id,
+                    rule_id: "sitemap.page_not_in_sitemap".into(),
+                    severity: Severity::Info,
+                    category: RuleCategory::Indexability,
+                    message: format!(
+                        "Page \"{}\" was crawled successfully but is not in the sitemap.",
+                        url
+                    ),
+                    detail_json: Some(serde_json::json!({ "url": url }).to_string()),
+                });
+            }
+            Ok(())
+        })?;
+
+        Ok(issues)
+    }
 }
 
 #[cfg(test)]
@@ -252,6 +363,8 @@ mod tests {
             state: "analyzed".into(),
             fetched_at: Some("2026-04-03T00:00:00Z".into()),
             error_message: None,
+            custom_extractions: None,
+            is_js_rendered: false,
         }
     }
 
@@ -490,5 +603,93 @@ mod tests {
         assert_eq!(dup_titles, 2); // Both pages with "Dup Title"
         assert_eq!(broken, 1); // Link to /gone (410)
         assert_eq!(orphans, 1); // /orphan has no inbound internal links
+    }
+
+    // --- Sitemap cross-reference tests ---
+
+    fn insert_sitemap_url(db: &Database, crawl_id: &str, url: &str) {
+        use crate::storage::models::SitemapUrlRow;
+        db.with_conn(|conn| {
+            queries::insert_sitemap_url(
+                conn,
+                &SitemapUrlRow {
+                    id: 0,
+                    crawl_id: crawl_id.into(),
+                    url: url.into(),
+                    lastmod: None,
+                    changefreq: None,
+                    priority: None,
+                    source: "sitemap_xml".into(),
+                },
+            )
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_sitemap_url_not_crawled() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        // A page that was crawled with 200.
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        // Sitemap declares two URLs: one that was crawled, one that was not.
+        insert_sitemap_url(&db, "c1", "https://example.com/");
+        insert_sitemap_url(&db, "c1", "https://example.com/missing-page");
+
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+
+        let not_crawled: Vec<_> = issues
+            .iter()
+            .filter(|i| i.rule_id == "sitemap.url_not_crawled")
+            .collect();
+        assert_eq!(not_crawled.len(), 1);
+        assert!(not_crawled[0].message.contains("missing-page"));
+    }
+
+    #[test]
+    fn test_sitemap_page_not_in_sitemap() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        // Two pages crawled with 200.
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        let p2 = make_page("c1", "https://example.com/unlisted");
+        insert_page(&db, "c1", "https://example.com/unlisted", p2);
+
+        // Sitemap only declares the root — /unlisted is missing.
+        insert_sitemap_url(&db, "c1", "https://example.com/");
+
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+
+        let not_in_sitemap: Vec<_> = issues
+            .iter()
+            .filter(|i| i.rule_id == "sitemap.page_not_in_sitemap")
+            .collect();
+        assert_eq!(not_in_sitemap.len(), 1);
+        assert!(not_in_sitemap[0].message.contains("unlisted"));
+    }
+
+    #[test]
+    fn test_sitemap_no_data_skips_analysis() {
+        let db = test_db();
+        insert_crawl(&db, "c1");
+
+        let mut p1 = make_page("c1", "https://example.com/");
+        p1.depth = 0;
+        insert_page(&db, "c1", "https://example.com/", p1);
+
+        // No sitemap URLs inserted — analysis should return empty.
+        let analyzer = PostCrawlAnalyzer::new(&db, "c1");
+        let issues = analyzer.find_sitemap_cross_references().unwrap();
+        assert!(issues.is_empty());
     }
 }

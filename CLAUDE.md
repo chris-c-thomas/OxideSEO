@@ -108,6 +108,22 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - Dashboard "Open File" and per-crawl "Save" buttons
 - See `.claude/plans/seo-crawler-development-plan.pdf` for Phases 6-8 roadmap
 
+**Phase 6 — Advanced Crawl Features:** ~~All work units implemented~~ ✅
+- See `.claude/plans/phase-6.md` for full plan (13 work units across 7 batches)
+- ~~WU-1: Schema migration 002_advanced_crawl.sql~~ ✅ (sitemap_urls, external_links tables; is_js_rendered, custom_extractions columns on pages)
+- ~~WU-2: CrawlConfig expanded with 10 new fields~~ ✅ (JS rendering, sitemap, external links, cookies, rewrite rules, CSS selectors)
+- ~~WU-3: Custom headers key-value editor UI~~ ✅
+- ~~WU-4: Cookie-based authenticated crawling~~ ✅ (reqwest cookie jar pre-seeded from config)
+- ~~WU-5: URL rewrite rules + include/exclude pattern evaluation~~ ✅ (regex crate, CompiledPatterns in engine.rs)
+- ~~WU-6: Sitemap auto-discovery and parsing~~ ✅ (quick-xml + flate2, crawler/sitemap.rs)
+- ~~WU-7: Sitemap vs. crawl cross-reference rules~~ ✅ (sitemap.url_not_crawled, sitemap.page_not_in_sitemap)
+- ~~WU-8: External link checking~~ ✅ (crawler/external_checker.rs, HEAD-only, dedup, per-domain rate limiting)
+- ~~WU-9: JavaScript rendering pipeline~~ ✅ (experimental — hidden Tauri webviews, `__TAURI_INTERNALS__` fallback)
+- ~~WU-10: Custom CSS extraction~~ ✅ (parser::extract_custom_css via scraper, stored as JSON blob)
+- ~~WU-11: Frontend advanced config form sections~~ ✅ (7 collapsible AdvancedSection components in CrawlConfig)
+- ~~WU-12: Frontend sitemap & external links tabs~~ ✅ (SitemapTab, ExternalLinksTab in ResultsExplorer)
+- ~~WU-13: Tests~~ ✅ (4 integration tests: sitemap discovery, include/exclude patterns, URL rewrite rules)
+
 ## Architecture Invariants
 
 These design decisions are intentional and should not be changed:
@@ -177,6 +193,15 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `storage/writer.rs` | Batched storage writer thread | Complete with tests |
 | `commands/export.rs` | Export commands: CSV, NDJSON, HTML report, .seocrawl save/open | Complete |
 | `ai/provider.rs` | LlmProvider trait | Complete (Phase 7) |
+
+### Phase 6 New Files
+
+| File | Purpose | Status |
+|---|---|---|
+| `crawler/sitemap.rs` | Sitemap XML parser (quick-xml), discovery, recursive fetch | Complete |
+| `crawler/external_checker.rs` | External link HEAD checker with dedup + rate limiting | Complete |
+| `crawler/js_renderer.rs` | JS rendering via hidden Tauri webviews (experimental) | Complete |
+| `migrations/002_advanced_crawl.sql` | sitemap_urls, external_links tables; pages column additions | Complete |
 
 ### Frontend (`src/`)
 
@@ -283,6 +308,9 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **TanStack Table v8** — Headless table (no DOM). Column definitions, sorting state, filter state are all managed by the library. You provide the render functions.
 - **TanStack Virtual v3** — Row virtualization. Renders only ~50 DOM nodes regardless of total row count.
 - **Zustand v5** — Minimal state management. Stores are plain functions. Access with `useStore((s) => s.field)`.
+- **quick-xml v0.36** — Streaming XML parser for sitemap XML. Uses `Reader::from_reader` with event-based parsing.
+- **flate2 v1** — Gzip decompression for `.xml.gz` sitemaps. Uses `GzDecoder`.
+- **regex v1** — URL include/exclude pattern matching and rewrite rules. Compiled once at crawl start via `CompiledPatterns`.
 
 ## Gotchas
 
@@ -297,4 +325,5 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Run Prettier via npx** — `npx prettier --write <file>` for formatting. It is not installed globally. The pre-commit hook (husky + lint-staged) runs Prettier automatically on staged `.ts`/`.tsx` files.
 - **Use `.clamp()` not `.min().max()`** — Clippy's `manual_clamp` lint rejects the `.min(max).max(min)` pattern. Use `value.clamp(min, max)`.
 - **`Severity` and `RuleCategory` have `Display`/`FromStr`/`ToSql`/`FromSql`** — Use these enums directly in `IssueRow`, SQLite params, and string formatting. No manual `format!("{:?}").to_lowercase()` conversion needed.
+- **Adding a field to `PageRow` touches many locations** — Update: `storage/models.rs` (struct), `queries.rs` (UPSERT_PAGE SQL + all SELECT queries + `row_to_page` mapper), `types/index.ts` (TS interface), and every `PageRow { ... }` construction including test helpers in `writer.rs` and `post_crawl.rs`.
 - **`tauri-plugin-dialog` Rust API** — Import `use tauri_plugin_dialog::DialogExt;`. Use `app.dialog().file().add_filter(...).blocking_save_file()` which returns `Option<FilePath>`. Call `.into_path()` for `PathBuf`. `blocking_*` methods are safe from async Tauri commands (they run on tokio worker threads, not the main thread).

@@ -15,6 +15,8 @@ struct RobotsEntry {
     robot: Option<Robot>,
     /// Crawl-delay directive value (if present), in seconds.
     crawl_delay: Option<f64>,
+    /// Sitemap URLs declared in this robots.txt.
+    sitemaps: Vec<String>,
     /// When this entry was cached.
     cached_at: Instant,
 }
@@ -69,6 +71,14 @@ impl RobotsCache {
         }
     }
 
+    /// Get sitemap URLs declared in a domain's robots.txt.
+    pub fn sitemaps(&self, domain: &str) -> Vec<String> {
+        self.cache
+            .get(domain)
+            .map(|entry| entry.sitemaps.clone())
+            .unwrap_or_default()
+    }
+
     /// Get the crawl delay for a domain (if specified in robots.txt).
     pub fn crawl_delay(&self, domain: &str) -> Option<Duration> {
         self.cache
@@ -105,6 +115,7 @@ impl RobotsCache {
                     RobotsEntry {
                         robot: None,
                         crawl_delay: None,
+                        sitemaps: Vec::new(),
                         cached_at: Instant::now(),
                     },
                 );
@@ -119,15 +130,19 @@ impl RobotsCache {
             match Robot::new(&self.user_agent, body.as_bytes()) {
                 Ok(robot) => {
                     let crawl_delay = robot.delay.map(|d| d as f64);
+                    let sitemaps: Vec<String> =
+                        robot.sitemaps.iter().map(|s| s.to_string()).collect();
                     RobotsEntry {
                         robot: Some(robot),
                         crawl_delay,
+                        sitemaps,
                         cached_at: Instant::now(),
                     }
                 }
                 Err(_) => RobotsEntry {
                     robot: None,
                     crawl_delay: None,
+                    sitemaps: Vec::new(),
                     cached_at: Instant::now(),
                 },
             }
@@ -136,6 +151,7 @@ impl RobotsCache {
             RobotsEntry {
                 robot: None,
                 crawl_delay: None,
+                sitemaps: Vec::new(),
                 cached_at: Instant::now(),
             }
         };
@@ -149,15 +165,18 @@ impl RobotsCache {
         let entry = match Robot::new(&self.user_agent, content) {
             Ok(robot) => {
                 let crawl_delay = robot.delay.map(|d| d as f64);
+                let sitemaps: Vec<String> = robot.sitemaps.iter().map(|s| s.to_string()).collect();
                 RobotsEntry {
                     robot: Some(robot),
                     crawl_delay,
+                    sitemaps,
                     cached_at: Instant::now(),
                 }
             }
             Err(_) => RobotsEntry {
                 robot: None,
                 crawl_delay: None,
+                sitemaps: Vec::new(),
                 cached_at: Instant::now(),
             },
         };

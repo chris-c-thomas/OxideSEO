@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use regex::Regex;
 use tokio::sync::{Mutex, Semaphore, watch};
 use url::Url;
 
@@ -21,7 +22,7 @@ use crate::crawler::robots::RobotsCache;
 use crate::rules::engine::RuleRegistry;
 use crate::rules::rule::CrawlContext;
 use crate::storage::db::Database;
-use crate::storage::models::{IssueRow, LinkRow, PageRow, StorageCommand};
+use crate::storage::models::{IssueRow, LinkRow, PageRow, SitemapUrlRow, StorageCommand};
 use crate::storage::writer::spawn_storage_writer;
 
 /// Handle to a running crawl. Used to control lifecycle from Tauri commands.
@@ -107,6 +108,7 @@ pub async fn spawn_crawl(
     config: CrawlConfig,
     db: Arc<Database>,
     emitter: Arc<dyn ProgressEmitter>,
+    app_handle: Option<tauri::AppHandle>,
 ) -> Result<CrawlHandle> {
     let (state_tx, state_rx) = watch::channel(CrawlState::Running);
 
@@ -143,6 +145,34 @@ pub async fn spawn_crawl(
     let parsed_seed = Url::parse(&seed_url)?;
     let root_domain = parsed_seed.host_str().unwrap_or("").to_string();
     let seed_scheme = parsed_seed.scheme().to_string();
+    // Authority includes port (e.g. "127.0.0.1:8080") for sitemap well-known paths.
+    let seed_authority = parsed_seed
+        .host_str()
+        .map(|h| match parsed_seed.port() {
+            Some(p) => format!("{}:{}", h, p),
+            None => h.to_string(),
+        })
+        .unwrap_or_default();
+
+    // Compile URL patterns for filtering and rewriting.
+    let compiled_patterns =
+        Arc::new(CompiledPatterns::from_config(&config).context("Failed to compile URL patterns")?);
+
+    // JS renderer (only created when enabled and app_handle is available).
+    let js_renderer: Option<Arc<crate::crawler::js_renderer::JsRenderer>> =
+        if config.enable_js_rendering {
+            if let Some(ref handle) = app_handle {
+                Some(Arc::new(crate::crawler::js_renderer::JsRenderer::new(
+                    handle.clone(),
+                    config.js_render_max_concurrent,
+                )))
+            } else {
+                tracing::warn!("JS rendering enabled but no AppHandle available (test mode?)");
+                None
+            }
+        } else {
+            None
+        };
 
     // Seed the frontier.
     {
@@ -159,6 +189,30 @@ pub async fn spawn_crawl(
     // Storage writer channel + thread.
     let (storage_tx, storage_rx) = tokio::sync::mpsc::channel::<StorageCommand>(5000);
     let _writer_handle = spawn_storage_writer(db.clone(), storage_rx, 200);
+
+    // External link checker channel + task handle (only active when enabled).
+    let (external_checker_tx, external_checker_handle): (
+        Option<tokio::sync::mpsc::Sender<crate::crawler::external_checker::ExternalLinkEntry>>,
+        Option<tokio::task::JoinHandle<()>>,
+    ) = if config.enable_external_link_check {
+        let (ext_tx, ext_rx) = tokio::sync::mpsc::channel(5000);
+        let ext_storage_tx = storage_tx.clone();
+        let ext_db = db.clone();
+        let ext_concurrency = config.external_link_concurrency;
+        let handle = tokio::spawn(async move {
+            crate::crawler::external_checker::run_external_checker(
+                ext_rx,
+                ext_storage_tx,
+                ext_db,
+                ext_concurrency,
+            )
+            .await;
+            tracing::info!("External link checker finished");
+        });
+        (Some(ext_tx), Some(handle))
+    } else {
+        (None, None)
+    };
 
     let global_semaphore = Arc::new(Semaphore::new(config.max_concurrency as usize));
     let in_flight = Arc::new(AtomicU64::new(0));
@@ -179,6 +233,81 @@ pub async fn spawn_crawl(
     let started_at = handle.started_at;
     tokio::spawn(async move {
         tracing::info!(%crawl_id, "Crawl orchestrator started");
+
+        // --- Sitemap discovery (before main crawl loop) ---
+        if config.enable_sitemap_discovery {
+            // Ensure robots.txt is fetched so we can extract Sitemap: directives.
+            {
+                let mut rc = robots_cache.lock().await;
+                if !rc.has_cached(&root_domain) {
+                    rc.fetch_and_cache_with_scheme(&root_domain, &seed_scheme, fetcher.client())
+                        .await
+                        .ok();
+                }
+            }
+
+            let robots_sitemaps = {
+                let rc = robots_cache.lock().await;
+                rc.sitemaps(&root_domain)
+            };
+
+            let sitemap_urls = crate::crawler::sitemap::discover_sitemaps(
+                &seed_authority,
+                &seed_scheme,
+                fetcher.client(),
+                &robots_sitemaps,
+            )
+            .await;
+
+            if !sitemap_urls.is_empty() {
+                let entries =
+                    crate::crawler::sitemap::fetch_all_sitemaps(&sitemap_urls, fetcher.client())
+                        .await;
+
+                tracing::info!(count = entries.len(), "Sitemap entries discovered");
+
+                // Store sitemap URLs in the database.
+                let sitemap_rows: Vec<SitemapUrlRow> = entries
+                    .iter()
+                    .map(|e| SitemapUrlRow {
+                        id: 0,
+                        crawl_id: crawl_id.clone(),
+                        url: e.url.clone(),
+                        lastmod: e.lastmod.clone(),
+                        changefreq: e.changefreq.clone(),
+                        priority: e.priority,
+                        source: "sitemap_xml".into(),
+                    })
+                    .collect();
+
+                if !sitemap_rows.is_empty() {
+                    if let Err(e) = storage_tx
+                        .send(StorageCommand::InsertSitemapUrls(sitemap_rows))
+                        .await
+                    {
+                        tracing::error!(error = %e, "Failed to send sitemap URLs to storage");
+                    }
+                }
+
+                // Seed frontier with sitemap URLs at elevated priority.
+                let mut f = frontier.lock().await;
+                for entry in &entries {
+                    if let Ok(normalized) = normalize_url(&entry.url, true) {
+                        // Apply include/exclude filters to sitemap URLs too.
+                        if let Some(final_url) = compiled_patterns.filter_and_rewrite(&normalized) {
+                            let hash = hash_url(&final_url);
+                            f.push(FrontierEntry {
+                                url: final_url,
+                                url_hash: hash,
+                                depth: 0,
+                                priority: 150, // Higher than default 100 - depth
+                                source_page_id: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
 
         let mut last_emit = Instant::now();
         let mut last_emit_count = 0u64;
@@ -287,6 +416,9 @@ pub async fn spawn_crawl(
             let task_config = config.clone();
             let task_in_flight = in_flight.clone();
             let task_stats = stats.clone();
+            let task_patterns = compiled_patterns.clone();
+            let task_ext_tx = external_checker_tx.clone();
+            let task_js_renderer = js_renderer.clone();
 
             tokio::spawn(async move {
                 let _permit = permit;
@@ -300,7 +432,7 @@ pub async fn spawn_crawl(
                         task_stats.urls_errored.fetch_add(1, Ordering::SeqCst);
 
                         let url_hash = entry.url_hash.to_vec();
-                        let _ = task_storage_tx
+                        if let Err(send_err) = task_storage_tx
                             .send(StorageCommand::UpsertPage {
                                 page: Box::new(PageRow {
                                     id: 0,
@@ -319,10 +451,15 @@ pub async fn spawn_crawl(
                                     state: "errored".into(),
                                     fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                     error_message: Some(e.to_string()),
+                                    custom_extractions: None,
+                                    is_js_rendered: false,
                                 }),
                                 url_hash,
                             })
-                            .await;
+                            .await
+                        {
+                            tracing::error!(url = %entry.url, error = %send_err, "Failed to send errored page to storage");
+                        }
 
                         task_in_flight.fetch_sub(1, Ordering::SeqCst);
                         return;
@@ -366,24 +503,92 @@ pub async fn spawn_crawl(
                         return;
                     };
 
+                    // --- JS rendering (if heuristic triggers) ---
+                    let (parsed_page, issues, is_js_rendered) = if let Some(ref renderer) =
+                        task_js_renderer
+                    {
+                        if crate::crawler::js_renderer::should_js_render(
+                            &parsed_page,
+                            &task_config,
+                            &task_patterns,
+                        ) {
+                            match renderer.render(&entry.url).await {
+                                Ok(rendered_html) => {
+                                    tracing::info!(url = %entry.url, "JS-rendered page, re-parsing");
+                                    let rd = task_root_domain.clone();
+                                    let final_url2 = fetch_result.final_url.clone();
+                                    let registry2 = task_rule_registry.clone();
+                                    let fetch_body_size2 = fetch_result.body_size;
+                                    let fetch_response_time2 = fetch_result.response_time_ms;
+
+                                    let (tx2, rx2) = tokio::sync::oneshot::channel();
+                                    rayon::spawn(move || {
+                                        let mut page =
+                                            parser::parse_html(&rendered_html, &final_url2, &rd);
+                                        page.body_size = Some(fetch_body_size2);
+                                        page.response_time_ms = Some(fetch_response_time2);
+                                        let ctx = CrawlContext {
+                                            root_domain: rd,
+                                            cross_page_available: false,
+                                        };
+                                        let issues = registry2.evaluate_page(&page, &ctx);
+                                        let _ = tx2.send((page, issues));
+                                    });
+
+                                    match rx2.await {
+                                        Ok((page, issues)) => (page, issues, true),
+                                        Err(_) => (parsed_page, issues, false),
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(url = %entry.url, error = %e, "JS render failed, using static parse");
+                                    (parsed_page, issues, false)
+                                }
+                            }
+                        } else {
+                            (parsed_page, issues, false)
+                        }
+                    } else {
+                        (parsed_page, issues, false)
+                    };
+
                     // --- Enqueue discovered links ---
                     if entry.depth < task_config.max_depth {
                         let mut f = task_frontier.lock().await;
                         for link in &parsed_page.links {
                             if link.is_internal && !link.is_nofollow {
                                 if let Ok(normalized) = normalize_url(&link.href, true) {
-                                    let hash = hash_url(&normalized);
-                                    f.push(FrontierEntry {
-                                        url: normalized,
-                                        url_hash: hash,
-                                        depth: entry.depth + 1,
-                                        priority: 100i32.saturating_sub(entry.depth as i32 + 1),
-                                        source_page_id: None,
-                                    });
+                                    // Apply URL rewrite rules, then include/exclude filters.
+                                    let url_to_enqueue =
+                                        task_patterns.filter_and_rewrite(&normalized);
+                                    if let Some(final_url) = url_to_enqueue {
+                                        let hash = hash_url(&final_url);
+                                        f.push(FrontierEntry {
+                                            url: final_url,
+                                            url_hash: hash,
+                                            depth: entry.depth + 1,
+                                            priority: 100i32.saturating_sub(entry.depth as i32 + 1),
+                                            source_page_id: None,
+                                        });
+                                    }
                                 }
                             }
                         }
                     }
+
+                    // --- Custom CSS extraction (second parse, only when selectors configured) ---
+                    let custom_extractions = if !task_config.custom_css_selectors.is_empty() {
+                        let selectors = task_config.custom_css_selectors.clone();
+                        let body_for_css = fetch_result.body_bytes.clone();
+                        let (css_tx, css_rx) = tokio::sync::oneshot::channel();
+                        rayon::spawn(move || {
+                            let result = parser::extract_custom_css(&body_for_css, &selectors);
+                            let _ = css_tx.send(result);
+                        });
+                        css_rx.await.ok().map(|v| v.to_string())
+                    } else {
+                        None
+                    };
 
                     // --- Send to storage ---
                     let url_hash = entry.url_hash.to_vec();
@@ -404,6 +609,8 @@ pub async fn spawn_crawl(
                         state: "analyzed".into(),
                         fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                         error_message: None,
+                        custom_extractions,
+                        is_js_rendered,
                     };
 
                     // Build link rows.
@@ -437,19 +644,40 @@ pub async fn spawn_crawl(
                         })
                         .collect();
 
+                    // Send external links to the checker (if enabled).
+                    if let Some(ref ext_tx) = task_ext_tx {
+                        for link in &parsed_page.links {
+                            if !link.is_internal {
+                                if let Err(e) = ext_tx
+                                    .send(crate::crawler::external_checker::ExternalLinkEntry {
+                                        crawl_id: task_crawl_id.clone(),
+                                        source_page_url: entry.url.clone(),
+                                        target_url: link.href.clone(),
+                                    })
+                                    .await
+                                {
+                                    tracing::error!(target_url = %link.href, error = %e, "Failed to send external link to checker");
+                                }
+                            }
+                        }
+                    }
+
                     // Send page + links + issues together so writer can resolve page ID.
-                    let _ = task_storage_tx
+                    if let Err(e) = task_storage_tx
                         .send(StorageCommand::StorePage {
                             page: Box::new(page_row),
                             url_hash,
                             links: link_rows,
                             issues: issue_rows,
                         })
-                        .await;
+                        .await
+                    {
+                        tracing::error!(url = %entry.url, error = %e, "Failed to send page to storage");
+                    }
                 } else {
                     // Non-HTML resource or error status — record metadata only.
                     let url_hash = entry.url_hash.to_vec();
-                    let _ = task_storage_tx
+                    if let Err(e) = task_storage_tx
                         .send(StorageCommand::UpsertPage {
                             page: Box::new(PageRow {
                                 id: 0,
@@ -468,10 +696,15 @@ pub async fn spawn_crawl(
                                 state: "fetched".into(),
                                 fetched_at: Some(chrono::Utc::now().to_rfc3339()),
                                 error_message: None,
+                                custom_extractions: None,
+                                is_js_rendered: false,
                             }),
                             url_hash,
                         })
-                        .await;
+                        .await
+                    {
+                        tracing::error!(url = %entry.url, error = %e, "Failed to send non-HTML page to storage");
+                    }
                 }
 
                 task_in_flight.fetch_sub(1, Ordering::SeqCst);
@@ -512,6 +745,16 @@ pub async fn spawn_crawl(
         }
 
         // --- Crawl complete ---
+        // Close the external checker channel so it drains remaining work,
+        // then await its completion to ensure all results are sent to storage
+        // before we flush and run post-crawl analysis.
+        drop(external_checker_tx);
+        if let Some(handle) = external_checker_handle {
+            if let Err(e) = handle.await {
+                tracing::error!(error = %e, "External link checker task panicked");
+            }
+        }
+
         // Persist frontier for potential resume.
         {
             let f = frontier.lock().await;
@@ -634,6 +877,91 @@ pub async fn spawn_crawl(
     });
 
     Ok(handle)
+}
+
+/// Pre-compiled regex patterns for URL filtering and rewriting.
+#[derive(Clone)]
+pub(crate) struct CompiledPatterns {
+    include: Vec<Regex>,
+    exclude: Vec<Regex>,
+    rewrite_rules: Vec<(Regex, String)>,
+    pub(crate) js_always: Vec<Regex>,
+    pub(crate) js_never: Vec<Regex>,
+}
+
+impl CompiledPatterns {
+    /// Compile patterns from config. Returns an error if any regex is invalid.
+    ///
+    /// Invalid patterns must fail the crawl rather than being silently skipped,
+    /// because skipping an include/exclude filter could cause the crawl to run
+    /// with unintended scope.
+    fn from_config(config: &CrawlConfig) -> Result<Self> {
+        let include = config
+            .include_patterns
+            .iter()
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid include pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
+
+        let exclude = config
+            .exclude_patterns
+            .iter()
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid exclude pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
+
+        let rewrite_rules = config
+            .url_rewrite_rules
+            .iter()
+            .map(|(pattern, replacement)| {
+                Regex::new(pattern)
+                    .map(|r| (r, replacement.clone()))
+                    .with_context(|| format!("Invalid rewrite pattern: {pattern}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let js_always = config
+            .js_render_patterns
+            .iter()
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid JS render pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
+
+        let js_never = config
+            .js_never_render_patterns
+            .iter()
+            .map(|p| Regex::new(p).with_context(|| format!("Invalid JS never-render pattern: {p}")))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Self {
+            include,
+            exclude,
+            rewrite_rules,
+            js_always,
+            js_never,
+        })
+    }
+
+    /// Apply rewrite rules to a URL, then check include/exclude filters.
+    /// Returns `Some(rewritten_url)` if the URL should be crawled, `None` if filtered out.
+    fn filter_and_rewrite(&self, url: &str) -> Option<String> {
+        // Apply rewrite rules in order.
+        let mut result = url.to_string();
+        for (regex, replacement) in &self.rewrite_rules {
+            result = regex
+                .replace_all(&result, replacement.as_str())
+                .into_owned();
+        }
+
+        // Check include patterns: if non-empty, URL must match at least one.
+        if !self.include.is_empty() && !self.include.iter().any(|r| r.is_match(&result)) {
+            return None;
+        }
+
+        // Check exclude patterns: URL must not match any.
+        if self.exclude.iter().any(|r| r.is_match(&result)) {
+            return None;
+        }
+
+        Some(result)
+    }
 }
 
 /// Extract the hostname from a URL string.

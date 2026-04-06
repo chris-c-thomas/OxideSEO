@@ -170,6 +170,164 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
           </label>
         </div>
 
+        {/* Advanced Settings */}
+        <AdvancedSection title="Custom Headers">
+          <p className="mb-2 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Inject custom HTTP headers into every crawl request.
+          </p>
+          <KeyValueEditor
+            pairs={formData.customHeaders}
+            onChange={(v) => updateField("customHeaders", v)}
+            keyPlaceholder="Header name"
+            valuePlaceholder="Header value"
+          />
+        </AdvancedSection>
+
+        <AdvancedSection title="Cookies">
+          <p className="mb-2 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Pre-seed cookies for authenticated crawling. One per row.
+          </p>
+          <KeyValueEditor
+            pairs={formData.cookies}
+            onChange={(v) => updateField("cookies", v)}
+            keyPlaceholder="Cookie name"
+            valuePlaceholder="Cookie value"
+          />
+        </AdvancedSection>
+
+        <AdvancedSection title="URL Include / Exclude Patterns">
+          <p className="mb-2 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Regex patterns to control which URLs are crawled.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">
+                Include (must match at least one)
+              </label>
+              <PatternListEditor
+                patterns={formData.includePatterns}
+                onChange={(v) => updateField("includePatterns", v)}
+                placeholder="/blog/.*"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Exclude (must not match any)</label>
+              <PatternListEditor
+                patterns={formData.excludePatterns}
+                onChange={(v) => updateField("excludePatterns", v)}
+                placeholder="/admin/.*"
+              />
+            </div>
+          </div>
+        </AdvancedSection>
+
+        <AdvancedSection title="URL Rewrite Rules">
+          <p className="mb-2 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Regex find/replace applied to discovered URLs before crawling.
+          </p>
+          <KeyValueEditor
+            pairs={formData.urlRewriteRules}
+            onChange={(v) => updateField("urlRewriteRules", v)}
+            keyPlaceholder="Pattern (regex)"
+            valuePlaceholder="Replacement"
+          />
+        </AdvancedSection>
+
+        <AdvancedSection title="Sitemap & External Links">
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.enableSitemapDiscovery}
+                onChange={(e) => updateField("enableSitemapDiscovery", e.target.checked)}
+                className="rounded"
+              />
+              Enable sitemap auto-discovery
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.enableExternalLinkCheck}
+                onChange={(e) => updateField("enableExternalLinkCheck", e.target.checked)}
+                className="rounded"
+              />
+              Check external links (HEAD requests)
+            </label>
+            {formData.enableExternalLinkCheck && (
+              <FieldGroup
+                label="External Link Concurrency"
+                error={errors.externalLinkConcurrency}
+              >
+                <NumberInput
+                  value={formData.externalLinkConcurrency}
+                  onChange={(v) => updateField("externalLinkConcurrency", v)}
+                  min={1}
+                  max={50}
+                />
+              </FieldGroup>
+            )}
+          </div>
+        </AdvancedSection>
+
+        <AdvancedSection title="JavaScript Rendering">
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.enableJsRendering}
+                onChange={(e) => updateField("enableJsRendering", e.target.checked)}
+                className="rounded"
+              />
+              Enable JS rendering for SPA detection
+            </label>
+            {formData.enableJsRendering && (
+              <>
+                <FieldGroup
+                  label="Max Concurrent Webviews"
+                  error={errors.jsRenderMaxConcurrent}
+                >
+                  <NumberInput
+                    value={formData.jsRenderMaxConcurrent}
+                    onChange={(v) => updateField("jsRenderMaxConcurrent", v)}
+                    min={1}
+                    max={8}
+                  />
+                </FieldGroup>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Always render patterns</label>
+                    <PatternListEditor
+                      patterns={formData.jsRenderPatterns}
+                      onChange={(v) => updateField("jsRenderPatterns", v)}
+                      placeholder="/app/.*"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Never render patterns</label>
+                    <PatternListEditor
+                      patterns={formData.jsNeverRenderPatterns}
+                      onChange={(v) => updateField("jsNeverRenderPatterns", v)}
+                      placeholder="/static/.*"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </AdvancedSection>
+
+        <AdvancedSection title="Custom CSS Selectors">
+          <p className="mb-2 text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Extract data from pages using CSS selectors. Results stored per page.
+          </p>
+          <KeyValueEditor
+            pairs={formData.customCssSelectors}
+            onChange={(v) => updateField("customCssSelectors", v)}
+            keyPlaceholder="Label"
+            valuePlaceholder="CSS selector"
+          />
+        </AdvancedSection>
+
         {/* Submit */}
         <button
           onClick={handleSubmit}
@@ -209,6 +367,178 @@ function FieldGroup({
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+function AdvancedSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded-md border" style={{ borderColor: "var(--color-border)" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium"
+      >
+        {title}
+        <span className="text-xs">{isOpen ? "\u25B2" : "\u25BC"}</span>
+      </button>
+      {isOpen && (
+        <div
+          className="border-t px-4 pt-3 pb-4"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface KeyValueEditorProps {
+  pairs: [string, string][];
+  onChange: (pairs: [string, string][]) => void;
+  keyPlaceholder: string;
+  valuePlaceholder: string;
+}
+
+function KeyValueEditor({
+  pairs,
+  onChange,
+  keyPlaceholder,
+  valuePlaceholder,
+}: KeyValueEditorProps) {
+  const updatePair = (index: number, field: 0 | 1, value: string) => {
+    const next = pairs.map((p, i) => {
+      if (i !== index) return p;
+      const copy: [string, string] = [...p];
+      copy[field] = value;
+      return copy;
+    });
+    onChange(next);
+  };
+
+  const addPair = () => {
+    onChange([...pairs, ["", ""]]);
+  };
+
+  const removePair = (index: number) => {
+    onChange(pairs.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      {pairs.map((pair, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={pair[0]}
+            onChange={(e) => updatePair(i, 0, e.target.value)}
+            placeholder={keyPlaceholder}
+            className="flex-1 rounded-md border px-2 py-1.5 text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          />
+          <input
+            type="text"
+            value={pair[1]}
+            onChange={(e) => updatePair(i, 1, e.target.value)}
+            placeholder={valuePlaceholder}
+            className="flex-1 rounded-md border px-2 py-1.5 text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => removePair(i)}
+            className="rounded px-2 py-1 text-xs"
+            style={{ color: "var(--color-severity-error)" }}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addPair}
+        className="text-xs font-medium"
+        style={{ color: "var(--color-primary)" }}
+      >
+        + Add
+      </button>
+    </div>
+  );
+}
+
+function PatternListEditor({
+  patterns,
+  onChange,
+  placeholder,
+}: {
+  patterns: string[];
+  onChange: (patterns: string[]) => void;
+  placeholder: string;
+}) {
+  const updatePattern = (index: number, value: string) => {
+    const next = patterns.map((p, i) => (i === index ? value : p));
+    onChange(next);
+  };
+
+  const addPattern = () => {
+    onChange([...patterns, ""]);
+  };
+
+  const removePattern = (index: number) => {
+    onChange(patterns.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      {patterns.map((pattern, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={pattern}
+            onChange={(e) => updatePattern(i, e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 rounded-md border px-2 py-1.5 font-mono text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => removePattern(i)}
+            className="rounded px-2 py-1 text-xs"
+            style={{ color: "var(--color-severity-error)" }}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addPattern}
+        className="text-xs font-medium"
+        style={{ color: "var(--color-primary)" }}
+      >
+        + Add
+      </button>
     </div>
   );
 }

@@ -50,6 +50,13 @@ rayon = "1"
 # --- Robots.txt ---
 texting_robots = "0.2"
 
+# --- URL pattern matching ---
+regex = "1"
+
+# --- Sitemap parsing ---
+quick-xml = "0.36"
+flate2 = "1"
+
 # --- Error handling ---
 anyhow = "1"
 thiserror = "2"
