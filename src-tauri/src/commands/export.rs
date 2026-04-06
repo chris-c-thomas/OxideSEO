@@ -517,31 +517,42 @@ pub async fn save_crawl_file(
     }
 
     // Copy data from the app DB into the target via ATTACH.
-    db.with_conn(|conn| {
+    let copy_result = db.with_conn_mut(|conn| {
         let escaped_path = file_path.to_string_lossy().replace('\'', "''");
         conn.execute_batch(&format!("ATTACH DATABASE '{}' AS target", escaped_path))?;
 
-        conn.execute(
-            "INSERT INTO target.crawls SELECT * FROM crawls WHERE id = ?1",
-            rusqlite::params![crawl_id],
-        )?;
-        conn.execute(
-            "INSERT INTO target.pages SELECT * FROM pages WHERE crawl_id = ?1",
-            rusqlite::params![crawl_id],
-        )?;
-        conn.execute(
-            "INSERT INTO target.links SELECT * FROM links WHERE crawl_id = ?1",
-            rusqlite::params![crawl_id],
-        )?;
-        conn.execute(
-            "INSERT INTO target.issues SELECT * FROM issues WHERE crawl_id = ?1",
-            rusqlite::params![crawl_id],
-        )?;
+        let result = (|| -> anyhow::Result<()> {
+            let tx = conn.transaction()?;
+            tx.execute(
+                "INSERT INTO target.crawls SELECT * FROM crawls WHERE id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            tx.execute(
+                "INSERT INTO target.pages SELECT * FROM pages WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            tx.execute(
+                "INSERT INTO target.links SELECT * FROM links WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            tx.execute(
+                "INSERT INTO target.issues SELECT * FROM issues WHERE crawl_id = ?1",
+                rusqlite::params![crawl_id],
+            )?;
+            tx.commit()?;
+            Ok(())
+        })();
 
-        conn.execute_batch("DETACH DATABASE target")?;
-        Ok(())
-    })
-    .map_err(|e| format!("Failed to save crawl data: {e:#}"))?;
+        // Always detach, regardless of success or failure.
+        let _ = conn.execute_batch("DETACH DATABASE target");
+        result
+    });
+
+    if let Err(e) = copy_result {
+        // Clean up the orphaned file on failure.
+        let _ = std::fs::remove_file(&file_path);
+        return Err(format!("Failed to save crawl data: {e:#}"));
+    }
 
     let path_str = file_path.to_string_lossy().to_string();
     tracing::info!(path = %path_str, crawl_id = %crawl_id, "Crawl file saved");
@@ -584,7 +595,7 @@ pub async fn open_crawl_file(
                 [],
                 |row| row.get(0),
             )
-            .unwrap_or(false);
+            .map_err(|e| format!("Cannot read file structure: {e}"))?;
 
         if !has_crawls {
             return Err("Invalid .seocrawl file: missing crawls table".into());
@@ -593,49 +604,53 @@ pub async fn open_crawl_file(
 
     // Import data via ATTACH.
     let crawl_id = db
-        .with_conn(|conn| {
+        .with_conn_mut(|conn| {
             let escaped_path = file_path.to_string_lossy().replace('\'', "''");
             conn.execute_batch(&format!("ATTACH DATABASE '{}' AS source", escaped_path))?;
 
-            // Get the crawl ID from the source file.
-            let crawl_id: String = conn
-                .query_row("SELECT id FROM source.crawls LIMIT 1", [], |row| row.get(0))
-                .context("No crawl found in .seocrawl file")?;
+            let result = (|| -> anyhow::Result<String> {
+                // Get the crawl ID from the source file.
+                let crawl_id: String = conn
+                    .query_row("SELECT id FROM source.crawls LIMIT 1", [], |row| row.get(0))
+                    .context("No crawl found in .seocrawl file")?;
 
-            // Check if this crawl already exists in the app DB.
-            let exists: bool = conn
-                .query_row(
-                    "SELECT COUNT(*) > 0 FROM crawls WHERE id = ?1",
+                // Check if this crawl already exists in the app DB.
+                let exists: bool = conn
+                    .query_row(
+                        "SELECT COUNT(*) > 0 FROM crawls WHERE id = ?1",
+                        rusqlite::params![crawl_id],
+                        |row| row.get(0),
+                    )
+                    .context("Failed to check for existing crawl")?;
+
+                if exists {
+                    anyhow::bail!("Crawl {} is already imported", crawl_id);
+                }
+
+                let tx = conn.transaction()?;
+                tx.execute(
+                    "INSERT INTO crawls SELECT * FROM source.crawls WHERE id = ?1",
                     rusqlite::params![crawl_id],
-                    |row| row.get(0),
-                )
-                .unwrap_or(false);
+                )?;
+                tx.execute(
+                    "INSERT INTO pages SELECT * FROM source.pages WHERE crawl_id = ?1",
+                    rusqlite::params![crawl_id],
+                )?;
+                tx.execute(
+                    "INSERT INTO links SELECT * FROM source.links WHERE crawl_id = ?1",
+                    rusqlite::params![crawl_id],
+                )?;
+                tx.execute(
+                    "INSERT INTO issues SELECT * FROM source.issues WHERE crawl_id = ?1",
+                    rusqlite::params![crawl_id],
+                )?;
+                tx.commit()?;
+                Ok(crawl_id)
+            })();
 
-            if exists {
-                conn.execute_batch("DETACH DATABASE source")?;
-                anyhow::bail!("Crawl {} is already imported", crawl_id);
-            }
-
-            conn.execute(
-                "INSERT INTO crawls SELECT * FROM source.crawls WHERE id = ?1",
-                rusqlite::params![crawl_id],
-            )?;
-            conn.execute(
-                "INSERT INTO pages SELECT * FROM source.pages WHERE crawl_id = ?1",
-                rusqlite::params![crawl_id],
-            )?;
-            conn.execute(
-                "INSERT INTO links SELECT * FROM source.links WHERE crawl_id = ?1",
-                rusqlite::params![crawl_id],
-            )?;
-            conn.execute(
-                "INSERT INTO issues SELECT * FROM source.issues WHERE crawl_id = ?1",
-                rusqlite::params![crawl_id],
-            )?;
-
-            conn.execute_batch("DETACH DATABASE source")?;
-
-            Ok(crawl_id)
+            // Always detach, regardless of success or failure.
+            let _ = conn.execute_batch("DETACH DATABASE source");
+            result
         })
         .map_err(|e| format!("Failed to import crawl: {e:#}"))?;
 

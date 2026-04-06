@@ -941,8 +941,11 @@ pub fn avg_response_time(conn: &Connection, crawl_id: &str) -> Result<Option<f64
 /// Get a single setting value by key.
 pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
     let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
-    let result: Option<String> = stmt.query_row(params![key], |row| row.get(0)).ok();
-    Ok(result)
+    match stmt.query_row(params![key], |row| row.get(0)) {
+        Ok(value) => Ok(Some(value)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Upsert a setting key-value pair.
