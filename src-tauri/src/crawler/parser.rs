@@ -342,6 +342,7 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         scripts: scripts.borrow().clone(),
         stylesheets: stylesheets.borrow().clone(),
         word_count: count_words(&body_text.borrow()),
+        body_text: truncate_body_text(&body_text.borrow()),
         base_url: base_resolved,
         parse_ok: true,
         body_size: None,
@@ -497,6 +498,7 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
         scripts,
         stylesheets,
         word_count: count_words(&body_text),
+        body_text: truncate_body_text(&body_text),
         base_url,
         parse_ok: true,
         body_size: None,
@@ -563,6 +565,25 @@ pub fn is_internal(url: &str, root_domain: &str) -> bool {
 /// Count words in text content (tags stripped).
 pub fn count_words(text: &str) -> u32 {
     text.split_whitespace().count() as u32
+}
+
+/// Truncate body text to at most 8000 characters for AI analysis storage.
+/// Returns `None` if the text is empty after trimming.
+fn truncate_body_text(text: &str) -> Option<String> {
+    // Normalize whitespace: collapse runs of whitespace into single spaces.
+    let normalized: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return None;
+    }
+    const MAX_BODY_TEXT_CHARS: usize = 8000;
+    if normalized.len() <= MAX_BODY_TEXT_CHARS {
+        Some(normalized)
+    } else {
+        // Truncate at a word boundary near the limit.
+        let truncated = &normalized[..MAX_BODY_TEXT_CHARS];
+        let end = truncated.rfind(' ').unwrap_or(MAX_BODY_TEXT_CHARS);
+        Some(normalized[..end].to_string())
+    }
 }
 
 #[cfg(test)]

@@ -45,6 +45,8 @@ pub struct PageRow {
     pub custom_extractions: Option<String>,
     /// Whether the page was re-parsed after JavaScript rendering.
     pub is_js_rendered: bool,
+    /// First ~8000 characters of visible text for AI analysis.
+    pub body_text: Option<String>,
 }
 
 /// Row in the `links` table.
@@ -101,6 +103,58 @@ pub struct ExternalLinkRow {
     pub response_time_ms: Option<i32>,
     pub error_message: Option<String>,
     pub checked_at: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// AI analysis models (Phase 7)
+// ---------------------------------------------------------------------------
+
+/// Row in the `ai_analyses` table — cached per-page AI analysis results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiAnalysisRow {
+    pub id: i64,
+    pub crawl_id: String,
+    pub page_id: i64,
+    pub analysis_type: String,
+    pub provider: String,
+    pub model: String,
+    pub result_json: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub cost_usd: f64,
+    pub latency_ms: u32,
+    pub created_at: String,
+}
+
+/// Row in the `ai_usage` table — per-crawl token/cost tracking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiUsageRow {
+    pub id: i64,
+    pub crawl_id: String,
+    pub provider: String,
+    pub model: String,
+    pub total_input_tokens: u64,
+    pub total_output_tokens: u64,
+    pub total_cost_usd: f64,
+    pub request_count: u32,
+    pub updated_at: String,
+}
+
+/// Row in the `ai_crawl_summaries` table — one per crawl.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiCrawlSummaryRow {
+    pub id: i64,
+    pub crawl_id: String,
+    pub provider: String,
+    pub model: String,
+    pub summary_json: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub cost_usd: f64,
+    pub created_at: String,
 }
 
 /// Batch of items to write to the database.

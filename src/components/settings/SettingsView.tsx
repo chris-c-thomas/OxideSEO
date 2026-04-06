@@ -3,8 +3,17 @@
  */
 
 import { useEffect, useState } from "react";
-import { getSettings, setSettings } from "@/lib/commands";
-import type { AppSettings } from "@/types";
+import {
+  getSettings,
+  setSettings,
+  getAiConfig,
+  setAiConfig,
+  setApiKey,
+  deleteApiKey,
+  hasApiKey,
+  testAiConnection,
+} from "@/lib/commands";
+import type { AppSettings, AiProviderConfig, AiProviderType } from "@/types";
 
 export function SettingsView() {
   const [settings, setLocalSettings] = useState<AppSettings | null>(null);
@@ -76,19 +85,8 @@ export function SettingsView() {
         </div>
       </section>
 
-      {/* AI Providers (Phase 7 placeholder) */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">AI Providers</h2>
-        <div
-          className="rounded-lg border p-6 text-center"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          <p className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
-            AI provider configuration (OpenAI, Anthropic, Ollama) will be available in a
-            future release.
-          </p>
-        </div>
-      </section>
+      {/* AI Providers */}
+      <AiProviderSection />
 
       {/* Plugins (Phase 8 placeholder) */}
       <section className="space-y-4">
@@ -139,5 +137,292 @@ export function SettingsView() {
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI Provider configuration section
+// ---------------------------------------------------------------------------
+
+const PROVIDER_OPTIONS: { value: AiProviderType; label: string }[] = [
+  { value: "open_ai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "ollama", label: "Ollama (Local)" },
+];
+
+const DEFAULT_MODELS: Record<AiProviderType, string> = {
+  open_ai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  ollama: "llama3",
+};
+
+function AiProviderSection() {
+  const [config, setConfig] = useState<AiProviderConfig | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [keyStored, setKeyStored] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAiConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        setKeyStored(cfg.isConfigured);
+      })
+      .catch(console.error);
+  }, []);
+
+  const refreshKeyStatus = async (provider: AiProviderType) => {
+    try {
+      const has = await hasApiKey(provider);
+      setKeyStored(has);
+    } catch {
+      setKeyStored(false);
+    }
+  };
+
+  const handleProviderChange = (provider: AiProviderType) => {
+    if (!config) return;
+    const updated = {
+      ...config,
+      providerType: provider,
+      model: DEFAULT_MODELS[provider],
+      ollamaEndpoint: provider === "ollama" ? "http://localhost:11434" : null,
+    };
+    setConfig(updated);
+    setApiKeyInput("");
+    refreshKeyStatus(provider);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!config) return;
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      await setAiConfig(config);
+      setMessage("AI configuration saved.");
+    } catch (err) {
+      setMessage(`Error: ${err}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveKey = async () => {
+    if (!config || !apiKeyInput.trim()) return;
+    setIsSaving(true);
+    setMessage(null);
+    try {
+      await setApiKey(config.providerType, apiKeyInput.trim());
+      setApiKeyInput("");
+      setKeyStored(true);
+      setMessage("API key saved to OS keychain.");
+    } catch (err) {
+      setMessage(`Error saving key: ${err}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteKey = async () => {
+    if (!config) return;
+    try {
+      await deleteApiKey(config.providerType);
+      setKeyStored(false);
+      setMessage("API key deleted.");
+    } catch (err) {
+      setMessage(`Error deleting key: ${err}`);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setMessage(null);
+    try {
+      const result = await testAiConnection();
+      setMessage(result);
+    } catch (err) {
+      setMessage(`Connection failed: ${err}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  if (!config) return null;
+
+  const isOllama = config.providerType === "ollama";
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold">AI Providers</h2>
+      <div
+        className="space-y-4 rounded-lg border p-4"
+        style={{ borderColor: "var(--color-border)" }}
+      >
+        {/* Provider selector */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Provider</label>
+          <select
+            value={config.providerType}
+            onChange={(e) => handleProviderChange(e.target.value as AiProviderType)}
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          >
+            {PROVIDER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* API key */}
+        {!isOllama && (
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              API Key{" "}
+              <span
+                className="text-xs"
+                style={{
+                  color: keyStored
+                    ? "var(--color-success, green)"
+                    : "var(--color-muted-foreground)",
+                }}
+              >
+                {keyStored ? "(stored in OS keychain)" : "(not set)"}
+              </span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder={keyStored ? "Enter new key to replace" : "Enter API key"}
+                className="flex-1 rounded-md border px-3 py-2 text-sm"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-background)",
+                  color: "var(--color-foreground)",
+                }}
+              />
+              <button
+                onClick={handleSaveKey}
+                disabled={!apiKeyInput.trim() || isSaving}
+                className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                Save Key
+              </button>
+              {keyStored && (
+                <button
+                  onClick={handleDeleteKey}
+                  className="rounded-md border px-3 py-2 text-sm"
+                  style={{
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-destructive, red)",
+                  }}
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Model */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Model</label>
+          <input
+            type="text"
+            value={config.model}
+            onChange={(e) => setConfig({ ...config, model: e.target.value })}
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          />
+        </div>
+
+        {/* Ollama endpoint */}
+        {isOllama && (
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Ollama Endpoint</label>
+            <input
+              type="text"
+              value={config.ollamaEndpoint ?? "http://localhost:11434"}
+              onChange={(e) => setConfig({ ...config, ollamaEndpoint: e.target.value })}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Token budget */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Token Budget Per Crawl</label>
+          <input
+            type="number"
+            value={config.maxTokensPerCrawl}
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                maxTokensPerCrawl: parseInt(e.target.value) || 100000,
+              })
+            }
+            min={1000}
+            step={10000}
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-background)",
+              color: "var(--color-foreground)",
+            }}
+          />
+          <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            Maximum tokens to spend per analysis session. Ollama runs locally at no cost.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-2">
+          <button
+            onClick={handleSaveConfig}
+            disabled={isSaving}
+            className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+            style={{
+              backgroundColor: "var(--color-primary)",
+              color: "var(--color-primary-foreground)",
+            }}
+          >
+            {isSaving ? "Saving..." : "Save AI Config"}
+          </button>
+          <button
+            onClick={handleTestConnection}
+            disabled={isTesting || (!keyStored && !isOllama)}
+            className="rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            {isTesting ? "Testing..." : "Test Connection"}
+          </button>
+        </div>
+
+        {message && (
+          <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+            {message}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

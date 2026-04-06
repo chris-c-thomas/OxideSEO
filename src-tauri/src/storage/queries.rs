@@ -7,7 +7,10 @@
 use anyhow::Result;
 use rusqlite::{Connection, params, types::Value};
 
-use super::models::{CrawlRow, ExternalLinkRow, IssueRow, LinkRow, PageRow, SitemapUrlRow};
+use super::models::{
+    AiAnalysisRow, AiCrawlSummaryRow, AiUsageRow, CrawlRow, ExternalLinkRow, IssueRow, LinkRow,
+    PageRow, SitemapUrlRow,
+};
 
 // ---------------------------------------------------------------------------
 // SQL constants
@@ -38,8 +41,8 @@ pub const UPSERT_PAGE: &str = r#"
     INSERT INTO pages (crawl_id, url, url_hash, depth, status_code, content_type,
                        response_time_ms, body_size, title, meta_desc, h1, canonical,
                        robots_directives, state, fetched_at, error_message,
-                       custom_extractions, is_js_rendered)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+                       custom_extractions, is_js_rendered, body_text)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
     ON CONFLICT(crawl_id, url_hash) DO UPDATE SET
         status_code = excluded.status_code,
         content_type = excluded.content_type,
@@ -54,7 +57,8 @@ pub const UPSERT_PAGE: &str = r#"
         fetched_at = excluded.fetched_at,
         error_message = excluded.error_message,
         custom_extractions = excluded.custom_extractions,
-        is_js_rendered = excluded.is_js_rendered
+        is_js_rendered = excluded.is_js_rendered,
+        body_text = excluded.body_text
 "#;
 
 /// Insert a link record.
@@ -91,7 +95,7 @@ pub const SELECT_PAGES_BASE: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
            robots_directives, state, fetched_at, error_message,
-           custom_extractions, is_js_rendered
+           custom_extractions, is_js_rendered, body_text
     FROM pages
     WHERE crawl_id = ?1
 "#;
@@ -101,7 +105,7 @@ pub const SELECT_PAGE_BY_ID: &str = r#"
     SELECT id, crawl_id, url, depth, status_code, content_type,
            response_time_ms, body_size, title, meta_desc, h1, canonical,
            robots_directives, state, fetched_at, error_message,
-           custom_extractions, is_js_rendered
+           custom_extractions, is_js_rendered, body_text
     FROM pages
     WHERE crawl_id = ?1 AND id = ?2
 "#;
@@ -293,6 +297,7 @@ pub fn upsert_page(conn: &Connection, page: &PageRow, url_hash: &[u8]) -> Result
             page.error_message,
             page.custom_extractions,
             page.is_js_rendered,
+            page.body_text,
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -357,6 +362,7 @@ fn row_to_page(row: &rusqlite::Row) -> rusqlite::Result<PageRow> {
         error_message: row.get(15)?,
         custom_extractions: row.get(16)?,
         is_js_rendered: row.get(17)?,
+        body_text: row.get(18)?,
     })
 }
 
@@ -1117,4 +1123,250 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
         params![key, value],
     )?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// AI analysis queries (Phase 7)
+// ---------------------------------------------------------------------------
+
+/// Insert an AI analysis result. Uses INSERT OR REPLACE to handle re-analysis.
+pub fn insert_ai_analysis(conn: &Connection, row: &AiAnalysisRow) -> Result<i64> {
+    conn.execute(
+        r#"INSERT OR REPLACE INTO ai_analyses
+           (crawl_id, page_id, analysis_type, content_hash, provider, model,
+            result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))"#,
+        params![
+            row.crawl_id,
+            row.page_id,
+            row.analysis_type,
+            Vec::<u8>::new(), // content_hash is set by caller via separate param
+            row.provider,
+            row.model,
+            row.result_json,
+            row.input_tokens,
+            row.output_tokens,
+            row.cost_usd,
+            row.latency_ms,
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Insert an AI analysis with a specific content hash for caching.
+pub fn insert_ai_analysis_with_hash(
+    conn: &Connection,
+    row: &AiAnalysisRow,
+    content_hash: &[u8],
+) -> Result<i64> {
+    conn.execute(
+        r#"INSERT OR REPLACE INTO ai_analyses
+           (crawl_id, page_id, analysis_type, content_hash, provider, model,
+            result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))"#,
+        params![
+            row.crawl_id,
+            row.page_id,
+            row.analysis_type,
+            content_hash,
+            row.provider,
+            row.model,
+            row.result_json,
+            row.input_tokens,
+            row.output_tokens,
+            row.cost_usd,
+            row.latency_ms,
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Select all AI analyses for a specific page.
+pub fn select_ai_analyses_for_page(
+    conn: &Connection,
+    crawl_id: &str,
+    page_id: i64,
+) -> Result<Vec<AiAnalysisRow>> {
+    let mut stmt = conn.prepare(
+        r#"SELECT id, crawl_id, page_id, analysis_type, provider, model,
+                  result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at
+           FROM ai_analyses
+           WHERE crawl_id = ?1 AND page_id = ?2
+           ORDER BY analysis_type"#,
+    )?;
+    let rows = stmt
+        .query_map(params![crawl_id, page_id], row_to_ai_analysis)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Look up a cached AI analysis by content hash and type.
+pub fn select_ai_analysis_by_hash(
+    conn: &Connection,
+    crawl_id: &str,
+    content_hash: &[u8],
+    analysis_type: &str,
+) -> Result<Option<AiAnalysisRow>> {
+    let mut stmt = conn.prepare(
+        r#"SELECT id, crawl_id, page_id, analysis_type, provider, model,
+                  result_json, input_tokens, output_tokens, cost_usd, latency_ms, created_at
+           FROM ai_analyses
+           WHERE crawl_id = ?1 AND content_hash = ?2 AND analysis_type = ?3"#,
+    )?;
+    match stmt.query_row(
+        params![crawl_id, content_hash, analysis_type],
+        row_to_ai_analysis,
+    ) {
+        Ok(row) => Ok(Some(row)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn row_to_ai_analysis(row: &rusqlite::Row) -> rusqlite::Result<AiAnalysisRow> {
+    Ok(AiAnalysisRow {
+        id: row.get(0)?,
+        crawl_id: row.get(1)?,
+        page_id: row.get(2)?,
+        analysis_type: row.get(3)?,
+        provider: row.get(4)?,
+        model: row.get(5)?,
+        result_json: row.get(6)?,
+        input_tokens: row.get(7)?,
+        output_tokens: row.get(8)?,
+        cost_usd: row.get(9)?,
+        latency_ms: row.get(10)?,
+        created_at: row.get(11)?,
+    })
+}
+
+/// Upsert AI usage tracking for a crawl/provider/model combination.
+pub fn upsert_ai_usage(
+    conn: &Connection,
+    crawl_id: &str,
+    provider: &str,
+    model: &str,
+    input_tokens: u32,
+    output_tokens: u32,
+    cost: f64,
+) -> Result<()> {
+    conn.execute(
+        r#"INSERT INTO ai_usage (crawl_id, provider, model, total_input_tokens,
+               total_output_tokens, total_cost_usd, request_count, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, datetime('now'))
+           ON CONFLICT(crawl_id, provider, model) DO UPDATE SET
+               total_input_tokens = total_input_tokens + ?4,
+               total_output_tokens = total_output_tokens + ?5,
+               total_cost_usd = total_cost_usd + ?6,
+               request_count = request_count + 1,
+               updated_at = datetime('now')"#,
+        params![crawl_id, provider, model, input_tokens, output_tokens, cost],
+    )?;
+    Ok(())
+}
+
+/// Select AI usage stats for a crawl.
+pub fn select_ai_usage(conn: &Connection, crawl_id: &str) -> Result<Vec<AiUsageRow>> {
+    let mut stmt = conn.prepare(
+        r#"SELECT id, crawl_id, provider, model, total_input_tokens,
+                  total_output_tokens, total_cost_usd, request_count, updated_at
+           FROM ai_usage WHERE crawl_id = ?1"#,
+    )?;
+    let rows = stmt
+        .query_map(params![crawl_id], |row| {
+            Ok(AiUsageRow {
+                id: row.get(0)?,
+                crawl_id: row.get(1)?,
+                provider: row.get(2)?,
+                model: row.get(3)?,
+                total_input_tokens: row.get(4)?,
+                total_output_tokens: row.get(5)?,
+                total_cost_usd: row.get(6)?,
+                request_count: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Insert or replace an AI crawl summary.
+pub fn insert_ai_crawl_summary(conn: &Connection, row: &AiCrawlSummaryRow) -> Result<i64> {
+    conn.execute(
+        r#"INSERT OR REPLACE INTO ai_crawl_summaries
+           (crawl_id, provider, model, summary_json, input_tokens, output_tokens,
+            cost_usd, created_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))"#,
+        params![
+            row.crawl_id,
+            row.provider,
+            row.model,
+            row.summary_json,
+            row.input_tokens,
+            row.output_tokens,
+            row.cost_usd,
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Select the AI crawl summary for a crawl (if one exists).
+pub fn select_ai_crawl_summary(
+    conn: &Connection,
+    crawl_id: &str,
+) -> Result<Option<AiCrawlSummaryRow>> {
+    let mut stmt = conn.prepare(
+        r#"SELECT id, crawl_id, provider, model, summary_json,
+                  input_tokens, output_tokens, cost_usd, created_at
+           FROM ai_crawl_summaries WHERE crawl_id = ?1"#,
+    )?;
+    match stmt.query_row(params![crawl_id], |row| {
+        Ok(AiCrawlSummaryRow {
+            id: row.get(0)?,
+            crawl_id: row.get(1)?,
+            provider: row.get(2)?,
+            model: row.get(3)?,
+            summary_json: row.get(4)?,
+            input_tokens: row.get(5)?,
+            output_tokens: row.get(6)?,
+            cost_usd: row.get(7)?,
+            created_at: row.get(8)?,
+        })
+    }) {
+        Ok(row) => Ok(Some(row)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Select pages eligible for AI analysis (200 status, with body text).
+pub fn select_pages_for_ai_analysis(
+    conn: &Connection,
+    crawl_id: &str,
+    only_with_issues: bool,
+    only_missing_meta: bool,
+    max_pages: i64,
+) -> Result<Vec<PageRow>> {
+    let mut sql = String::from(
+        r#"SELECT id, crawl_id, url, depth, status_code, content_type,
+                  response_time_ms, body_size, title, meta_desc, h1, canonical,
+                  robots_directives, state, fetched_at, error_message,
+                  custom_extractions, is_js_rendered, body_text
+           FROM pages
+           WHERE crawl_id = ?1 AND status_code = 200 AND body_text IS NOT NULL"#,
+    );
+
+    if only_with_issues {
+        sql.push_str(" AND id IN (SELECT DISTINCT page_id FROM issues WHERE crawl_id = ?1)");
+    }
+    if only_missing_meta {
+        sql.push_str(" AND (meta_desc IS NULL OR meta_desc = '' OR title IS NULL OR title = '')");
+    }
+    sql.push_str(" LIMIT ?2");
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![crawl_id, max_pages], row_to_page)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
 }

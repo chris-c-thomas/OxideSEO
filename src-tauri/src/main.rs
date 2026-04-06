@@ -68,6 +68,19 @@ fn main() {
             commands::export::export_data,
             commands::export::save_crawl_file,
             commands::export::open_crawl_file,
+            // AI analysis
+            commands::ai::get_ai_config,
+            commands::ai::set_ai_config,
+            commands::ai::set_api_key,
+            commands::ai::delete_api_key,
+            commands::ai::has_api_key,
+            commands::ai::test_ai_connection,
+            commands::ai::analyze_page,
+            commands::ai::batch_analyze_pages,
+            commands::ai::generate_crawl_summary,
+            commands::ai::get_page_analyses,
+            commands::ai::get_ai_usage,
+            commands::ai::get_crawl_ai_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OxideSEO");

@@ -4,4 +4,7 @@
 //! is configured. Users supply their own API keys (BYOK model).
 
 pub mod adapters;
+pub mod engine;
+pub mod keystore;
+pub mod prompts;
 pub mod provider;

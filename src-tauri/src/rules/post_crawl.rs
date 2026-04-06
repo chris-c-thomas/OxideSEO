@@ -365,6 +365,7 @@ mod tests {
             error_message: None,
             custom_extractions: None,
             is_js_rendered: false,
+            body_text: None,
         }
     }
 

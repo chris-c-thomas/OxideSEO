@@ -15,7 +15,7 @@ pub struct CompletionRequest {
 }
 
 /// Response format hint.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResponseFormat {
     Text,
     Json,
