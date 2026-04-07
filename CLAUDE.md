@@ -207,7 +207,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `storage/queries.rs` | SQL statements + execution functions | Complete (paginated queries with dynamic filtering for pages, issues, links) |
 | `storage/writer.rs` | Batched storage writer thread | Complete with tests |
 | `commands/export.rs` | Export commands: CSV, NDJSON, HTML report, .seocrawl save/open | Complete |
-| `ai/provider.rs` | LlmProvider trait + CompletionRequest/Response types | Complete |
+| `ai/provider.rs` | LlmProvider trait + CompletionRequest/Response + `compute_cost()` helper | Complete |
 | `ai/adapters/mod.rs` | AiProviderType, AiProviderConfig, create_provider() | Complete |
 | `ai/adapters/openai.rs` | OpenAI Chat Completions adapter | Complete |
 | `ai/adapters/anthropic.rs` | Anthropic Messages API adapter | Complete |
@@ -350,6 +350,7 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **flate2 v1** — Gzip decompression for `.xml.gz` sitemaps. Uses `GzDecoder`.
 - **regex v1** — URL include/exclude pattern matching and rewrite rules. Compiled once at crawl start via `CompiledPatterns`.
 - **keyring v3** — OS-native credential storage for AI provider API keys. Uses macOS Keychain, Windows Credential Manager, or Linux Secret Service. Keys are never stored in plaintext files.
+- **git-cliff** — Changelog generator from conventional commits. Run `git-cliff -o CHANGELOG.md` after tagging a release. Installed via Homebrew.
 
 ## Gotchas
 
@@ -368,3 +369,6 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Adding a field to `PageRow` touches many locations** — Update: `storage/models.rs` (struct), `queries.rs` (UPSERT_PAGE SQL + all SELECT queries + `row_to_page` mapper), `types/index.ts` (TS interface), and every `PageRow { ... }` construction including test helpers in `writer.rs`, `post_crawl.rs`, and the two non-HTML/errored page constructions in `engine.rs`.
 - **`ResultsTab` type is duplicated** — `ResultsExplorer.tsx` and `ExportDialog.tsx` each define their own `ResultsTab` union type. Adding a new tab requires updating both. The ExportDialog copy is easy to miss.
 - **`tauri-plugin-dialog` Rust API** — Import `use tauri_plugin_dialog::DialogExt;`. Use `app.dialog().file().add_filter(...).blocking_save_file()` which returns `Option<FilePath>`. Call `.into_path()` for `PathBuf`. `blocking_*` methods are safe from async Tauri commands (they run on tokio worker threads, not the main thread).
+- **Vitest globals not visible to `tsc`** — Despite `globals: true` in `vitest.config.ts`, TypeScript doesn't know about `vi`, `describe`, `it`, `expect`. Always `import { describe, it, expect, vi } from "vitest"` in test files (see `utils.test.ts` for the pattern).
+- **`git-cliff` is a standalone binary** — Run `git-cliff -o CHANGELOG.md`, not `git cliff`. Installed via Homebrew.
+- **`LlmProvider::health_check` must propagate errors** — Never return `Ok(false)` on connection failures. The caller in `test_ai_connection` ignores the boolean via `Ok(Ok(_))` pattern matching. Always use `.context()?` and `bail!` for failures.
