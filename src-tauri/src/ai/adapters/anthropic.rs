@@ -173,10 +173,11 @@ impl LlmProvider for AnthropicProvider {
     }
 
     async fn health_check(&self) -> Result<bool> {
+        // Use max_tokens: 1 to minimize cost while still validating the key.
         let req = CompletionRequest {
             system_prompt: String::new(),
-            user_prompt: "Say OK".into(),
-            max_tokens: 5,
+            user_prompt: "OK".into(),
+            max_tokens: 1,
             temperature: 0.0,
             response_format: ResponseFormat::Text,
         };

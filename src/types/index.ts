@@ -336,6 +336,13 @@ export interface BatchAnalysisResult {
   budgetExhausted: boolean;
 }
 
+export interface BatchCostEstimate {
+  eligiblePages: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedCostUsd: number;
+}
+
 export interface BatchProgress {
   completed: number;
   total: number;

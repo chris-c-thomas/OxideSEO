@@ -157,12 +157,16 @@ impl LlmProvider for OllamaProvider {
     async fn health_check(&self) -> Result<bool> {
         // Check if the Ollama server is reachable by listing models.
         let url = format!("{}/api/tags", self.endpoint.trim_end_matches('/'));
-        match self.client.get(&url).send().await {
-            Ok(resp) => Ok(resp.status().is_success()),
-            Err(e) => {
-                tracing::warn!(error = %e, "Ollama health check failed");
-                Ok(false)
-            }
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to connect to Ollama")?;
+        if resp.status().is_success() {
+            Ok(true)
+        } else {
+            bail!("Ollama returned HTTP {}", resp.status());
         }
     }
 
@@ -170,6 +174,41 @@ impl LlmProvider for OllamaProvider {
         // Local inference — no cost.
         (0.0, 0.0)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Ollama model discovery
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModelInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaModelInfo {
+    name: String,
+}
+
+/// List models installed on an Ollama instance.
+pub async fn list_ollama_models(endpoint: &str) -> Result<Vec<String>> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+    let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .context("Failed to connect to Ollama")?;
+    if !resp.status().is_success() {
+        bail!("Ollama returned HTTP {}", resp.status());
+    }
+    let tags: OllamaTagsResponse = resp
+        .json()
+        .await
+        .context("Failed to parse Ollama model list")?;
+    Ok(tags.models.into_iter().map(|m| m.name).collect())
 }
 
 #[cfg(test)]

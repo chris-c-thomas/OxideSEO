@@ -28,6 +28,16 @@ pub struct BatchAnalysisFilter {
 // Re-export from engine to maintain public API.
 pub use crate::ai::engine::BatchAnalysisResult;
 
+/// Pre-flight cost estimate for batch analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCostEstimate {
+    pub eligible_pages: u32,
+    pub estimated_input_tokens: u64,
+    pub estimated_output_tokens: u64,
+    pub estimated_cost_usd: f64,
+}
+
 // ---------------------------------------------------------------------------
 // Provider configuration commands
 // ---------------------------------------------------------------------------
@@ -91,6 +101,8 @@ pub async fn has_api_key(provider: AiProviderType) -> Result<bool, String> {
 }
 
 /// Test connectivity to the configured provider. Returns the model name on success.
+///
+/// Times out after 15 seconds to avoid hanging on unreachable endpoints.
 #[tauri::command]
 pub async fn test_ai_connection(db: State<'_, Arc<Database>>) -> Result<String, String> {
     let config = get_ai_config_internal(&db)?;
@@ -98,16 +110,15 @@ pub async fn test_ai_connection(db: State<'_, Arc<Database>>) -> Result<String, 
 
     let provider = create_provider(&config, api_key.as_deref()).map_err(|e| format!("{e:#}"))?;
 
-    provider
-        .health_check()
-        .await
-        .map_err(|e| format!("{e:#}"))?;
-
-    Ok(format!(
-        "Connected to {} (model: {})",
-        provider.name(),
-        config.model
-    ))
+    match tokio::time::timeout(std::time::Duration::from_secs(15), provider.health_check()).await {
+        Ok(Ok(_)) => Ok(format!(
+            "Connected to {} (model: {})",
+            provider.name(),
+            config.model
+        )),
+        Ok(Err(e)) => Err(format!("Connection failed: {e:#}")),
+        Err(_) => Err("Connection timed out after 15 seconds".to_string()),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -179,13 +190,67 @@ pub async fn batch_analyze_pages(
 }
 
 // ---------------------------------------------------------------------------
+// Cost estimation
+// ---------------------------------------------------------------------------
+
+/// Estimate the cost of a batch analysis before running it.
+#[tauri::command]
+pub async fn estimate_batch_cost(
+    crawl_id: String,
+    filter: BatchAnalysisFilter,
+    analysis_types: Vec<String>,
+    db: State<'_, Arc<Database>>,
+) -> Result<BatchCostEstimate, String> {
+    if analysis_types.is_empty() {
+        return Err("At least one analysis type must be selected".to_string());
+    }
+
+    let config = get_ai_config_internal(&db)?;
+    let api_key = keystore::get_api_key(config.provider_type).map_err(|e| format!("{e:#}"))?;
+    let provider = create_provider(&config, api_key.as_deref()).map_err(|e| format!("{e:#}"))?;
+
+    let page_count = db
+        .with_conn(|conn| {
+            queries::count_pages_for_ai_analysis(
+                conn,
+                &crawl_id,
+                filter.only_with_issues,
+                filter.only_missing_meta,
+                filter.max_pages as i64,
+            )
+        })
+        .map_err(|e| format!("{e:#}"))?;
+
+    /// Estimated input tokens per analysis type per page.
+    const EST_INPUT_TOKENS_PER_ANALYSIS: u64 = 2000;
+    /// Estimated output tokens per analysis type per page.
+    const EST_OUTPUT_TOKENS_PER_ANALYSIS: u64 = 500;
+
+    let num_types = analysis_types.len() as u64;
+    let est_input = page_count as u64 * num_types * EST_INPUT_TOKENS_PER_ANALYSIS;
+    let est_output = page_count as u64 * num_types * EST_OUTPUT_TOKENS_PER_ANALYSIS;
+    let est_cost =
+        crate::ai::provider::compute_cost(est_input, est_output, provider.cost_estimate());
+
+    Ok(BatchCostEstimate {
+        eligible_pages: page_count as u32,
+        estimated_input_tokens: est_input,
+        estimated_output_tokens: est_output,
+        estimated_cost_usd: est_cost,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Crawl summary commands
 // ---------------------------------------------------------------------------
 
 /// Generate an AI summary for a completed crawl.
+///
+/// When `force` is true, regenerates even if a cached summary exists.
 #[tauri::command]
 pub async fn generate_crawl_summary(
     crawl_id: String,
+    force: bool,
     db: State<'_, Arc<Database>>,
 ) -> Result<AiCrawlSummaryRow, String> {
     let config = get_ai_config_internal(&db)?;
@@ -194,7 +259,7 @@ pub async fn generate_crawl_summary(
 
     let engine = crate::ai::engine::AiAnalysisEngine::new(provider, db.inner().clone());
     engine
-        .generate_summary(&crawl_id)
+        .generate_summary(&crawl_id, force)
         .await
         .map_err(|e| format!("{e:#}"))
 }
@@ -227,6 +292,18 @@ pub async fn get_crawl_ai_summary(
     db: State<'_, Arc<Database>>,
 ) -> Result<Option<AiCrawlSummaryRow>, String> {
     db.with_conn(|conn| queries::select_ai_crawl_summary(conn, &crawl_id))
+        .map_err(|e| format!("{e:#}"))
+}
+
+// ---------------------------------------------------------------------------
+// Ollama model discovery
+// ---------------------------------------------------------------------------
+
+/// List models installed on an Ollama instance.
+#[tauri::command]
+pub async fn list_ollama_models(endpoint: String) -> Result<Vec<String>, String> {
+    crate::ai::adapters::ollama::list_ollama_models(&endpoint)
+        .await
         .map_err(|e| format!("{e:#}"))
 }
 

@@ -117,10 +117,11 @@ impl AiAnalysisEngine {
                 continue;
             }
 
-            let (input_cost, output_cost) = self.provider.cost_estimate();
-            let cost = (response.input_tokens as f64 * input_cost
-                + response.output_tokens as f64 * output_cost)
-                / 1000.0;
+            let cost = super::provider::compute_cost(
+                response.input_tokens as u64,
+                response.output_tokens as u64,
+                self.provider.cost_estimate(),
+            );
 
             let row = AiAnalysisRow {
                 id: 0,
@@ -258,13 +259,17 @@ impl AiAnalysisEngine {
     }
 
     /// Generate an AI summary for a completed crawl.
-    pub async fn generate_summary(&self, crawl_id: &str) -> Result<AiCrawlSummaryRow> {
-        // Check for cached summary first.
-        if let Some(cached) = self
-            .db
-            .with_conn(|conn| queries::select_ai_crawl_summary(conn, crawl_id))?
-        {
-            return Ok(cached);
+    ///
+    /// When `force` is true, regenerates even if a cached summary exists.
+    pub async fn generate_summary(&self, crawl_id: &str, force: bool) -> Result<AiCrawlSummaryRow> {
+        // Check for cached summary first (unless forced).
+        if !force {
+            if let Some(cached) = self
+                .db
+                .with_conn(|conn| queries::select_ai_crawl_summary(conn, crawl_id))?
+            {
+                return Ok(cached);
+            }
         }
 
         // Gather crawl statistics.
@@ -297,10 +302,11 @@ impl AiAnalysisEngine {
             .await
             .context("Failed to generate crawl summary")?;
 
-        let (input_cost, output_cost) = self.provider.cost_estimate();
-        let cost = (response.input_tokens as f64 * input_cost
-            + response.output_tokens as f64 * output_cost)
-            / 1000.0;
+        let cost = super::provider::compute_cost(
+            response.input_tokens as u64,
+            response.output_tokens as u64,
+            self.provider.cost_estimate(),
+        );
 
         let row = AiCrawlSummaryRow {
             id: 0,
