@@ -201,6 +201,10 @@ pub async fn estimate_batch_cost(
     analysis_types: Vec<String>,
     db: State<'_, Arc<Database>>,
 ) -> Result<BatchCostEstimate, String> {
+    if analysis_types.is_empty() {
+        return Err("At least one analysis type must be selected".to_string());
+    }
+
     let config = get_ai_config_internal(&db)?;
     let api_key = keystore::get_api_key(config.provider_type).map_err(|e| format!("{e:#}"))?;
     let provider = create_provider(&config, api_key.as_deref()).map_err(|e| format!("{e:#}"))?;

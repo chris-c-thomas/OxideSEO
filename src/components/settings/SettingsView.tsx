@@ -166,7 +166,7 @@ function AiProviderSection() {
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
-  const [modelsFetchError, setModelsFetchError] = useState(false);
+  const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     getAiConfig()
@@ -181,13 +181,13 @@ function AiProviderSection() {
   }, []);
 
   const fetchOllamaModels = async (endpoint: string) => {
-    setModelsFetchError(false);
+    setModelsFetchError(null);
     try {
       const models = await listOllamaModels(endpoint);
       setOllamaModels(models);
-    } catch {
+    } catch (err) {
       setOllamaModels(null);
-      setModelsFetchError(true);
+      setModelsFetchError(String(err));
     }
   };
 
@@ -213,7 +213,7 @@ function AiProviderSection() {
     setConfig(updated);
     setApiKeyInput("");
     setOllamaModels(null);
-    setModelsFetchError(false);
+    setModelsFetchError(null);
     refreshKeyStatus(provider);
     if (provider === "ollama" && endpoint) {
       fetchOllamaModels(endpoint);
@@ -420,8 +420,8 @@ function AiProviderSection() {
             />
           )}
           {isOllama && modelsFetchError && (
-            <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
-              Could not fetch models from Ollama — enter model name manually.
+            <p className="text-xs" style={{ color: "var(--color-severity-warning)" }}>
+              Could not fetch models: {modelsFetchError}. Enter model name manually.
             </p>
           )}
         </div>
@@ -433,7 +433,11 @@ function AiProviderSection() {
             <input
               type="text"
               value={config.ollamaEndpoint ?? "http://localhost:11434"}
-              onChange={(e) => setConfig({ ...config, ollamaEndpoint: e.target.value })}
+              onChange={(e) => {
+                setConfig({ ...config, ollamaEndpoint: e.target.value });
+                setOllamaModels(null);
+                setModelsFetchError(null);
+              }}
               className="w-full rounded-md border px-3 py-2 text-sm"
               style={{
                 borderColor: "var(--color-border)",

@@ -157,12 +157,16 @@ impl LlmProvider for OllamaProvider {
     async fn health_check(&self) -> Result<bool> {
         // Check if the Ollama server is reachable by listing models.
         let url = format!("{}/api/tags", self.endpoint.trim_end_matches('/'));
-        match self.client.get(&url).send().await {
-            Ok(resp) => Ok(resp.status().is_success()),
-            Err(e) => {
-                tracing::warn!(error = %e, "Ollama health check failed");
-                Ok(false)
-            }
+        let resp = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .context("Failed to connect to Ollama")?;
+        if resp.status().is_success() {
+            Ok(true)
+        } else {
+            bail!("Ollama returned HTTP {}", resp.status());
         }
     }
 

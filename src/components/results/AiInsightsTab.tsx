@@ -99,7 +99,9 @@ export function AiInsightsTab({ crawlId }: AiInsightsTabProps) {
       <BatchAnalysisSection
         crawlId={crawlId}
         onComplete={() => {
-          getAiUsage(crawlId).then(setUsage).catch(console.error);
+          getAiUsage(crawlId)
+            .then(setUsage)
+            .catch((err) => setLoadError(`Failed to refresh usage data: ${String(err)}`));
         }}
       />
 

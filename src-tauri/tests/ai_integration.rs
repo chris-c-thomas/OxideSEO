@@ -285,6 +285,66 @@ fn test_pages_for_ai_analysis_filters() {
     assert_eq!(limited.len(), 1);
 }
 
+#[test]
+fn test_count_pages_for_ai_analysis() {
+    let db = test_db();
+    let crawl_id = "crawl-ai-count";
+    insert_test_crawl(&db, crawl_id, "https://example.com");
+    insert_test_page(&db, crawl_id, 1, "https://example.com/", "Page one content");
+    insert_test_page(
+        &db,
+        crawl_id,
+        2,
+        "https://example.com/about",
+        "Page two content",
+    );
+    // Page 3 has no body text — should be excluded.
+    db.with_conn(|conn| {
+        let hash = blake3::hash(b"https://example.com/empty").as_bytes().to_vec();
+        conn.execute(
+            r#"INSERT INTO pages (id, crawl_id, url, url_hash, depth, status_code, state, is_js_rendered)
+               VALUES (3, ?1, 'https://example.com/empty', ?2, 0, 200, 'analyzed', 0)"#,
+            rusqlite::params![crawl_id, hash],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Insert an issue for page 1 only.
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO issues (crawl_id, page_id, rule_id, severity, category, message) VALUES (?1, 1, 'test.rule', 'warning', 'meta', 'Test issue')",
+            rusqlite::params![crawl_id],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // All pages with body_text (excludes page 3).
+    let count = db
+        .with_conn(|conn| queries::count_pages_for_ai_analysis(conn, crawl_id, false, false, 100))
+        .unwrap();
+    assert_eq!(count, 2);
+
+    // Only with issues.
+    let count_issues = db
+        .with_conn(|conn| queries::count_pages_for_ai_analysis(conn, crawl_id, true, false, 100))
+        .unwrap();
+    assert_eq!(count_issues, 1);
+
+    // Max pages limit.
+    let count_limited = db
+        .with_conn(|conn| queries::count_pages_for_ai_analysis(conn, crawl_id, false, false, 1))
+        .unwrap();
+    assert_eq!(count_limited, 1);
+
+    // Count matches select length.
+    let selected = db
+        .with_conn(|conn| queries::select_pages_for_ai_analysis(conn, crawl_id, false, false, 100))
+        .unwrap();
+    assert_eq!(count, selected.len() as i64);
+}
+
 // ---------------------------------------------------------------------------
 // Prompt construction tests
 // ---------------------------------------------------------------------------

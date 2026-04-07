@@ -1331,7 +1331,6 @@ pub fn select_ai_crawl_summary(
     }
 }
 
-/// Select pages eligible for AI analysis (200 status, with body text).
 /// Count pages eligible for AI analysis (same filters as `select_pages_for_ai_analysis`).
 pub fn count_pages_for_ai_analysis(
     conn: &Connection,
@@ -1356,6 +1355,7 @@ pub fn count_pages_for_ai_analysis(
     Ok(conn.query_row(&sql, params![crawl_id, max_pages], |row| row.get(0))?)
 }
 
+/// Select pages eligible for AI analysis (200 status, with body text).
 pub fn select_pages_for_ai_analysis(
     conn: &Connection,
     crawl_id: &str,
