@@ -172,6 +172,8 @@ pub struct CrawlProgress {
     pub current_rps: f64,
     pub elapsed_ms: u64,
     pub recent_urls: Vec<RecentUrl>,
+    /// Resident set size in bytes (platform-dependent, may be None).
+    pub memory_rss_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

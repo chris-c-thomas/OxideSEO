@@ -59,6 +59,10 @@ pub struct ParsedPage {
     pub images: Vec<ExtractedImage>,
     pub scripts: Vec<String>,
     pub stylesheets: Vec<String>,
+    /// Count of external scripts in `<head>` without `async` or `defer` attributes.
+    pub render_blocking_scripts: u32,
+    /// Count of stylesheets in `<head>` without a non-default `media` attribute.
+    pub render_blocking_stylesheets: u32,
     pub word_count: u32,
     /// First ~8000 characters of visible text, stripped of HTML.
     pub body_text: Option<String>,

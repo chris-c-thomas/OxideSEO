@@ -146,6 +146,112 @@ impl SeoRule for SlowResponse {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Render-blocking resources
+// ---------------------------------------------------------------------------
+
+pub struct RenderBlocking {
+    pub max_blocking_scripts: u32,
+    pub max_blocking_stylesheets: u32,
+}
+
+impl Default for RenderBlocking {
+    fn default() -> Self {
+        Self {
+            max_blocking_scripts: 2,
+            max_blocking_stylesheets: 3,
+        }
+    }
+}
+
+impl SeoRule for RenderBlocking {
+    fn id(&self) -> &str {
+        "perf.render_blocking"
+    }
+    fn name(&self) -> &str {
+        "Render-Blocking Resources"
+    }
+    fn category(&self) -> RuleCategory {
+        RuleCategory::Performance
+    }
+    fn default_severity(&self) -> Severity {
+        Severity::Warning
+    }
+
+    fn evaluate(&self, page: &ParsedPage, _ctx: &CrawlContext) -> Vec<Issue> {
+        let mut issues = Vec::new();
+
+        if page.render_blocking_scripts > self.max_blocking_scripts {
+            issues.push(Issue {
+                rule_id: self.id().into(),
+                severity: self.default_severity(),
+                category: self.category(),
+                message: format!(
+                    "Page has {} render-blocking scripts (without async/defer), exceeds {} threshold.",
+                    page.render_blocking_scripts, self.max_blocking_scripts
+                ),
+                detail: Some(serde_json::json!({
+                    "render_blocking_scripts": page.render_blocking_scripts,
+                    "threshold": self.max_blocking_scripts,
+                    "type": "scripts",
+                })),
+            });
+        }
+
+        if page.render_blocking_stylesheets > self.max_blocking_stylesheets {
+            issues.push(Issue {
+                rule_id: self.id().into(),
+                severity: self.default_severity(),
+                category: self.category(),
+                message: format!(
+                    "Page has {} render-blocking stylesheets (without media query), exceeds {} threshold.",
+                    page.render_blocking_stylesheets, self.max_blocking_stylesheets
+                ),
+                detail: Some(serde_json::json!({
+                    "render_blocking_stylesheets": page.render_blocking_stylesheets,
+                    "threshold": self.max_blocking_stylesheets,
+                    "type": "stylesheets",
+                })),
+            });
+        }
+
+        issues
+    }
+
+    fn config_schema(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "max_blocking_scripts": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Maximum render-blocking scripts allowed"
+                },
+                "max_blocking_stylesheets": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Maximum render-blocking stylesheets allowed"
+                }
+            }
+        }))
+    }
+
+    fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
+        if let Some(val) = params.get("max_blocking_scripts") {
+            self.max_blocking_scripts = val
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("max_blocking_scripts must be a positive integer"))?
+                as u32;
+        }
+        if let Some(val) = params.get("max_blocking_stylesheets") {
+            self.max_blocking_stylesheets = val.as_u64().ok_or_else(|| {
+                anyhow::anyhow!("max_blocking_stylesheets must be a positive integer")
+            })? as u32;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +350,72 @@ mod tests {
 
         let issues = rule.evaluate(&page, &ctx);
         assert!(issues.is_empty());
+    }
+
+    // --- RenderBlocking tests ---
+
+    #[test]
+    fn test_render_blocking_flags_scripts() {
+        let rule = RenderBlocking::default();
+        let ctx = make_ctx();
+        let mut page = make_page();
+        page.render_blocking_scripts = 5;
+
+        let issues = rule.evaluate(&page, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].rule_id, "perf.render_blocking");
+        assert!(issues[0].message.contains("5 render-blocking scripts"));
+    }
+
+    #[test]
+    fn test_render_blocking_flags_stylesheets() {
+        let rule = RenderBlocking::default();
+        let ctx = make_ctx();
+        let mut page = make_page();
+        page.render_blocking_stylesheets = 6;
+
+        let issues = rule.evaluate(&page, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].message.contains("6 render-blocking stylesheets"));
+    }
+
+    #[test]
+    fn test_render_blocking_passes_within_threshold() {
+        let rule = RenderBlocking::default();
+        let ctx = make_ctx();
+        let mut page = make_page();
+        page.render_blocking_scripts = 1;
+        page.render_blocking_stylesheets = 2;
+
+        let issues = rule.evaluate(&page, &ctx);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_render_blocking_both_exceeded() {
+        let rule = RenderBlocking::default();
+        let ctx = make_ctx();
+        let mut page = make_page();
+        page.render_blocking_scripts = 5;
+        page.render_blocking_stylesheets = 5;
+
+        let issues = rule.evaluate(&page, &ctx);
+        assert_eq!(issues.len(), 2);
+    }
+
+    #[test]
+    fn test_render_blocking_configurable() {
+        let mut rule = RenderBlocking::default();
+        rule.configure(&serde_json::json!({ "max_blocking_scripts": 0 }))
+            .unwrap();
+        assert_eq!(rule.max_blocking_scripts, 0);
+
+        let ctx = make_ctx();
+        let mut page = make_page();
+        page.render_blocking_scripts = 1;
+
+        let issues = rule.evaluate(&page, &ctx);
+        assert_eq!(issues.len(), 1);
     }
 
     #[test]

@@ -57,6 +57,7 @@ impl RuleRegistry {
         // Performance & Security rules
         self.register(Box::new(builtin::performance::LargePage::default()));
         self.register(Box::new(builtin::performance::SlowResponse::default()));
+        self.register(Box::new(builtin::performance::RenderBlocking::default()));
         self.register(Box::new(builtin::security::MixedContent));
         self.register(Box::new(builtin::security::HttpPage));
 

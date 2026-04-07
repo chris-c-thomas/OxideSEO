@@ -166,6 +166,101 @@ Focus on:
     }
 }
 
+/// Build a structured data recommendation request.
+pub fn structured_data_request(
+    page_text: &str,
+    url: &str,
+    title: Option<&str>,
+) -> CompletionRequest {
+    let truncated = truncate_to_words(page_text, MAX_PROMPT_WORDS);
+
+    let system_prompt = r#"You are an SEO structured data specialist. Analyze the web page and recommend appropriate JSON-LD structured data. Return a JSON object:
+
+{
+  "pageType": "<detected page type: article, product, faq, local_business, recipe, event, organization, person, other>",
+  "recommendedSchemas": [
+    {
+      "type": "<Schema.org type, e.g. Article, Product, FAQPage>",
+      "priority": "<high|medium|low>",
+      "reason": "<why this schema fits>",
+      "example": "<minimal JSON-LD snippet>"
+    }
+  ],
+  "existingMarkup": "<description of any existing structured data found, or 'none'>",
+  "reasoning": "<overall analysis>"
+}
+
+Guidelines:
+- Identify the primary content type from the page text and URL structure
+- Recommend the most impactful Schema.org types (max 3)
+- Prioritize schemas that enable rich results in Google Search
+- Include minimal but valid JSON-LD examples"#;
+
+    let title_str = title.unwrap_or("(no title)");
+    let user_prompt = format!("URL: {url}\nTitle: {title_str}\n\nPage content:\n{truncated}");
+
+    CompletionRequest {
+        system_prompt: system_prompt.into(),
+        user_prompt,
+        max_tokens: 800,
+        temperature: 0.3,
+        response_format: ResponseFormat::Json,
+    }
+}
+
+/// Build an accessibility narrative request.
+pub fn accessibility_request(
+    page_text: &str,
+    url: &str,
+    title: Option<&str>,
+    h1s: &[String],
+    images_without_alt: u32,
+) -> CompletionRequest {
+    let truncated = truncate_to_words(page_text, MAX_PROMPT_WORDS);
+
+    let system_prompt = r#"You are a web accessibility specialist following WCAG 2.1 guidelines. Analyze the page context and provide plain-English accessibility remediation guidance. Return a JSON object:
+
+{
+  "overallRating": "<good|fair|poor>",
+  "issues": [
+    {
+      "wcagCriterion": "<e.g. 1.1.1 Non-text Content>",
+      "level": "<A|AA|AAA>",
+      "description": "<plain-English description of the issue>",
+      "remediation": "<specific, actionable fix instructions>",
+      "priority": "<high|medium|low>"
+    }
+  ],
+  "positives": ["<things the page does well>"],
+  "reasoning": "<overall accessibility assessment>"
+}
+
+Focus on:
+- Image alt text completeness
+- Heading hierarchy and document structure
+- Link text descriptiveness
+- Color contrast and readability considerations
+- Keyboard navigation implications"#;
+
+    let title_str = title.unwrap_or("(no title)");
+    let h1_list = if h1s.is_empty() {
+        "none".to_string()
+    } else {
+        h1s.join(", ")
+    };
+    let user_prompt = format!(
+        "URL: {url}\nTitle: {title_str}\nH1 headings: {h1_list}\nImages without alt text: {images_without_alt}\n\nPage content:\n{truncated}"
+    );
+
+    CompletionRequest {
+        system_prompt: system_prompt.into(),
+        user_prompt,
+        max_tokens: 800,
+        temperature: 0.3,
+        response_format: ResponseFormat::Json,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,6 +310,40 @@ mod tests {
             req.user_prompt
                 .contains("Current meta description: Old desc")
         );
+    }
+
+    #[test]
+    fn test_structured_data_request_format() {
+        let req = structured_data_request(
+            "Page about recipes",
+            "https://example.com/recipe",
+            Some("Best Pasta"),
+        );
+        assert!(req.system_prompt.contains("structured data"));
+        assert!(req.user_prompt.contains("Best Pasta"));
+        assert!(req.user_prompt.contains("recipe"));
+        assert_eq!(req.response_format, ResponseFormat::Json);
+    }
+
+    #[test]
+    fn test_accessibility_request_format() {
+        let req = accessibility_request(
+            "Page content here",
+            "https://example.com",
+            Some("Home"),
+            &["Welcome".into()],
+            3,
+        );
+        assert!(req.system_prompt.contains("WCAG"));
+        assert!(req.user_prompt.contains("Images without alt text: 3"));
+        assert!(req.user_prompt.contains("Welcome"));
+        assert_eq!(req.response_format, ResponseFormat::Json);
+    }
+
+    #[test]
+    fn test_accessibility_request_no_h1s() {
+        let req = accessibility_request("content", "https://example.com", None, &[], 0);
+        assert!(req.user_prompt.contains("H1 headings: none"));
     }
 
     #[test]

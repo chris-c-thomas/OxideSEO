@@ -2,6 +2,7 @@
  * Live crawl monitor: real-time stats, progress bar, URL stream, controls.
  */
 
+import { ResourceMeter } from "@/components/crawl/ResourceMeter";
 import { useCrawlProgress } from "@/hooks/useCrawlProgress";
 import { pauseCrawl, resumeCrawl, stopCrawl } from "@/lib/commands";
 import { formatDuration, formatNumber, formatRps, truncate } from "@/lib/utils";
@@ -18,6 +19,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
   const progress = useCrawlStore((s) => s.progress);
   const state = useCrawlStore((s) => s.state);
   const setCrawlState = useCrawlStore((s) => s.setCrawlState);
+  const maxMemoryMb = useCrawlStore((s) => s.config?.maxMemoryMb ?? 512);
 
   if (!crawlId) {
     return (
@@ -142,6 +144,9 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
         <StatCard label="Errors" value={formatNumber(urlsErrored)} />
         <StatCard label="Speed" value={formatRps(progress?.currentRps ?? 0)} />
       </div>
+
+      {/* Resource meter */}
+      <ResourceMeter progress={progress} maxMemoryMb={maxMemoryMb} />
 
       {/* Recent URLs table */}
       <section>

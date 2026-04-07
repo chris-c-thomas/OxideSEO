@@ -750,6 +750,7 @@ pub async fn spawn_crawl(
                     current_rps: rps,
                     elapsed_ms: elapsed,
                     recent_urls: std::mem::take(&mut recent_urls),
+                    memory_rss_bytes: get_memory_rss(),
                 };
                 emitter.emit_progress(&progress);
 
@@ -879,6 +880,7 @@ pub async fn spawn_crawl(
             current_rps: 0.0,
             elapsed_ms: elapsed,
             recent_urls: vec![],
+            memory_rss_bytes: get_memory_rss(),
         });
 
         tracing::info!(
@@ -984,4 +986,78 @@ fn extract_domain(url: &str) -> String {
         .ok()
         .and_then(|u| u.host_str().map(|h| h.to_string()))
         .unwrap_or_default()
+}
+
+/// Return the resident set size (RSS) of the current process in bytes.
+///
+/// Platform-specific: uses `mach` task_info on macOS, `/proc/self/statm`
+/// on Linux. Returns `None` on unsupported platforms or on error.
+fn get_memory_rss() -> Option<u64> {
+    #[cfg(target_os = "macos")]
+    {
+        /// Mach kernel `mach_task_basic_info` layout (macOS task_info.h).
+        #[repr(C)]
+        struct MachTaskBasicInfo {
+            virtual_size: u64,
+            resident_size: u64,
+            resident_size_max: u64,
+            user_time: [i32; 2],
+            system_time: [i32; 2],
+            policy: i32,
+            suspend_count: i32,
+        }
+
+        const MACH_TASK_BASIC_INFO: u32 = 20;
+        const KERN_SUCCESS: i32 = 0;
+
+        unsafe extern "C" {
+            fn mach_task_self() -> u32;
+            fn task_info(
+                target_task: u32,
+                flavor: u32,
+                task_info_out: *mut MachTaskBasicInfo,
+                task_info_outCnt: *mut u32,
+            ) -> i32;
+        }
+
+        // SAFETY: `task_info` is a stable mach kernel API. We pass a correctly-sized
+        // zeroed buffer and check the return code before reading fields.
+        unsafe {
+            let mut info: MachTaskBasicInfo = std::mem::zeroed();
+            let mut count =
+                (std::mem::size_of::<MachTaskBasicInfo>() / std::mem::size_of::<u32>()) as u32;
+            let kr = task_info(
+                mach_task_self(),
+                MACH_TASK_BASIC_INFO,
+                &mut info,
+                &mut count,
+            );
+            if kr == KERN_SUCCESS {
+                Some(info.resident_size)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Parse VmRSS from /proc/self/status (value is in kB).
+        std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|s| {
+                for line in s.lines() {
+                    if let Some(rest) = line.strip_prefix("VmRSS:") {
+                        let kb: u64 = rest.trim().trim_end_matches(" kB").trim().parse().ok()?;
+                        return Some(kb * 1024);
+                    }
+                }
+                None
+            })
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        None
+    }
 }

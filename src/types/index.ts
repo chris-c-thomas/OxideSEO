@@ -64,6 +64,8 @@ export interface CrawlProgress {
   currentRps: number;
   elapsedMs: number;
   recentUrls: RecentUrl[];
+  /** Resident set size in bytes (platform-dependent, may be null). */
+  memoryRssBytes: number | null;
 }
 
 export interface RecentUrl {
@@ -280,7 +282,12 @@ export interface AiProviderConfig {
   isConfigured: boolean;
 }
 
-export type AnalysisType = "content_score" | "meta_desc" | "title_tag";
+export type AnalysisType =
+  | "content_score"
+  | "meta_desc"
+  | "title_tag"
+  | "structured_data"
+  | "accessibility";
 
 export interface AiAnalysisRow {
   id: number;
