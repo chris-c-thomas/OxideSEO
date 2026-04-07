@@ -382,3 +382,35 @@ export interface CrawlSummaryResult {
   criticalIssuesCount: number;
   keyFindings: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Plugins (Phase 8)
+// ---------------------------------------------------------------------------
+
+/** The type of extension a plugin provides. */
+export type PluginKind = "rule" | "exporter" | "post_processor" | "ui_extension";
+
+/** Summary info about an installed plugin. */
+export interface PluginInfo {
+  name: string;
+  version: string;
+  description: string;
+  kind: PluginKind;
+  enabled: boolean;
+  isNative: boolean;
+}
+
+/** Detailed info about a specific plugin. */
+export interface PluginDetail {
+  name: string;
+  version: string;
+  description: string;
+  author: string | null;
+  license: string | null;
+  kind: PluginKind;
+  capabilities: string[];
+  enabled: boolean;
+  isNative: boolean;
+  config: Record<string, unknown> | null;
+  installedAt: string;
+}

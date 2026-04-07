@@ -139,6 +139,26 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - ~~WU-11: AI Insights tab~~ ✅ (crawl summary, batch analysis controls with progress bar, cost tracking dashboard)
 - ~~WU-12: AI progress events~~ ✅ (ai://progress Tauri events, useAiProgress hook)
 
+**Phase 8 — Plugin Architecture:** ~~All work units implemented~~ ✅
+- See `.claude/plans/phase-8.md` for full plan (19 work units across 8 batches)
+- ~~WU-0: Remove stale Phase-3 TODO comments~~ ✅
+- ~~WU-1: Plugin module structure and manifest types~~ ✅ (plugin/mod.rs, manifest.rs, error.rs; PluginManifest, PluginKind, Capability)
+- ~~WU-2: Plugin manager (discovery and lifecycle)~~ ✅ (plugin/manager.rs; discovery, enable/disable, install/uninstall with DB persistence)
+- ~~WU-3: Schema migration 004_plugins.sql~~ ✅ (plugins table with name, version, kind, enabled, config_json)
+- ~~WU-4: WIT interface definitions and wasmtime host~~ ✅ (wit/oxide-seo-plugin.wit; plugin/wasm_host.rs with wasmtime engine, fuel metering)
+- ~~WU-5: WASM rule adapter~~ ✅ (plugin/wasm_rule.rs; WasmRuleAdapter implements SeoRule, ephemeral Store per evaluate)
+- ~~WU-6: Native plugin loading~~ ✅ (plugin/native_host.rs; libloading with C-ABI constructor, trust flag)
+- ~~WU-7: Plugin rule registration in crawl engine~~ ✅ (plugin rules loaded after builtins in spawn_crawl)
+- ~~WU-8: Plugin exporter integration~~ ✅ (ExportFormat::Plugin variant, plugin/exporter.rs trait)
+- ~~WU-9: Plugin post-processor support~~ ✅ (plugin/post_processor.rs; SQL validation for WASM, &Database for native)
+- ~~WU-10: Plugin Tauri commands~~ ✅ (7 commands: list/enable/disable/detail/reload/install/uninstall)
+- ~~WU-11: TypeScript types and command wrappers~~ ✅ (PluginInfo, PluginDetail, PluginKind types; 7 command wrappers)
+- ~~WU-12: Plugin manager UI~~ ✅ (PluginManagerView with card grid, enable/disable toggles, detail sheet, install/uninstall)
+- ~~WU-13: UI extension slots~~ ✅ (PluginSlot, usePluginExtensions hook; results-tab slot stub)
+- ~~WU-14: Example WASM plugin~~ ✅ (plugins/examples/schema-validator/ — JSON-LD validator)
+- ~~WU-15: Example native exporter~~ ✅ (plugins/examples/markdown-exporter/ — Markdown report)
+- ~~WU-16/17/18: Docs, stability, tests~~ ✅ (docs/plugin-*.md; PluginManagerView.test.tsx with 9 tests)
+
 ## Architecture Invariants
 
 These design decisions are intentional and should not be changed:
@@ -172,6 +192,8 @@ These types cross the IPC boundary. Changes must be synchronized between Rust an
 | `IssueRow` | `IssueRow` | `storage/models.rs` ↔ `types/index.ts` |
 | `LinkRow` | `LinkRow` | `storage/models.rs` ↔ `types/index.ts` |
 | `PaginatedResponse<T>` | `PaginatedResponse<T>` | `commands/results.rs` ↔ `types/index.ts` |
+| `PluginInfo` | `PluginInfo` | `plugin/manager.rs` ↔ `types/index.ts` |
+| `PluginDetail` | `PluginDetail` | `plugin/manager.rs` ↔ `types/index.ts` |
 
 All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use camelCase natively. These must match exactly.
 
@@ -239,6 +261,23 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `commands/ai.rs` | 12 Tauri IPC commands for AI configuration and analysis | Complete |
 | `migrations/003_ai_analysis.sql` | ai_analyses, ai_usage, ai_crawl_summaries tables; body_text column | Complete |
 
+### Phase 8 New Files
+
+| File | Purpose | Status |
+|---|---|---|
+| `plugin/mod.rs` | Plugin module root | Complete |
+| `plugin/manifest.rs` | PluginManifest, PluginKind, Capability, WasmConfig, NativeConfig | Complete |
+| `plugin/error.rs` | PluginError thiserror enum | Complete |
+| `plugin/manager.rs` | PluginManager: discovery, enable/disable, install/uninstall | Complete |
+| `plugin/wasm_host.rs` | WasmPluginHost: wasmtime engine, component compilation | Complete |
+| `plugin/wasm_rule.rs` | WasmRuleAdapter: SeoRule impl with ephemeral Store | Complete |
+| `plugin/native_host.rs` | NativePluginHost: libloading dynamic library loading | Complete |
+| `plugin/exporter.rs` | PluginExporter trait | Complete |
+| `plugin/post_processor.rs` | PluginPostProcessor trait, SQL validation | Complete |
+| `commands/plugin.rs` | 7 Tauri IPC commands for plugin management | Complete |
+| `wit/oxide-seo-plugin.wit` | WIT interface definitions for WASM plugins | Complete |
+| `migrations/004_plugins.sql` | plugins table | Complete |
+
 ### Frontend (`src/`)
 
 | File | Purpose | Status |
@@ -270,6 +309,10 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `components/settings/SettingsView.tsx` | Settings page + AI provider config | Complete |
 | `components/results/AiInsightsTab.tsx` | AI Insights tab (summary, batch, cost tracking) | Complete |
 | `hooks/useAiProgress.ts` | AI batch analysis progress event subscription | Complete |
+| `components/plugins/PluginManagerView.tsx` | Plugin manager grid, install/reload, detail sheet | Complete |
+| `components/plugins/PluginCard.tsx` | Individual plugin card with toggle | Complete |
+| `components/plugins/PluginSlot.tsx` | UI extension slot placeholder | Complete |
+| `hooks/usePluginExtensions.ts` | Plugin extension hook (stub) | Complete |
 
 ## Testing Approach
 
@@ -350,6 +393,10 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **flate2 v1** — Gzip decompression for `.xml.gz` sitemaps. Uses `GzDecoder`.
 - **regex v1** — URL include/exclude pattern matching and rewrite rules. Compiled once at crawl start via `CompiledPatterns`.
 - **keyring v3** — OS-native credential storage for AI provider API keys. Uses macOS Keychain, Windows Credential Manager, or Linux Secret Service. Keys are never stored in plaintext files.
+- **wasmtime v29** (optional, `plugin-wasm` feature) — WASM Component Model runtime for plugin sandboxing. Adds ~5-10MB to binary. Feature-gated via `plugin-wasm` in Cargo.toml.
+- **libloading v0.8** — Dynamic library loading for native plugins. Loads `.dylib`/`.so`/`.dll` via C-ABI constructor.
+- **toml v0.8** — TOML parser for plugin manifests (`plugin.toml`).
+- **semver v1** — Semver parsing and version requirement matching for plugin compatibility checks.
 
 ## Gotchas
 
@@ -368,3 +415,8 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Adding a field to `PageRow` touches many locations** — Update: `storage/models.rs` (struct), `queries.rs` (UPSERT_PAGE SQL + all SELECT queries + `row_to_page` mapper), `types/index.ts` (TS interface), and every `PageRow { ... }` construction including test helpers in `writer.rs`, `post_crawl.rs`, and the two non-HTML/errored page constructions in `engine.rs`.
 - **`ResultsTab` type is duplicated** — `ResultsExplorer.tsx` and `ExportDialog.tsx` each define their own `ResultsTab` union type. Adding a new tab requires updating both. The ExportDialog copy is easy to miss.
 - **`tauri-plugin-dialog` Rust API** — Import `use tauri_plugin_dialog::DialogExt;`. Use `app.dialog().file().add_filter(...).blocking_save_file()` which returns `Option<FilePath>`. Call `.into_path()` for `PathBuf`. `blocking_*` methods are safe from async Tauri commands (they run on tokio worker threads, not the main thread).
+- **`plugin-wasm` feature flag** — wasmtime and wasmtime-wasi are behind the `plugin-wasm` Cargo feature (default-enabled). Building without WASM support: `cargo build --no-default-features`. WASM-related code is gated with `#[cfg(feature = "plugin-wasm")]`.
+- **`ExportFormat` is no longer `Copy`** — Adding `Plugin(String)` removed the `Copy` derive. Use `Clone` where needed.
+- **`spawn_crawl` signature change (Phase 8)** — Added `plugin_manager: Option<Arc<tokio::sync::Mutex<PluginManager>>>` as the 6th parameter. Integration tests pass `None`. Tauri commands pass `Some(pm.inner().clone())`.
+- **Plugin directory must exist** — `{app_data_dir}/plugins/` is created in `main.rs` setup. Plugin discovery silently skips if the directory doesn't exist.
+- **Native plugin ABI stability** — Native plugins use Rust `dyn` trait objects. Vtable layout is not stable across Rust compiler versions. Native plugins must be compiled with the same toolchain as the host.

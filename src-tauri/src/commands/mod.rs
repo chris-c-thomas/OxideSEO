@@ -7,5 +7,6 @@
 pub mod ai;
 pub mod crawl;
 pub mod export;
+pub mod plugin;
 pub mod results;
 pub mod settings;

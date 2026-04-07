@@ -24,6 +24,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "003_ai_analysis",
         include_str!("../../migrations/003_ai_analysis.sql"),
     ),
+    (
+        "004_plugins",
+        include_str!("../../migrations/004_plugins.sql"),
+    ),
 ];
 
 /// Application database handle.

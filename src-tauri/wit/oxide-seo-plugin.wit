@@ -1,0 +1,90 @@
+/// OxideSEO Plugin Interface — WIT (WebAssembly Interface Types) definition.
+///
+/// This file defines the contract between OxideSEO and WASM plugins.
+/// Plugin authors compile against this interface using `wit-bindgen`.
+///
+/// Stability: fields in `plugin-parsed-page` can be added but never removed.
+
+package oxide-seo:plugin@0.1.0;
+
+interface types {
+    /// Subset of the host's ParsedPage exposed to plugins.
+    /// This is the stability boundary — fields are append-only.
+    record plugin-parsed-page {
+        url: string,
+        title: option<string>,
+        meta-description: option<string>,
+        meta-robots: option<string>,
+        canonical: option<string>,
+        viewport: option<string>,
+        h1s: list<string>,
+        h2s: list<string>,
+        word-count: u32,
+        body-text: option<string>,
+        body-size: option<u32>,
+        response-time-ms: option<u32>,
+        links-count: u32,
+        images-count: u32,
+        scripts: list<string>,
+        stylesheets: list<string>,
+    }
+
+    /// An issue reported by a plugin rule.
+    record plugin-issue {
+        rule-id: string,
+        severity: severity,
+        category: string,
+        message: string,
+        detail-json: option<string>,
+    }
+
+    /// Issue severity levels.
+    enum severity {
+        error,
+        warning,
+        info,
+    }
+}
+
+/// Host-provided logging interface.
+interface host-log {
+    /// Log a message at the given level (trace, debug, info, warn, error).
+    log: func(level: string, message: string);
+}
+
+/// SEO rule plugin world.
+///
+/// Plugins implementing this world provide a single rule that evaluates
+/// parsed pages and returns a list of issues found.
+world seo-rule-plugin {
+    import host-log;
+
+    use types.{plugin-parsed-page, plugin-issue, severity};
+
+    /// Unique rule identifier (e.g., "missing_schema").
+    export id: func() -> string;
+    /// Human-readable rule name.
+    export name: func() -> string;
+    /// Rule category (e.g., "structured", "meta", "content").
+    export category: func() -> string;
+    /// Default severity for issues from this rule.
+    export default-severity: func() -> severity;
+    /// Evaluate a parsed page and return issues found.
+    export evaluate: func(page: plugin-parsed-page) -> list<plugin-issue>;
+}
+
+/// Exporter plugin world.
+///
+/// Plugins implementing this world provide a custom export format.
+/// The host passes serialized crawl data as JSON; the plugin returns
+/// the formatted output bytes (host writes to disk).
+world seo-exporter-plugin {
+    import host-log;
+
+    /// Human-readable format name (e.g., "Markdown Report").
+    export format-name: func() -> string;
+    /// File extension (e.g., "md").
+    export file-extension: func() -> string;
+    /// Export crawl data. Returns formatted output bytes.
+    export export-data: func(data-json: string) -> result<list<u8>, string>;
+}

@@ -160,6 +160,23 @@ pub struct AiCrawlSummaryRow {
     pub created_at: String,
 }
 
+// ---------------------------------------------------------------------------
+// Plugin models (Phase 8)
+// ---------------------------------------------------------------------------
+
+/// Row in the `plugins` table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginRow {
+    pub name: String,
+    pub version: String,
+    pub kind: String,
+    pub enabled: bool,
+    pub config_json: Option<String>,
+    pub installed_at: String,
+    pub updated_at: String,
+}
+
 /// Batch of items to write to the database.
 ///
 /// The storage writer thread receives these via a channel and flushes

@@ -30,12 +30,14 @@ pub enum ThemePreference {
     Dark,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     Csv,
     Json,
     Html,
+    /// Plugin-provided export format. The string is the plugin name.
+    Plugin(String),
 }
 
 /// Per-rule configuration overlay.

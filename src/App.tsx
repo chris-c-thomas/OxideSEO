@@ -6,6 +6,7 @@ import { CrawlConfig } from "@/components/crawl/CrawlConfig";
 import { CrawlMonitor } from "@/components/crawl/CrawlMonitor";
 import { ResultsExplorer } from "@/components/results/ResultsExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
+import { PluginManagerView } from "@/components/plugins/PluginManagerView";
 
 /** Application views mapped to sidebar navigation items. */
 export type AppView =
@@ -13,6 +14,7 @@ export type AppView =
   | "crawl-config"
   | "crawl-monitor"
   | "results"
+  | "plugins"
   | "settings";
 
 export function App() {
@@ -50,6 +52,8 @@ export function App() {
         );
       case "results":
         return <ResultsExplorer crawlId={activeCrawlId} />;
+      case "plugins":
+        return <PluginManagerView />;
       case "settings":
         return <SettingsView />;
       default:

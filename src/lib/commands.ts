@@ -34,6 +34,8 @@ import type {
   RuleConfigOverride,
   ExternalLinkRow,
   SitemapReportEntry,
+  PluginInfo,
+  PluginDetail,
 } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -289,4 +291,43 @@ export function estimateBatchCost(
     filter,
     analysisTypes,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Plugins
+// ---------------------------------------------------------------------------
+
+/** List all discovered plugins. */
+export function listPlugins(): Promise<PluginInfo[]> {
+  return invoke<PluginInfo[]>("list_plugins");
+}
+
+/** Enable a plugin by name. */
+export function enablePlugin(name: string): Promise<void> {
+  return invoke<void>("enable_plugin", { name });
+}
+
+/** Disable a plugin by name. */
+export function disablePlugin(name: string): Promise<void> {
+  return invoke<void>("disable_plugin", { name });
+}
+
+/** Get detailed info about a specific plugin. */
+export function getPluginDetail(name: string): Promise<PluginDetail> {
+  return invoke<PluginDetail>("get_plugin_detail", { name });
+}
+
+/** Re-scan the plugins directory for new or updated plugins. */
+export function reloadPlugins(): Promise<PluginInfo[]> {
+  return invoke<PluginInfo[]>("reload_plugins");
+}
+
+/** Install a plugin from a directory chosen via file dialog. */
+export function installPluginFromFile(): Promise<PluginInfo | null> {
+  return invoke<PluginInfo | null>("install_plugin_from_file");
+}
+
+/** Uninstall a plugin by name. */
+export function uninstallPlugin(name: string): Promise<void> {
+  return invoke<void>("uninstall_plugin", { name });
 }

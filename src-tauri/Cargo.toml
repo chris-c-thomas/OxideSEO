@@ -12,6 +12,10 @@ rust-version = "1.85"
 name = "oxide_seo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = ["plugin-wasm"]
+plugin-wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -79,6 +83,13 @@ async-trait = "0.1"
 
 # --- OS-native credential storage ---
 keyring = "3"
+
+# --- Plugin system ---
+toml = "0.8"
+semver = "1"
+libloading = "0.8"
+wasmtime = { version = "29", optional = true }
+wasmtime-wasi = { version = "29", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

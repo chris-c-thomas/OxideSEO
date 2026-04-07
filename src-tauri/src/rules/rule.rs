@@ -30,9 +30,6 @@ pub struct CrawlContext {
     pub root_domain: String,
     /// Whether cross-page analysis data is available (post-crawl only).
     pub cross_page_available: bool,
-    // TODO(phase-3): Add methods for cross-page lookups:
-    // - fn find_pages_with_title(&self, title: &str) -> Vec<i64>
-    // - fn inbound_link_count(&self, page_id: i64) -> u32
 }
 
 /// Core trait for SEO audit rules.

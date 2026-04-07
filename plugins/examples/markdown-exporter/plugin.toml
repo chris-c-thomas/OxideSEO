@@ -1,0 +1,12 @@
+name = "markdown-exporter"
+version = "0.1.0"
+description = "Export crawl reports as Markdown"
+author = "OxideSEO Contributors"
+license = "MIT OR Apache-2.0"
+min_app_version = ">=0.3.0"
+kind = "exporter"
+capabilities = ["log"]
+
+[native]
+library = "libmarkdown_exporter.dylib"
+trusted = true
