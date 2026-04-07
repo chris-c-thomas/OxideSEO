@@ -154,24 +154,25 @@ impl PluginManager {
         let manifest = PluginManifest::parse(&toml_content)?;
         let name = manifest.name.clone();
 
-        // Load enable/disable state from DB (defaults to disabled for new plugins).
+        // Load enable/disable state from DB, then refresh stored metadata so the DB
+        // reflects current manifest values (version, kind) even if the plugin was updated on disk.
         let enabled = self
             .db
             .with_conn(|conn| {
-                if let Some(row) = queries::select_plugin(conn, &name)? {
-                    Ok(row.enabled)
-                } else {
-                    // Register new plugin in DB as disabled.
-                    queries::upsert_plugin(
-                        conn,
-                        &name,
-                        &manifest.version.to_string(),
-                        &manifest.kind.to_string(),
-                        false,
-                        None,
-                    )?;
-                    Ok(false)
-                }
+                let enabled = queries::select_plugin(conn, &name)?
+                    .map(|row| row.enabled)
+                    .unwrap_or(false);
+
+                queries::upsert_plugin(
+                    conn,
+                    &name,
+                    &manifest.version.to_string(),
+                    &manifest.kind.to_string(),
+                    enabled,
+                    None,
+                )?;
+
+                Ok(enabled)
             })
             .with_context(|| format!("reading plugin state for {name}"))?;
 
@@ -307,9 +308,10 @@ impl PluginManager {
         }
     }
 
-    /// Get a summary list of all discovered plugins.
+    /// Get a summary list of all discovered plugins, sorted by name for stable UI ordering.
     pub fn list_plugins(&self) -> Vec<PluginInfo> {
-        self.plugins
+        let mut list: Vec<PluginInfo> = self
+            .plugins
             .iter()
             .map(|(name, p)| PluginInfo {
                 name: p.manifest.name.clone(),
@@ -320,7 +322,9 @@ impl PluginManager {
                 is_native: p.manifest.is_native(),
                 load_error: self.load_errors.get(name).cloned(),
             })
-            .collect()
+            .collect();
+        list.sort_by(|a, b| a.name.cmp(&b.name));
+        list
     }
 
     /// Get detailed info about a specific plugin.

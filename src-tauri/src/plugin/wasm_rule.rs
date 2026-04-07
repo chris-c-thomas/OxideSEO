@@ -67,7 +67,7 @@ pub fn to_plugin_parsed_page(page: &ParsedPage) -> PluginParsedPage {
         h2s: page.h2s.clone(),
         word_count: page.word_count,
         body_text: page.body_text.clone(),
-        body_size: page.body_size.map(|s| s as u32),
+        body_size: page.body_size.map(|s| s.min(u32::MAX as usize) as u32),
         response_time_ms: page.response_time_ms,
         links_count: page.links.len() as u32,
         images_count: page.images.len() as u32,
@@ -120,6 +120,7 @@ pub struct WasmRuleAdapter {
     engine: Arc<Engine>,
     #[allow(dead_code)] // Used when full WIT bindgen is integrated.
     component: Component,
+    #[allow(dead_code)] // Used when full WIT bindgen is integrated for error context.
     plugin_name: String,
     id: String,
     name: String,
@@ -135,6 +136,10 @@ impl WasmRuleAdapter {
     /// The `id`, `name`, `category`, and `default_severity` are fetched from
     /// the component's exported metadata functions during construction.
     pub fn new(config: WasmRuleConfig) -> Self {
+        tracing::warn!(
+            plugin = %config.plugin_name,
+            "WASM evaluate is stubbed — this plugin will not produce issues until WIT bindgen is integrated"
+        );
         Self {
             engine: config.engine,
             component: config.component,
@@ -169,20 +174,14 @@ impl SeoRule for WasmRuleAdapter {
         let _plugin_page = to_plugin_parsed_page(page);
 
         // TODO(phase-8): Full wasmtime component instantiation + call.
-        // For now, the adapter structure is in place. The actual WASM
-        // component call will be wired once the WIT bindgen! macro is
-        // integrated and a test WASM component is available.
-        //
         // The pattern will be:
         // 1. Create ephemeral Store with fuel budget
         // 2. Instantiate component with linker (host-log imports)
         // 3. Call guest evaluate(plugin_page)
         // 4. Convert PluginIssue -> Issue via to_core_issue
-
-        tracing::warn!(
-            plugin = %self.plugin_name,
-            "WASM evaluate stub — component call not yet wired; returning no issues"
-        );
+        //
+        // Warning is emitted once at adapter construction time (in new()),
+        // not per-page, to avoid log spam during large crawls.
 
         vec![]
     }

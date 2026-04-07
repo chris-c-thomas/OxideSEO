@@ -38,7 +38,6 @@ export const crawlConfigSchema = z.object({
 
 export type CrawlConfigFormValues = z.infer<typeof crawlConfigSchema>;
 
-/** Default values for a new crawl configuration form. */
 // ---------------------------------------------------------------------------
 // Plugin schemas (Phase 8)
 // ---------------------------------------------------------------------------

@@ -72,18 +72,10 @@ pub async fn get_settings(db: State<'_, Arc<Database>>) -> Result<AppSettings, S
 
         let default_export_format: ExportFormat =
             match queries::get_setting(conn, "default_export_format")? {
-                Some(v) => {
-                    // Try simple string match first, then serde for complex variants.
-                    match v.as_str() {
-                        "csv" => ExportFormat::Csv,
-                        "json" => ExportFormat::Json,
-                        "html" => ExportFormat::Html,
-                        other => serde_json::from_str(other).unwrap_or_else(|_| {
-                            tracing::warn!(key = "default_export_format", value = %v, "Invalid setting value, using default");
-                            ExportFormat::Csv
-                        }),
-                    }
-                }
+                Some(v) => serde_json::from_str(&v).unwrap_or_else(|_| {
+                    tracing::warn!(key = "default_export_format", value = %v, "Invalid setting value, using default");
+                    ExportFormat::Csv
+                }),
                 None => ExportFormat::Csv,
             };
 
@@ -118,11 +110,9 @@ pub async fn set_settings(
             .ok_or_else(|| anyhow::anyhow!("theme did not serialize to a string"))?;
         queries::set_setting(conn, "theme", &theme_str)?;
 
-        let export_str = serde_json::to_value(settings.default_export_format)
-            .context("failed to serialize default_export_format")?
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| anyhow::anyhow!("export format did not serialize to a string"))?;
+        // Serialize as JSON string to support both simple ("csv") and complex ({"plugin":"name"}) variants.
+        let export_str = serde_json::to_string(&settings.default_export_format)
+            .context("failed to serialize default_export_format")?;
         queries::set_setting(conn, "default_export_format", &export_str)?;
 
         let config_str = serde_json::to_string(&settings.default_crawl_config)

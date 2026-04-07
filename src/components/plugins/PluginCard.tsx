@@ -30,7 +30,10 @@ export function PluginCard({ plugin, onToggle, onClick }: PluginCardProps) {
       )}
       onClick={() => onClick(plugin.name)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onClick(plugin.name);
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(plugin.name);
+        }
       }}
       role="button"
       tabIndex={0}
@@ -44,6 +47,7 @@ export function PluginCard({ plugin, onToggle, onClick }: PluginCardProps) {
           )}
           role="switch"
           aria-checked={plugin.enabled}
+          aria-label={`${plugin.enabled ? "Disable" : "Enable"} plugin ${plugin.name}`}
           onClick={(e) => {
             e.stopPropagation();
             onToggle(plugin.name, !plugin.enabled);
