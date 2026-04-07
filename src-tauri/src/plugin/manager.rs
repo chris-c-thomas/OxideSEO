@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::Context;
 
 use super::error::PluginError;
-use super::manifest::{Capability, PluginKind, PluginManifest};
+use super::manifest::{Capability, PluginKind, PluginManifest, PluginRuntime};
 use crate::rules::rule::SeoRule;
 use crate::storage::db::Database;
 use crate::storage::queries;
@@ -41,6 +41,8 @@ pub struct PluginInfo {
     pub kind: PluginKind,
     pub enabled: bool,
     pub is_native: bool,
+    /// Last load error, if any. Populated when `load_rules()` fails for this plugin.
+    pub load_error: Option<String>,
 }
 
 /// Detailed info about a plugin (for detail sheets).
@@ -71,6 +73,8 @@ pub struct PluginManager {
     plugins_dir: PathBuf,
     plugins: HashMap<String, LoadedPlugin>,
     db: Arc<Database>,
+    /// Last load error per plugin, populated by `load_rules()`.
+    load_errors: HashMap<String, String>,
     #[cfg(feature = "plugin-wasm")]
     wasm_host: Option<super::wasm_host::WasmPluginHost>,
 }
@@ -89,6 +93,7 @@ impl PluginManager {
             plugins_dir,
             plugins: HashMap::new(),
             db,
+            load_errors: HashMap::new(),
             #[cfg(feature = "plugin-wasm")]
             wasm_host,
         }
@@ -217,15 +222,22 @@ impl PluginManager {
     /// Load rule adapters for all enabled Rule-kind plugins.
     ///
     /// Returns boxed `SeoRule` implementors ready for registration in
-    /// the `RuleRegistry`. Errors per-plugin are logged but don't halt loading.
-    pub fn load_rules(&self) -> Vec<Box<dyn SeoRule>> {
+    /// the `RuleRegistry`. Errors per-plugin are logged and stored in
+    /// `load_errors` so the frontend can display them via `list_plugins()`.
+    pub fn load_rules(&mut self) -> Vec<Box<dyn SeoRule>> {
+        self.load_errors.clear();
         let mut rules: Vec<Box<dyn SeoRule>> = Vec::new();
 
-        for (name, plugin) in &self.plugins {
-            if !plugin.enabled || plugin.manifest.kind != PluginKind::Rule {
-                continue;
-            }
+        // Collect names first to avoid borrow conflict with &mut self.
+        let enabled_rule_plugins: Vec<String> = self
+            .plugins
+            .iter()
+            .filter(|(_, p)| p.enabled && p.manifest.kind == PluginKind::Rule)
+            .map(|(name, _)| name.clone())
+            .collect();
 
+        for name in &enabled_rule_plugins {
+            let plugin = &self.plugins[name];
             match self.load_rule_for_plugin(name, plugin) {
                 Ok(rule) => {
                     tracing::info!(plugin = %name, rule_id = %rule.id(), "Loaded plugin rule");
@@ -233,6 +245,7 @@ impl PluginManager {
                 }
                 Err(e) => {
                     tracing::warn!(plugin = %name, error = %e, "Failed to load plugin rule");
+                    self.load_errors.insert(name.clone(), e.to_string());
                 }
             }
         }
@@ -246,73 +259,66 @@ impl PluginManager {
         name: &str,
         plugin: &LoadedPlugin,
     ) -> Result<Box<dyn SeoRule>, PluginError> {
-        if plugin.manifest.is_native() {
-            let native_config =
-                plugin.manifest.native.as_ref().ok_or_else(|| {
-                    PluginError::Other(format!("{name}: missing [native] config"))
-                })?;
+        match plugin.manifest.runtime() {
+            PluginRuntime::Native(native_config) => {
+                if !native_config.trusted {
+                    return Err(PluginError::NotTrusted(name.into()));
+                }
 
-            if !native_config.trusted {
-                return Err(PluginError::NotTrusted(name.into()));
+                let lib_path = plugin.dir.join(&native_config.library);
+                unsafe { super::native_host::NativePluginHost::load_rule(&lib_path) }
             }
+            PluginRuntime::Wasm(wasm_config) => {
+                #[cfg(feature = "plugin-wasm")]
+                {
+                    let wasm_host = self
+                        .wasm_host
+                        .as_ref()
+                        .ok_or_else(|| PluginError::WasmLoad("WASM host not initialized".into()))?;
 
-            let lib_path = plugin.dir.join(&native_config.library);
-            unsafe { super::native_host::NativePluginHost::load_rule(&lib_path) }
-        } else if plugin.manifest.is_wasm() {
-            #[cfg(feature = "plugin-wasm")]
-            {
-                let wasm_config =
-                    plugin.manifest.wasm.as_ref().ok_or_else(|| {
-                        PluginError::Other(format!("{name}: missing [wasm] config"))
-                    })?;
+                    let wasm_path = plugin.dir.join(&wasm_config.module);
+                    let component = wasm_host.compile_component_from_file(&wasm_path)?;
 
-                let wasm_host = self
-                    .wasm_host
-                    .as_ref()
-                    .ok_or_else(|| PluginError::WasmLoad("WASM host not initialized".into()))?;
+                    // For now, use manifest metadata as rule metadata.
+                    // Full WIT integration will call the component's exported
+                    // id(), name(), category(), default_severity() functions.
+                    let adapter =
+                        super::wasm_rule::WasmRuleAdapter::new(super::wasm_rule::WasmRuleConfig {
+                            engine: wasm_host.engine().clone(),
+                            component,
+                            plugin_name: name.to_string(),
+                            id: format!("plugin.{name}"),
+                            name: plugin.manifest.description.clone(),
+                            category: crate::RuleCategory::Structured,
+                            default_severity: crate::Severity::Warning,
+                            fuel_limit: wasm_config.fuel_limit(),
+                        });
 
-                let wasm_path = plugin.dir.join(&wasm_config.module);
-                let component = wasm_host.compile_component_from_file(&wasm_path)?;
-
-                // For now, use manifest metadata as rule metadata.
-                // Full WIT integration will call the component's exported
-                // id(), name(), category(), default_severity() functions.
-                let adapter =
-                    super::wasm_rule::WasmRuleAdapter::new(super::wasm_rule::WasmRuleConfig {
-                        engine: wasm_host.engine().clone(),
-                        component,
-                        plugin_name: name.to_string(),
-                        id: format!("plugin.{name}"),
-                        name: plugin.manifest.description.clone(),
-                        category: crate::RuleCategory::Structured,
-                        default_severity: crate::Severity::Warning,
-                        fuel_limit: wasm_config.fuel_limit(),
-                    });
-
-                Ok(Box::new(adapter))
+                    Ok(Box::new(adapter))
+                }
+                #[cfg(not(feature = "plugin-wasm"))]
+                {
+                    let _ = wasm_config;
+                    Err(PluginError::WasmLoad(
+                        "WASM support not compiled (plugin-wasm feature disabled)".into(),
+                    ))
+                }
             }
-            #[cfg(not(feature = "plugin-wasm"))]
-            {
-                Err(PluginError::WasmLoad(
-                    "WASM support not compiled (plugin-wasm feature disabled)".into(),
-                ))
-            }
-        } else {
-            Err(PluginError::Other(format!("{name}: no runtime configured")))
         }
     }
 
     /// Get a summary list of all discovered plugins.
     pub fn list_plugins(&self) -> Vec<PluginInfo> {
         self.plugins
-            .values()
-            .map(|p| PluginInfo {
+            .iter()
+            .map(|(name, p)| PluginInfo {
                 name: p.manifest.name.clone(),
                 version: p.manifest.version.to_string(),
                 description: p.manifest.description.clone(),
                 kind: p.manifest.kind,
                 enabled: p.enabled,
                 is_native: p.manifest.is_native(),
+                load_error: self.load_errors.get(name).cloned(),
             })
             .collect()
     }

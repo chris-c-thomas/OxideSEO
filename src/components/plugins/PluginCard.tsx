@@ -73,6 +73,10 @@ export function PluginCard({ plugin, onToggle, onClick }: PluginCardProps) {
           </Badge>
         )}
       </div>
+
+      {plugin.loadError && (
+        <p className="text-xs text-red-600 dark:text-red-400">{plugin.loadError}</p>
+      )}
     </div>
   );
 }

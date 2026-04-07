@@ -9,6 +9,21 @@ pub enum PluginError {
     #[error("incompatible app version: plugin requires {required}, app is {current}")]
     IncompatibleVersion { required: String, current: String },
 
+    #[error("plugin name must not be empty")]
+    EmptyName,
+
+    #[error("plugin name must contain only [a-zA-Z0-9_-] characters")]
+    InvalidName,
+
+    #[error("plugin cannot specify both [wasm] and [native] sections")]
+    DualRuntime,
+
+    #[error("plugin must specify either [wasm] or [native] section")]
+    NoRuntime,
+
+    #[error("{field} must be a simple filename without path separators")]
+    InvalidPath { field: String },
+
     #[error("plugin not found: {0}")]
     NotFound(String),
 
@@ -26,7 +41,4 @@ pub enum PluginError {
 
     #[error("storage error: {0}")]
     Storage(String),
-
-    #[error("{0}")]
-    Other(String),
 }

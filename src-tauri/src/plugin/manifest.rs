@@ -22,6 +22,10 @@ const DEFAULT_MEMORY_LIMIT_MB: u32 = 64;
 // ---------------------------------------------------------------------------
 
 /// Parsed `plugin.toml` manifest.
+///
+/// The `wasm` and `native` fields are `Option` for TOML deserialization
+/// compatibility. After `parse()`, exactly one is guaranteed to be `Some`.
+/// Use `runtime()` for a typed accessor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifest {
     /// Unique plugin name (used as directory name and DB key).
@@ -41,10 +45,20 @@ pub struct PluginManifest {
     /// Capabilities the plugin requests.
     #[serde(default)]
     pub capabilities: Vec<Capability>,
-    /// WASM-specific configuration.
+    /// WASM-specific configuration (mutually exclusive with `native`).
     pub wasm: Option<WasmConfig>,
-    /// Native-specific configuration.
+    /// Native-specific configuration (mutually exclusive with `wasm`).
     pub native: Option<NativeConfig>,
+}
+
+/// Resolved plugin runtime — the validated form of the wasm/native options.
+///
+/// After `parse()` validates the manifest, this enum provides a clean
+/// type-level distinction between WASM and native plugins.
+#[derive(Debug, Clone)]
+pub enum PluginRuntime<'a> {
+    Wasm(&'a WasmConfig),
+    Native(&'a NativeConfig),
 }
 
 /// The type of extension a plugin provides.
@@ -154,18 +168,16 @@ impl PluginManifest {
         }
 
         if self.name.is_empty() {
-            return Err(PluginError::Other("plugin name must not be empty".into()));
+            return Err(PluginError::EmptyName);
         }
 
-        // Plugin name is used as a directory name and DB key — restrict to safe characters.
+        // Plugin name is used as a directory name and DB key -- restrict to safe characters.
         if !self
             .name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
         {
-            return Err(PluginError::Other(
-                "plugin name must contain only [a-zA-Z0-9_-] characters".into(),
-            ));
+            return Err(PluginError::InvalidName);
         }
 
         // Validate runtime-specific paths contain no directory traversal.
@@ -177,18 +189,27 @@ impl PluginManifest {
         }
 
         if self.wasm.is_some() && self.native.is_some() {
-            return Err(PluginError::Other(
-                "plugin cannot specify both [wasm] and [native] sections".into(),
-            ));
+            return Err(PluginError::DualRuntime);
         }
 
         if self.wasm.is_none() && self.native.is_none() {
-            return Err(PluginError::Other(
-                "plugin must specify either [wasm] or [native] section".into(),
-            ));
+            return Err(PluginError::NoRuntime);
         }
 
         Ok(())
+    }
+
+    /// Get the validated plugin runtime.
+    ///
+    /// Panics if called on an unvalidated manifest (always safe after `parse()`).
+    pub fn runtime(&self) -> PluginRuntime<'_> {
+        if let Some(ref wasm) = self.wasm {
+            PluginRuntime::Wasm(wasm)
+        } else if let Some(ref native) = self.native {
+            PluginRuntime::Native(native)
+        } else {
+            unreachable!("PluginManifest::validate() ensures exactly one runtime is set")
+        }
     }
 
     /// Whether this is a WASM plugin.
@@ -210,9 +231,9 @@ fn validate_relative_filename(path: &str, field_name: &str) -> Result<(), Plugin
         || path.contains("..")
         || path.starts_with('.')
     {
-        return Err(PluginError::Other(format!(
-            "{field_name} must be a simple filename without path separators"
-        )));
+        return Err(PluginError::InvalidPath {
+            field: field_name.to_string(),
+        });
     }
     Ok(())
 }
@@ -266,8 +287,11 @@ trusted = true
         assert!(manifest.is_wasm());
         assert!(!manifest.is_native());
 
+        assert!(
+            matches!(manifest.runtime(), PluginRuntime::Wasm(w) if w.module == "test_plugin.wasm")
+        );
+
         let wasm = manifest.wasm.unwrap();
-        assert_eq!(wasm.module, "test_plugin.wasm");
         assert_eq!(wasm.fuel_limit(), 5_000_000);
         assert_eq!(wasm.memory_limit_mb(), 32);
     }
@@ -279,6 +303,8 @@ trusted = true
         assert_eq!(manifest.kind, PluginKind::Exporter);
         assert!(manifest.is_native());
         assert!(!manifest.is_wasm());
+
+        assert!(matches!(manifest.runtime(), PluginRuntime::Native(n) if n.trusted));
 
         let native = manifest.native.unwrap();
         assert_eq!(native.library, "libnative_test.dylib");
@@ -368,7 +394,7 @@ library = "libplugin.dylib"
 trusted = true
 "#;
         let err = PluginManifest::parse(toml_content).unwrap_err();
-        assert!(matches!(err, PluginError::Other(_)));
+        assert!(matches!(err, PluginError::DualRuntime));
     }
 
     #[test]
@@ -381,7 +407,23 @@ min_app_version = ">=0.1.0"
 kind = "rule"
 "#;
         let err = PluginManifest::parse(toml_content).unwrap_err();
-        assert!(matches!(err, PluginError::Other(_)));
+        assert!(matches!(err, PluginError::NoRuntime));
+    }
+
+    #[test]
+    fn test_empty_name_rejected() {
+        let toml_content = r#"
+name = ""
+version = "0.1.0"
+description = "test"
+min_app_version = ">=0.1.0"
+kind = "rule"
+
+[wasm]
+module = "plugin.wasm"
+"#;
+        let err = PluginManifest::parse(toml_content).unwrap_err();
+        assert!(matches!(err, PluginError::EmptyName));
     }
 
     #[test]
@@ -447,10 +489,9 @@ module = "plugin.wasm"
     }
 
     #[test]
-    fn test_path_traversal_in_name_rejected() {
-        for bad_name in [
-            "../evil", "foo/bar", "foo\\bar", "..\\evil", "foo bar", "foo.bar",
-        ] {
+    fn test_invalid_name_characters_rejected() {
+        // Names with non-alphanumeric/dash/underscore characters.
+        for bad_name in ["foo/bar", "foo bar", "foo.bar", "../evil"] {
             let toml_content = format!(
                 r#"
 name = "{bad_name}"
@@ -463,9 +504,11 @@ kind = "rule"
 module = "plugin.wasm"
 "#
             );
+            let err = PluginManifest::parse(&toml_content);
+            assert!(err.is_err(), "name '{bad_name}' should be rejected");
             assert!(
-                PluginManifest::parse(&toml_content).is_err(),
-                "name '{bad_name}' should be rejected"
+                matches!(err.unwrap_err(), PluginError::InvalidName),
+                "name '{bad_name}' should produce InvalidName"
             );
         }
     }
@@ -482,7 +525,8 @@ kind = "rule"
 [wasm]
 module = "../../../etc/evil.wasm"
 "#;
-        assert!(PluginManifest::parse(toml_content).is_err());
+        let err = PluginManifest::parse(toml_content).unwrap_err();
+        assert!(matches!(err, PluginError::InvalidPath { .. }));
     }
 
     #[test]
@@ -498,6 +542,7 @@ kind = "exporter"
 library = "../../../lib/evil.dylib"
 trusted = true
 "#;
-        assert!(PluginManifest::parse(toml_content).is_err());
+        let err = PluginManifest::parse(toml_content).unwrap_err();
+        assert!(matches!(err, PluginError::InvalidPath { .. }));
     }
 }

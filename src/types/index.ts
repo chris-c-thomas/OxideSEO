@@ -398,6 +398,8 @@ export interface PluginInfo {
   kind: PluginKind;
   enabled: boolean;
   isNative: boolean;
+  /** Last load error, if any. Set when the plugin fails to load during a crawl. */
+  loadError: string | null;
 }
 
 /** Detailed info about a specific plugin. */

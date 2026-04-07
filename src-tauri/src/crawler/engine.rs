@@ -142,7 +142,7 @@ pub async fn spawn_crawl(
 
     // Load plugin rules if a plugin manager is available.
     if let Some(ref pm) = plugin_manager {
-        let pm_guard = pm.lock().await;
+        let mut pm_guard = pm.lock().await;
         for rule in pm_guard.load_rules() {
             tracing::info!(rule_id = %rule.id(), "Registered plugin rule");
             rule_registry.register(rule);

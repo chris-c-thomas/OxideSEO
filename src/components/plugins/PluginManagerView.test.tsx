@@ -12,6 +12,7 @@ const mockPlugins: PluginInfo[] = [
     kind: "rule",
     enabled: true,
     isNative: false,
+    loadError: null,
   },
   {
     name: "markdown-exporter",
@@ -20,6 +21,7 @@ const mockPlugins: PluginInfo[] = [
     kind: "exporter",
     enabled: false,
     isNative: true,
+    loadError: null,
   },
 ];
 
@@ -59,7 +61,7 @@ describe("PluginManagerView", () => {
   it("shows loading spinner initially", () => {
     vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
     render(<PluginManagerView />);
-    expect(document.querySelector(".animate-spin")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Loading" })).toBeTruthy();
   });
 
   it("renders plugin list after loading", async () => {
