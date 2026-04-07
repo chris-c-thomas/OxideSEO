@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import { AiInsightsTab } from "./AiInsightsTab";
 import type { AiProviderConfig, AiCrawlSummaryRow, AiUsageRow } from "@/types";
@@ -138,6 +138,81 @@ describe("AiInsightsTab", () => {
       expect(
         screen.getByText("No AI analysis has been run for this crawl yet."),
       ).toBeTruthy();
+    });
+  });
+
+  it("calls generateCrawlSummary with force when regenerate is clicked", async () => {
+    mockInvoke({ get_crawl_ai_summary: mockSummary });
+    render(<AiInsightsTab crawlId="crawl-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Regenerate")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Regenerate"));
+
+    await waitFor(() => {
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("generate_crawl_summary", {
+        crawlId: "crawl-1",
+        force: true,
+      });
+    });
+  });
+
+  it("shows cost estimate confirmation before batch analysis", async () => {
+    mockInvoke({
+      estimate_batch_cost: {
+        eligiblePages: 25,
+        estimatedInputTokens: 150000,
+        estimatedOutputTokens: 37500,
+        estimatedCostUsd: 0.1875,
+      },
+    });
+    render(<AiInsightsTab crawlId="crawl-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Analyze All Pages")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Analyze All Pages"));
+
+    await waitFor(() => {
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+        "estimate_batch_cost",
+        expect.objectContaining({ crawlId: "crawl-1" }),
+      );
+      expect(screen.getByText("Cost Estimate")).toBeTruthy();
+      expect(screen.getByText("Start Analysis")).toBeTruthy();
+      expect(screen.getByText("Cancel")).toBeTruthy();
+    });
+  });
+
+  it("dismisses estimate on cancel", async () => {
+    mockInvoke({
+      estimate_batch_cost: {
+        eligiblePages: 10,
+        estimatedInputTokens: 60000,
+        estimatedOutputTokens: 15000,
+        estimatedCostUsd: 0.075,
+      },
+    });
+    render(<AiInsightsTab crawlId="crawl-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Analyze All Pages")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Analyze All Pages"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Cancel")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Cancel"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Cost Estimate")).toBeNull();
+      expect(screen.getByText("Analyze All Pages")).toBeTruthy();
     });
   });
 });

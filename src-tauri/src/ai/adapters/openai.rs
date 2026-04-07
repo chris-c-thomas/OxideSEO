@@ -184,11 +184,11 @@ impl LlmProvider for OpenAiProvider {
             .send()
             .await
             .context("OpenAI health check failed")?;
-        if resp.status().is_success() {
-            Ok(true)
-        } else {
-            let status = resp.status();
-            bail!("OpenAI API returned HTTP {status}");
+        match resp.status().as_u16() {
+            200..=299 => Ok(true),
+            401 => bail!("Invalid API key"),
+            429 => bail!("Rate limited — try again in a moment"),
+            status => bail!("OpenAI API returned HTTP {status}"),
         }
     }
 

@@ -221,12 +221,16 @@ pub async fn estimate_batch_cost(
         })
         .map_err(|e| format!("{e:#}"))?;
 
+    /// Estimated input tokens per analysis type per page.
+    const EST_INPUT_TOKENS_PER_ANALYSIS: u64 = 2000;
+    /// Estimated output tokens per analysis type per page.
+    const EST_OUTPUT_TOKENS_PER_ANALYSIS: u64 = 500;
+
     let num_types = analysis_types.len() as u64;
-    // Rough estimate: ~2000 input tokens + ~500 output tokens per analysis type per page.
-    let est_input = page_count as u64 * num_types * 2000;
-    let est_output = page_count as u64 * num_types * 500;
-    let (input_cost, output_cost) = provider.cost_estimate();
-    let est_cost = (est_input as f64 * input_cost + est_output as f64 * output_cost) / 1000.0;
+    let est_input = page_count as u64 * num_types * EST_INPUT_TOKENS_PER_ANALYSIS;
+    let est_output = page_count as u64 * num_types * EST_OUTPUT_TOKENS_PER_ANALYSIS;
+    let est_cost =
+        crate::ai::provider::compute_cost(est_input, est_output, provider.cost_estimate());
 
     Ok(BatchCostEstimate {
         eligible_pages: page_count as u32,

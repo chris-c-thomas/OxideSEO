@@ -180,12 +180,12 @@ impl LlmProvider for OllamaProvider {
 // Ollama model discovery
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct OllamaTagsResponse {
     models: Vec<OllamaModelInfo>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct OllamaModelInfo {
     name: String,
 }

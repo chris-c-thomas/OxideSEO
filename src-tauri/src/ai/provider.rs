@@ -48,3 +48,9 @@ pub trait LlmProvider: Send + Sync {
     /// Estimated cost per 1K tokens: (input_cost, output_cost).
     fn cost_estimate(&self) -> (f64, f64);
 }
+
+/// Compute USD cost from token counts and per-1K-token rates.
+pub fn compute_cost(input_tokens: u64, output_tokens: u64, cost_per_1k: (f64, f64)) -> f64 {
+    let (input_rate, output_rate) = cost_per_1k;
+    (input_tokens as f64 * input_rate + output_tokens as f64 * output_rate) / 1000.0
+}

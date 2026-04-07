@@ -186,12 +186,20 @@ function CrawlSummarySection({
           const parsed = parseSummary(summary.summaryJson);
           if (!parsed) {
             return (
-              <pre
-                className="max-h-60 overflow-auto rounded-md border p-3 text-xs whitespace-pre-wrap"
-                style={{ borderColor: "var(--color-border)" }}
-              >
-                {summary.summaryJson}
-              </pre>
+              <div>
+                <p
+                  className="mb-2 text-xs"
+                  style={{ color: "var(--color-severity-warning)" }}
+                >
+                  AI returned a non-standard response format. Raw output shown below.
+                </p>
+                <pre
+                  className="max-h-60 overflow-auto rounded-md border p-3 text-xs whitespace-pre-wrap"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  {summary.summaryJson}
+                </pre>
+              </div>
             );
           }
           return (
