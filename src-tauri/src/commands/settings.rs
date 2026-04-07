@@ -72,15 +72,18 @@ pub async fn get_settings(db: State<'_, Arc<Database>>) -> Result<AppSettings, S
 
         let default_export_format: ExportFormat =
             match queries::get_setting(conn, "default_export_format")? {
-                Some(v) => match v.as_str() {
-                    "csv" => ExportFormat::Csv,
-                    "json" => ExportFormat::Json,
-                    "html" => ExportFormat::Html,
-                    _ => {
-                        tracing::warn!(key = "default_export_format", value = %v, "Invalid setting value, using default");
-                        ExportFormat::Csv
+                Some(v) => {
+                    // Try simple string match first, then serde for complex variants.
+                    match v.as_str() {
+                        "csv" => ExportFormat::Csv,
+                        "json" => ExportFormat::Json,
+                        "html" => ExportFormat::Html,
+                        other => serde_json::from_str(other).unwrap_or_else(|_| {
+                            tracing::warn!(key = "default_export_format", value = %v, "Invalid setting value, using default");
+                            ExportFormat::Csv
+                        }),
                     }
-                },
+                }
                 None => ExportFormat::Csv,
             };
 

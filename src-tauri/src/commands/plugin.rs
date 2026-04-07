@@ -1,14 +1,9 @@
 //! Plugin management Tauri IPC commands.
 
-use std::sync::Arc;
-
 use tauri::State;
-use tokio::sync::Mutex;
 
-use crate::plugin::manager::{PluginDetail, PluginInfo, PluginManager};
-
-/// Managed state type alias for the plugin manager.
-type PluginManagerState = Arc<Mutex<PluginManager>>;
+use super::crawl::PluginManagerState;
+use crate::plugin::manager::{PluginDetail, PluginInfo};
 
 // ---------------------------------------------------------------------------
 // Plugin commands

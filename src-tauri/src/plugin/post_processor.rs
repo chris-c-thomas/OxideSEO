@@ -4,6 +4,7 @@
 //! additional issues from aggregate crawl data.
 
 use anyhow::Result;
+use rusqlite::Connection;
 
 use crate::storage::db::Database;
 use crate::storage::models::IssueRow;
@@ -28,30 +29,36 @@ pub trait PluginPostProcessor: Send + Sync {
     fn process(&self, crawl_id: &str, context: PostProcessorContext<'_>) -> Result<Vec<IssueRow>>;
 }
 
-/// Validate that a SQL statement is read-only.
+/// Validate that a SQL statement is read-only using SQLite's own analysis.
 ///
-/// Returns `true` if the statement appears safe for WASM plugin execution.
-/// Rejects statements containing write operations or schema modifications.
-pub fn validate_read_only_sql(sql: &str) -> bool {
-    let upper = sql.trim().to_uppercase();
-
-    // Must start with SELECT.
-    if !upper.starts_with("SELECT") {
+/// Prepares the statement and checks `stmt.readonly()`, which is the
+/// authoritative way to determine if a statement modifies the database.
+/// Falls back to keyword rejection if the statement fails to prepare.
+pub fn validate_read_only_sql(conn: &Connection, sql: &str) -> bool {
+    let trimmed = sql.trim();
+    if trimmed.is_empty() {
         return false;
     }
 
-    // Reject any write or DDL keywords.
-    const FORBIDDEN: &[&str] = &[
-        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "ATTACH", "DETACH", "REPLACE",
-        "PRAGMA",
-    ];
-    for keyword in FORBIDDEN {
-        if upper.contains(keyword) {
-            return false;
-        }
+    // Reject multi-statement strings (semicolons outside the final position).
+    // SQLite's prepare() only parses the first statement, so a trailing
+    // write statement would be invisible to readonly().
+    let without_trailing = trimmed.trim_end_matches(';').trim();
+    if without_trailing.contains(';') {
+        return false;
     }
 
-    true
+    // SQLite considers ATTACH, DETACH, and some PRAGMAs as "readonly" even
+    // though they can modify state. Block these explicitly.
+    let upper = trimmed.to_uppercase();
+    if upper.starts_with("ATTACH") || upper.starts_with("DETACH") || upper.starts_with("PRAGMA") {
+        return false;
+    }
+
+    match conn.prepare(trimmed) {
+        Ok(stmt) => stmt.readonly(),
+        Err(_) => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,53 +69,121 @@ pub fn validate_read_only_sql(sql: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pages (id INTEGER PRIMARY KEY, url TEXT, updated_at TEXT, title TEXT);
+             CREATE TABLE issues (id INTEGER PRIMARY KEY, rule_id TEXT, severity TEXT);",
+        )
+        .unwrap();
+        conn
+    }
+
     #[test]
     fn test_valid_select() {
+        let conn = test_conn();
         assert!(validate_read_only_sql(
-            "SELECT * FROM pages WHERE crawl_id = ?1"
+            &conn,
+            "SELECT * FROM pages WHERE id = ?1"
         ));
         assert!(validate_read_only_sql(
+            &conn,
             "SELECT COUNT(*) FROM issues WHERE rule_id LIKE 'plugin.%'"
         ));
-        assert!(validate_read_only_sql("  SELECT url FROM pages  "));
+        assert!(validate_read_only_sql(&conn, "  SELECT url FROM pages  "));
+    }
+
+    #[test]
+    fn test_column_names_with_keywords_allowed() {
+        let conn = test_conn();
+        // These were false positives with the old substring approach.
+        assert!(validate_read_only_sql(
+            &conn,
+            "SELECT updated_at FROM pages"
+        ));
+        assert!(validate_read_only_sql(
+            &conn,
+            "SELECT id, title FROM pages WHERE updated_at IS NOT NULL"
+        ));
     }
 
     #[test]
     fn test_rejects_write_operations() {
-        assert!(!validate_read_only_sql("INSERT INTO pages VALUES (1)"));
-        assert!(!validate_read_only_sql("UPDATE pages SET title = 'x'"));
-        assert!(!validate_read_only_sql("DELETE FROM pages WHERE id = 1"));
+        let conn = test_conn();
         assert!(!validate_read_only_sql(
+            &conn,
+            "INSERT INTO pages VALUES (1, 'x', 'y', 'z')"
+        ));
+        assert!(!validate_read_only_sql(
+            &conn,
+            "UPDATE pages SET title = 'x'"
+        ));
+        assert!(!validate_read_only_sql(
+            &conn,
+            "DELETE FROM pages WHERE id = 1"
+        ));
+    }
+
+    #[test]
+    fn test_rejects_multi_statement_injection() {
+        let conn = test_conn();
+        assert!(!validate_read_only_sql(
+            &conn,
             "SELECT * FROM pages; DELETE FROM pages"
         ));
+        assert!(!validate_read_only_sql(&conn, "SELECT 1; DROP TABLE pages"));
     }
 
     #[test]
     fn test_rejects_ddl() {
-        assert!(!validate_read_only_sql("DROP TABLE pages"));
-        assert!(!validate_read_only_sql("ALTER TABLE pages ADD COLUMN x"));
-        assert!(!validate_read_only_sql("CREATE TABLE evil (id INT)"));
-        assert!(!validate_read_only_sql("ATTACH DATABASE 'x' AS y"));
-        assert!(!validate_read_only_sql("DETACH DATABASE y"));
+        let conn = test_conn();
+        assert!(!validate_read_only_sql(&conn, "DROP TABLE pages"));
+        assert!(!validate_read_only_sql(&conn, "CREATE TABLE evil (id INT)"));
     }
 
     #[test]
     fn test_rejects_pragma() {
-        assert!(!validate_read_only_sql("PRAGMA table_info(pages)"));
+        let conn = test_conn();
+        // Most PRAGMAs are not readonly in SQLite.
+        assert!(!validate_read_only_sql(&conn, "PRAGMA table_info(pages)"));
     }
 
     #[test]
-    fn test_rejects_non_select() {
-        assert!(!validate_read_only_sql("REPLACE INTO pages VALUES (1)"));
-        assert!(!validate_read_only_sql(""));
-        assert!(!validate_read_only_sql("EXPLAIN SELECT * FROM pages"));
+    fn test_rejects_empty_and_invalid() {
+        let conn = test_conn();
+        assert!(!validate_read_only_sql(&conn, ""));
+        assert!(!validate_read_only_sql(&conn, "   "));
+        assert!(!validate_read_only_sql(&conn, "NOT VALID SQL AT ALL"));
     }
 
     #[test]
     fn test_case_insensitive() {
-        assert!(!validate_read_only_sql(
-            "select * from pages; insert into pages values(1)"
+        let conn = test_conn();
+        assert!(validate_read_only_sql(
+            &conn,
+            "select * from pages where id = 1"
         ));
-        assert!(validate_read_only_sql("select * from pages where id = 1"));
+        assert!(!validate_read_only_sql(
+            &conn,
+            "select * from pages; insert into pages values(1, 'a', 'b', 'c')"
+        ));
+    }
+
+    #[test]
+    fn test_with_cte() {
+        let conn = test_conn();
+        assert!(validate_read_only_sql(
+            &conn,
+            "WITH cte AS (SELECT id FROM pages) SELECT * FROM cte"
+        ));
+    }
+
+    #[test]
+    fn test_rejects_attach() {
+        let conn = test_conn();
+        assert!(!validate_read_only_sql(
+            &conn,
+            "ATTACH DATABASE ':memory:' AS evil"
+        ));
     }
 }

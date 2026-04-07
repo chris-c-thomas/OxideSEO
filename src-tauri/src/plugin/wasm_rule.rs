@@ -125,7 +125,7 @@ pub struct WasmRuleAdapter {
     name: String,
     category: RuleCategory,
     default_severity: Severity,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used when full WIT bindgen is integrated for fuel budgeting.
     fuel_limit: u64,
 }
 
@@ -179,9 +179,9 @@ impl SeoRule for WasmRuleAdapter {
         // 3. Call guest evaluate(plugin_page)
         // 4. Convert PluginIssue -> Issue via to_core_issue
 
-        tracing::debug!(
+        tracing::warn!(
             plugin = %self.plugin_name,
-            "WASM evaluate stub — component call not yet wired"
+            "WASM evaluate stub — component call not yet wired; returning no issues"
         );
 
         vec![]

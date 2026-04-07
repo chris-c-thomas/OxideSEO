@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::Context;
 
 use super::error::PluginError;
-use super::manifest::{PluginKind, PluginManifest};
+use super::manifest::{Capability, PluginKind, PluginManifest};
 use crate::rules::rule::SeoRule;
 use crate::storage::db::Database;
 use crate::storage::queries;
@@ -38,7 +38,7 @@ pub struct PluginInfo {
     pub name: String,
     pub version: String,
     pub description: String,
-    pub kind: String,
+    pub kind: PluginKind,
     pub enabled: bool,
     pub is_native: bool,
 }
@@ -52,8 +52,8 @@ pub struct PluginDetail {
     pub description: String,
     pub author: Option<String>,
     pub license: Option<String>,
-    pub kind: String,
-    pub capabilities: Vec<String>,
+    pub kind: PluginKind,
+    pub capabilities: Vec<Capability>,
     pub enabled: bool,
     pub is_native: bool,
     pub config: Option<serde_json::Value>,
@@ -310,7 +310,7 @@ impl PluginManager {
                 name: p.manifest.name.clone(),
                 version: p.manifest.version.to_string(),
                 description: p.manifest.description.clone(),
-                kind: p.manifest.kind.to_string(),
+                kind: p.manifest.kind,
                 enabled: p.enabled,
                 is_native: p.manifest.is_native(),
             })
@@ -356,13 +356,8 @@ impl PluginManager {
             description: plugin.manifest.description.clone(),
             author: plugin.manifest.author.clone(),
             license: plugin.manifest.license.clone(),
-            kind: plugin.manifest.kind.to_string(),
-            capabilities: plugin
-                .manifest
-                .capabilities
-                .iter()
-                .map(|c| format!("{c:?}").to_lowercase())
-                .collect(),
+            kind: plugin.manifest.kind,
+            capabilities: plugin.manifest.capabilities.clone(),
             enabled: plugin.enabled,
             is_native: plugin.manifest.is_native(),
             config,
@@ -450,10 +445,18 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
+        let file_type = entry.file_type()?;
+
+        // Skip symlinks to prevent information disclosure and traversal attacks.
+        if file_type.is_symlink() {
+            tracing::warn!(path = %entry.path().display(), "Skipping symlink in plugin directory");
+            continue;
+        }
+
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
 
-        if src_path.is_dir() {
+        if file_type.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
             std::fs::copy(&src_path, &dst_path)?;
@@ -625,7 +628,7 @@ trusted = true
         let detail = pm.get_plugin_detail("test-rule").unwrap();
         assert_eq!(detail.name, "test-rule");
         assert_eq!(detail.version, "0.1.0");
-        assert_eq!(detail.kind, "rule");
+        assert_eq!(detail.kind, PluginKind::Rule);
         assert!(!detail.is_native);
         assert!(!detail.enabled);
     }

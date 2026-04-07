@@ -85,6 +85,17 @@ pub enum Capability {
     Log,
 }
 
+impl std::fmt::Display for Capability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::HttpRead => f.write_str("http_read"),
+            Self::DbRead => f.write_str("db_read"),
+            Self::FsReadPluginDir => f.write_str("fs_read_plugin_dir"),
+            Self::Log => f.write_str("log"),
+        }
+    }
+}
+
 /// Configuration for WASM plugins.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WasmConfig {
@@ -146,7 +157,25 @@ impl PluginManifest {
             return Err(PluginError::Other("plugin name must not be empty".into()));
         }
 
-        // WASM plugins must specify a module path.
+        // Plugin name is used as a directory name and DB key — restrict to safe characters.
+        if !self
+            .name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(PluginError::Other(
+                "plugin name must contain only [a-zA-Z0-9_-] characters".into(),
+            ));
+        }
+
+        // Validate runtime-specific paths contain no directory traversal.
+        if let Some(ref wasm) = self.wasm {
+            validate_relative_filename(&wasm.module, "wasm.module")?;
+        }
+        if let Some(ref native) = self.native {
+            validate_relative_filename(&native.library, "native.library")?;
+        }
+
         if self.wasm.is_some() && self.native.is_some() {
             return Err(PluginError::Other(
                 "plugin cannot specify both [wasm] and [native] sections".into(),
@@ -171,6 +200,21 @@ impl PluginManifest {
     pub fn is_native(&self) -> bool {
         self.native.is_some()
     }
+}
+
+/// Validate that a path is a simple filename (no directory traversal).
+fn validate_relative_filename(path: &str, field_name: &str) -> Result<(), PluginError> {
+    if path.is_empty()
+        || path.contains('/')
+        || path.contains('\\')
+        || path.contains("..")
+        || path.starts_with('.')
+    {
+        return Err(PluginError::Other(format!(
+            "{field_name} must be a simple filename without path separators"
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -400,5 +444,60 @@ module = "plugin.wasm"
         assert!(manifest.capabilities.contains(&Capability::DbRead));
         assert!(manifest.capabilities.contains(&Capability::FsReadPluginDir));
         assert!(manifest.capabilities.contains(&Capability::Log));
+    }
+
+    #[test]
+    fn test_path_traversal_in_name_rejected() {
+        for bad_name in [
+            "../evil", "foo/bar", "foo\\bar", "..\\evil", "foo bar", "foo.bar",
+        ] {
+            let toml_content = format!(
+                r#"
+name = "{bad_name}"
+version = "0.1.0"
+description = "test"
+min_app_version = ">=0.1.0"
+kind = "rule"
+
+[wasm]
+module = "plugin.wasm"
+"#
+            );
+            assert!(
+                PluginManifest::parse(&toml_content).is_err(),
+                "name '{bad_name}' should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_path_traversal_in_wasm_module_rejected() {
+        let toml_content = r#"
+name = "test"
+version = "0.1.0"
+description = "test"
+min_app_version = ">=0.1.0"
+kind = "rule"
+
+[wasm]
+module = "../../../etc/evil.wasm"
+"#;
+        assert!(PluginManifest::parse(toml_content).is_err());
+    }
+
+    #[test]
+    fn test_path_traversal_in_native_library_rejected() {
+        let toml_content = r#"
+name = "test"
+version = "0.1.0"
+description = "test"
+min_app_version = ">=0.1.0"
+kind = "exporter"
+
+[native]
+library = "../../../lib/evil.dylib"
+trusted = true
+"#;
+        assert!(PluginManifest::parse(toml_content).is_err());
     }
 }

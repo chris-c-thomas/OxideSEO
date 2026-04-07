@@ -43,6 +43,7 @@ export function PluginManagerView() {
   }, [fetchPlugins]);
 
   const handleToggle = async (name: string, enabled: boolean) => {
+    setError(null);
     try {
       if (enabled) {
         await enablePlugin(name);
@@ -56,6 +57,7 @@ export function PluginManagerView() {
   };
 
   const handleInstall = async () => {
+    setError(null);
     try {
       await installPluginFromFile();
       await fetchPlugins();
@@ -65,6 +67,7 @@ export function PluginManagerView() {
   };
 
   const handleReload = async () => {
+    setError(null);
     try {
       const list = await reloadPlugins();
       setPlugins(list);
@@ -74,6 +77,7 @@ export function PluginManagerView() {
   };
 
   const handleUninstall = async (name: string) => {
+    setError(null);
     try {
       await uninstallPlugin(name);
       setSelectedPlugin(null);
@@ -85,6 +89,7 @@ export function PluginManagerView() {
   };
 
   const handleCardClick = async (name: string) => {
+    setError(null);
     setSelectedPlugin(name);
     try {
       const d = await getPluginDetail(name);
