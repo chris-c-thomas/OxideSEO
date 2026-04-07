@@ -1332,6 +1332,30 @@ pub fn select_ai_crawl_summary(
 }
 
 /// Select pages eligible for AI analysis (200 status, with body text).
+/// Count pages eligible for AI analysis (same filters as `select_pages_for_ai_analysis`).
+pub fn count_pages_for_ai_analysis(
+    conn: &Connection,
+    crawl_id: &str,
+    only_with_issues: bool,
+    only_missing_meta: bool,
+    max_pages: i64,
+) -> Result<i64> {
+    let mut sql = String::from(
+        "SELECT COUNT(*) FROM (SELECT id FROM pages \
+         WHERE crawl_id = ?1 AND status_code = 200 AND body_text IS NOT NULL",
+    );
+
+    if only_with_issues {
+        sql.push_str(" AND id IN (SELECT DISTINCT page_id FROM issues WHERE crawl_id = ?1)");
+    }
+    if only_missing_meta {
+        sql.push_str(" AND (meta_desc IS NULL OR meta_desc = '' OR title IS NULL OR title = '')");
+    }
+    sql.push_str(" LIMIT ?2)");
+
+    Ok(conn.query_row(&sql, params![crawl_id, max_pages], |row| row.get(0))?)
+}
+
 pub fn select_pages_for_ai_analysis(
     conn: &Connection,
     crawl_id: &str,

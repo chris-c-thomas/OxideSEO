@@ -258,13 +258,17 @@ impl AiAnalysisEngine {
     }
 
     /// Generate an AI summary for a completed crawl.
-    pub async fn generate_summary(&self, crawl_id: &str) -> Result<AiCrawlSummaryRow> {
-        // Check for cached summary first.
-        if let Some(cached) = self
-            .db
-            .with_conn(|conn| queries::select_ai_crawl_summary(conn, crawl_id))?
-        {
-            return Ok(cached);
+    ///
+    /// When `force` is true, regenerates even if a cached summary exists.
+    pub async fn generate_summary(&self, crawl_id: &str, force: bool) -> Result<AiCrawlSummaryRow> {
+        // Check for cached summary first (unless forced).
+        if !force {
+            if let Some(cached) = self
+                .db
+                .with_conn(|conn| queries::select_ai_crawl_summary(conn, crawl_id))?
+            {
+                return Ok(cached);
+            }
         }
 
         // Gather crawl statistics.

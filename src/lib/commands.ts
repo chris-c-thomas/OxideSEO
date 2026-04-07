@@ -16,6 +16,7 @@ import type {
   AppSettings,
   BatchAnalysisFilter,
   BatchAnalysisResult,
+  BatchCostEstimate,
   CrawlConfig,
   CrawlStatus,
   CrawlSummary,
@@ -243,9 +244,15 @@ export function batchAnalyzePages(
   });
 }
 
-/** Generate an AI summary for a completed crawl. */
-export function generateCrawlSummary(crawlId: string): Promise<AiCrawlSummaryRow> {
-  return invoke<AiCrawlSummaryRow>("generate_crawl_summary", { crawlId });
+/** Generate an AI summary for a completed crawl. Pass force=true to regenerate. */
+export function generateCrawlSummary(
+  crawlId: string,
+  force?: boolean,
+): Promise<AiCrawlSummaryRow> {
+  return invoke<AiCrawlSummaryRow>("generate_crawl_summary", {
+    crawlId,
+    force: force ?? false,
+  });
 }
 
 /** Get cached AI analyses for a page. */
@@ -264,4 +271,22 @@ export function getAiUsage(crawlId: string): Promise<AiUsageRow[]> {
 /** Get cached AI crawl summary. */
 export function getCrawlAiSummary(crawlId: string): Promise<AiCrawlSummaryRow | null> {
   return invoke<AiCrawlSummaryRow | null>("get_crawl_ai_summary", { crawlId });
+}
+
+/** List models installed on an Ollama instance. */
+export function listOllamaModels(endpoint: string): Promise<string[]> {
+  return invoke<string[]>("list_ollama_models", { endpoint });
+}
+
+/** Estimate cost of a batch analysis before running it. */
+export function estimateBatchCost(
+  crawlId: string,
+  filter: BatchAnalysisFilter,
+  analysisTypes: AnalysisType[],
+): Promise<BatchCostEstimate> {
+  return invoke<BatchCostEstimate>("estimate_batch_cost", {
+    crawlId,
+    filter,
+    analysisTypes,
+  });
 }

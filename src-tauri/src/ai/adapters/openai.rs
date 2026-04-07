@@ -176,17 +176,20 @@ impl LlmProvider for OpenAiProvider {
     }
 
     async fn health_check(&self) -> Result<bool> {
-        let req = CompletionRequest {
-            system_prompt: String::new(),
-            user_prompt: "Say OK".into(),
-            max_tokens: 5,
-            temperature: 0.0,
-            response_format: ResponseFormat::Text,
-        };
-        self.complete(req)
+        // Use GET /v1/models instead of a completion — no tokens consumed.
+        let resp = self
+            .client
+            .get("https://api.openai.com/v1/models")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .send()
             .await
             .context("OpenAI health check failed")?;
-        Ok(true)
+        if resp.status().is_success() {
+            Ok(true)
+        } else {
+            let status = resp.status();
+            bail!("OpenAI API returned HTTP {status}");
+        }
     }
 
     fn cost_estimate(&self) -> (f64, f64) {

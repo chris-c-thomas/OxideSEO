@@ -172,6 +172,41 @@ impl LlmProvider for OllamaProvider {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Ollama model discovery
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModelInfo>,
+}
+
+#[derive(Deserialize)]
+struct OllamaModelInfo {
+    name: String,
+}
+
+/// List models installed on an Ollama instance.
+pub async fn list_ollama_models(endpoint: &str) -> Result<Vec<String>> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+    let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .context("Failed to connect to Ollama")?;
+    if !resp.status().is_success() {
+        bail!("Ollama returned HTTP {}", resp.status());
+    }
+    let tags: OllamaTagsResponse = resp
+        .json()
+        .await
+        .context("Failed to parse Ollama model list")?;
+    Ok(tags.models.into_iter().map(|m| m.name).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

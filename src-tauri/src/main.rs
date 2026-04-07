@@ -81,6 +81,8 @@ fn main() {
             commands::ai::get_page_analyses,
             commands::ai::get_ai_usage,
             commands::ai::get_crawl_ai_summary,
+            commands::ai::list_ollama_models,
+            commands::ai::estimate_batch_cost,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OxideSEO");

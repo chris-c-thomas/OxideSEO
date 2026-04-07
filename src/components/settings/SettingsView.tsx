@@ -12,6 +12,7 @@ import {
   deleteApiKey,
   hasApiKey,
   testAiConnection,
+  listOllamaModels,
 } from "@/lib/commands";
 import type { AppSettings, AiProviderConfig, AiProviderType } from "@/types";
 
@@ -164,15 +165,31 @@ function AiProviderSection() {
   const [isTesting, setIsTesting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [ollamaModels, setOllamaModels] = useState<string[] | null>(null);
+  const [modelsFetchError, setModelsFetchError] = useState(false);
 
   useEffect(() => {
     getAiConfig()
       .then((cfg) => {
         setConfig(cfg);
         setKeyStored(cfg.isConfigured);
+        if (cfg.providerType === "ollama") {
+          fetchOllamaModels(cfg.ollamaEndpoint ?? "http://localhost:11434");
+        }
       })
       .catch((err) => setLoadError(String(err)));
   }, []);
+
+  const fetchOllamaModels = async (endpoint: string) => {
+    setModelsFetchError(false);
+    try {
+      const models = await listOllamaModels(endpoint);
+      setOllamaModels(models);
+    } catch {
+      setOllamaModels(null);
+      setModelsFetchError(true);
+    }
+  };
 
   const refreshKeyStatus = async (provider: AiProviderType) => {
     try {
@@ -186,15 +203,21 @@ function AiProviderSection() {
 
   const handleProviderChange = (provider: AiProviderType) => {
     if (!config) return;
+    const endpoint = provider === "ollama" ? "http://localhost:11434" : null;
     const updated = {
       ...config,
       providerType: provider,
       model: DEFAULT_MODELS[provider],
-      ollamaEndpoint: provider === "ollama" ? "http://localhost:11434" : null,
+      ollamaEndpoint: endpoint,
     };
     setConfig(updated);
     setApiKeyInput("");
+    setOllamaModels(null);
+    setModelsFetchError(false);
     refreshKeyStatus(provider);
+    if (provider === "ollama" && endpoint) {
+      fetchOllamaModels(endpoint);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -355,17 +378,52 @@ function AiProviderSection() {
         {/* Model */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Model</label>
-          <input
-            type="text"
-            value={config.model}
-            onChange={(e) => setConfig({ ...config, model: e.target.value })}
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            style={{
-              borderColor: "var(--color-border)",
-              backgroundColor: "var(--color-background)",
-              color: "var(--color-foreground)",
-            }}
-          />
+          {isOllama && ollamaModels && ollamaModels.length > 0 ? (
+            <div className="flex gap-2">
+              <select
+                value={config.model}
+                onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                className="flex-1 rounded-md border px-3 py-2 text-sm"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-background)",
+                  color: "var(--color-foreground)",
+                }}
+              >
+                {ollamaModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() =>
+                  fetchOllamaModels(config.ollamaEndpoint ?? "http://localhost:11434")
+                }
+                className="rounded-md border px-3 py-2 text-xs"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                Refresh
+              </button>
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={config.model}
+              onChange={(e) => setConfig({ ...config, model: e.target.value })}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
+            />
+          )}
+          {isOllama && modelsFetchError && (
+            <p className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>
+              Could not fetch models from Ollama — enter model name manually.
+            </p>
+          )}
         </div>
 
         {/* Ollama endpoint */}
