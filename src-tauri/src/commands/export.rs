@@ -195,6 +195,11 @@ pub async fn export_data(
         ExportFormat::Csv => export_csv(&request, &db, &app),
         ExportFormat::Json => export_ndjson(&request, &db, &app),
         ExportFormat::Html => export_html_report_inner(&request, &db, &app),
+        ExportFormat::Plugin(ref _name) => {
+            // Plugin export dispatch will be wired when PluginExporter
+            // adapters are loaded via the PluginManager.
+            Err(anyhow::anyhow!("Plugin export not yet implemented"))
+        }
     };
     result.map_err(|e| format!("{e:#}"))
 }

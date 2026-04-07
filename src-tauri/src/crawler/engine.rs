@@ -109,6 +109,7 @@ pub async fn spawn_crawl(
     db: Arc<Database>,
     emitter: Arc<dyn ProgressEmitter>,
     app_handle: Option<tauri::AppHandle>,
+    plugin_manager: Option<Arc<tokio::sync::Mutex<crate::plugin::manager::PluginManager>>>,
 ) -> Result<CrawlHandle> {
     let (state_tx, state_rx) = watch::channel(CrawlState::Running);
 
@@ -138,6 +139,16 @@ pub async fn spawn_crawl(
 
     let mut rule_registry = RuleRegistry::new();
     rule_registry.register_builtins();
+
+    // Load plugin rules if a plugin manager is available.
+    if let Some(ref pm) = plugin_manager {
+        let mut pm_guard = pm.lock().await;
+        for rule in pm_guard.load_rules() {
+            tracing::info!(rule_id = %rule.id(), "Registered plugin rule");
+            rule_registry.register(rule);
+        }
+    }
+
     let rule_registry = Arc::new(rule_registry);
 
     // Extract root domain and scheme from seed URL.

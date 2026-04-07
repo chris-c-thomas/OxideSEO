@@ -7,6 +7,7 @@
 pub mod ai;
 pub mod commands;
 pub mod crawler;
+pub mod plugin;
 pub mod rules;
 pub mod storage;
 

@@ -38,6 +38,41 @@ export const crawlConfigSchema = z.object({
 
 export type CrawlConfigFormValues = z.infer<typeof crawlConfigSchema>;
 
+// ---------------------------------------------------------------------------
+// Plugin schemas (Phase 8)
+// ---------------------------------------------------------------------------
+
+export const pluginKindSchema = z.enum([
+  "rule",
+  "exporter",
+  "post_processor",
+  "ui_extension",
+]);
+
+export const pluginInfoSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  description: z.string(),
+  kind: pluginKindSchema,
+  enabled: z.boolean(),
+  isNative: z.boolean(),
+  loadError: z.string().nullable(),
+});
+
+export const pluginDetailSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  description: z.string(),
+  author: z.string().nullable(),
+  license: z.string().nullable(),
+  kind: pluginKindSchema,
+  capabilities: z.array(z.string()),
+  enabled: z.boolean(),
+  isNative: z.boolean(),
+  config: z.record(z.unknown()).nullable(),
+  installedAt: z.string(),
+});
+
 /** Default values for a new crawl configuration form. */
 export const defaultCrawlConfig: CrawlConfigFormValues = {
   startUrl: "",

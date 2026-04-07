@@ -9,7 +9,7 @@ use rusqlite::{Connection, params, types::Value};
 
 use super::models::{
     AiAnalysisRow, AiCrawlSummaryRow, AiUsageRow, CrawlRow, ExternalLinkRow, IssueRow, LinkRow,
-    PageRow, SitemapUrlRow,
+    PageRow, PluginRow, SitemapUrlRow,
 };
 
 // ---------------------------------------------------------------------------
@@ -1385,4 +1385,94 @@ pub fn select_pages_for_ai_analysis(
         .query_map(params![crawl_id, max_pages], row_to_page)?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
+}
+
+// ---------------------------------------------------------------------------
+// Plugin queries (Phase 8)
+// ---------------------------------------------------------------------------
+
+/// Insert or update a plugin record.
+pub fn upsert_plugin(
+    conn: &Connection,
+    name: &str,
+    version: &str,
+    kind: &str,
+    enabled: bool,
+    config_json: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        r#"INSERT INTO plugins (name, version, kind, enabled, config_json, installed_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'), datetime('now'))
+           ON CONFLICT(name) DO UPDATE SET
+               version = excluded.version,
+               kind = excluded.kind,
+               enabled = excluded.enabled,
+               config_json = excluded.config_json,
+               updated_at = datetime('now')"#,
+        params![name, version, kind, enabled, config_json],
+    )?;
+    Ok(())
+}
+
+/// Retrieve all plugin records.
+pub fn select_all_plugins(conn: &Connection) -> Result<Vec<PluginRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT name, version, kind, enabled, config_json, installed_at, updated_at
+         FROM plugins ORDER BY name",
+    )?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(PluginRow {
+                name: row.get(0)?,
+                version: row.get(1)?,
+                kind: row.get(2)?,
+                enabled: row.get(3)?,
+                config_json: row.get(4)?,
+                installed_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Retrieve a single plugin record by name.
+pub fn select_plugin(conn: &Connection, name: &str) -> Result<Option<PluginRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT name, version, kind, enabled, config_json, installed_at, updated_at
+         FROM plugins WHERE name = ?1",
+    )?;
+    let mut rows = stmt.query_map(params![name], |row| {
+        Ok(PluginRow {
+            name: row.get(0)?,
+            version: row.get(1)?,
+            kind: row.get(2)?,
+            enabled: row.get(3)?,
+            config_json: row.get(4)?,
+            installed_at: row.get(5)?,
+            updated_at: row.get(6)?,
+        })
+    })?;
+    match rows.next() {
+        Some(row) => Ok(Some(row?)),
+        None => Ok(None),
+    }
+}
+
+/// Set the enabled flag for a plugin.
+pub fn set_plugin_enabled(conn: &Connection, name: &str, enabled: bool) -> Result<()> {
+    let rows = conn.execute(
+        "UPDATE plugins SET enabled = ?2, updated_at = datetime('now') WHERE name = ?1",
+        params![name, enabled],
+    )?;
+    if rows == 0 {
+        anyhow::bail!("plugin not found: {name}");
+    }
+    Ok(())
+}
+
+/// Delete a plugin record.
+pub fn delete_plugin(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute("DELETE FROM plugins WHERE name = ?1", params![name])?;
+    Ok(())
 }

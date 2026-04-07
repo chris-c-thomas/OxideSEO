@@ -13,6 +13,7 @@
 - **Single responsibility.** Each file, struct, component, and function does one thing. If a function exceeds ~40 lines, it likely needs decomposition.
 - **Fail loudly in dev, gracefully in prod.** Use `debug_assert!` for invariants in Rust. Use Zod `.parse()` (throws) during development and `.safeParse()` at runtime boundaries.
 - **Naming is documentation.** Prefer long, descriptive names over short ambiguous ones. `fetch_and_follow_redirects` over `do_fetch`. `useCrawlProgressSubscription` over `useProgress`.
+- **No emoji characters** Do not use emojis in code, comments, commit messages, or documentation unless explicitly instructed to so. They can cause encoding issues and are not universally supported.
 
 ---
 

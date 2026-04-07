@@ -24,9 +24,7 @@ impl SeoRule for BrokenInternal {
     }
 
     fn evaluate(&self, _page: &ParsedPage, _ctx: &CrawlContext) -> Vec<Issue> {
-        // TODO(phase-3): This requires cross-page context — checking the
-        // status code of the target URL. Implemented in post-crawl analysis
-        // by joining the links and pages tables.
+        // Per-page stub — cross-page detection in PostCrawlAnalyzer.
         vec![]
     }
 }
@@ -48,8 +46,7 @@ impl SeoRule for RedirectChain {
     }
 
     fn evaluate(&self, _page: &ParsedPage, _ctx: &CrawlContext) -> Vec<Issue> {
-        // TODO(phase-3): Flag internal links that require 2+ redirects.
-        // Requires cross-page analysis of the links table.
+        // Per-page stub — cross-page detection in PostCrawlAnalyzer.
         vec![]
     }
 }

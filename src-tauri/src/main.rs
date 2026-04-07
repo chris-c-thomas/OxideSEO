@@ -8,8 +8,10 @@
 use std::sync::Arc;
 
 use oxide_seo_lib::commands;
-use oxide_seo_lib::commands::crawl::CrawlHandles;
+use oxide_seo_lib::commands::crawl::{CrawlHandles, PluginManagerState};
+use oxide_seo_lib::plugin::manager::PluginManager;
 use tauri::Manager;
+use tokio::sync::Mutex;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 fn main() {
@@ -35,12 +37,25 @@ fn main() {
             let db = oxide_seo_lib::storage::db::Database::init(&app_handle)?;
 
             // Wrap in Arc for shared ownership across crawl engine and commands.
-            app.manage(Arc::new(db));
+            let db_arc = Arc::new(db);
+            app.manage(db_arc.clone());
 
             // Initialize empty crawl handles map.
             app.manage(CrawlHandles::default());
 
-            tracing::info!("Database initialized");
+            // Initialize plugin manager.
+            let app_data_dir = app.path().app_data_dir()?;
+            let plugins_dir = app_data_dir.join("plugins");
+            std::fs::create_dir_all(&plugins_dir)?;
+
+            let mut pm = PluginManager::new(plugins_dir, db_arc);
+            if let Err(e) = pm.discover() {
+                tracing::warn!(error = %e, "Plugin discovery failed");
+            }
+            let pm_state: PluginManagerState = Arc::new(Mutex::new(pm));
+            app.manage(pm_state);
+
+            tracing::info!("Database and plugin manager initialized");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -68,6 +83,14 @@ fn main() {
             commands::export::export_data,
             commands::export::save_crawl_file,
             commands::export::open_crawl_file,
+            // Plugins
+            commands::plugin::list_plugins,
+            commands::plugin::enable_plugin,
+            commands::plugin::disable_plugin,
+            commands::plugin::get_plugin_detail,
+            commands::plugin::reload_plugins,
+            commands::plugin::install_plugin_from_file,
+            commands::plugin::uninstall_plugin,
             // AI analysis
             commands::ai::get_ai_config,
             commands::ai::set_ai_config,

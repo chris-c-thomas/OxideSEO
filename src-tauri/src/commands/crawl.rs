@@ -10,9 +10,13 @@ use tokio::sync::Mutex;
 
 use crate::CrawlState;
 use crate::crawler::engine::{CrawlHandle, TauriEmitter};
+use crate::plugin::manager::PluginManager;
 use crate::storage::db::Database;
 use crate::storage::models::CrawlRow;
 use crate::storage::queries;
+
+/// Managed state type for the plugin manager.
+pub type PluginManagerState = Arc<Mutex<PluginManager>>;
 
 // ---------------------------------------------------------------------------
 // Managed state type for active crawl handles
@@ -189,6 +193,7 @@ pub async fn start_crawl(
     config: CrawlConfig,
     db: State<'_, Arc<Database>>,
     handles: State<'_, CrawlHandles>,
+    plugin_manager: State<'_, PluginManagerState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     // Validate config.
@@ -229,6 +234,7 @@ pub async fn start_crawl(
         db.inner().clone(),
         emitter,
         Some(app),
+        Some(plugin_manager.inner().clone()),
     )
     .await
     .map_err(|e| e.to_string())?;

@@ -1,0 +1,13 @@
+name = "schema-validator"
+version = "0.1.0"
+description = "Validates JSON-LD structured data on pages"
+author = "OxideSEO Contributors"
+license = "MIT OR Apache-2.0"
+min_app_version = ">=0.3.0"
+kind = "rule"
+capabilities = ["log"]
+
+[wasm]
+module = "schema_validator.wasm"
+fuel_limit = 10000000
+memory_limit_mb = 64

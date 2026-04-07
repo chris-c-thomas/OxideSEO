@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "crawl-config", label: "New Crawl", icon: "plus-circle" },
   { id: "crawl-monitor", label: "Monitor", icon: "activity" },
   { id: "results", label: "Results", icon: "table" },
+  { id: "plugins", label: "Plugins", icon: "puzzle" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 
