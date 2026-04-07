@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { listen } from "@tauri-apps/api/event";
 import { useAiProgress } from "./useAiProgress";
@@ -22,8 +23,7 @@ describe("useAiProgress", () => {
     };
 
     vi.mocked(listen).mockImplementation(async (_event, handler) => {
-      // Simulate an event arriving
-      (handler as (event: { payload: unknown }) => void)({ payload: mockPayload });
+      handler({ event: "ai://progress", id: 1, payload: mockPayload });
       return mockUnlisten;
     });
 
