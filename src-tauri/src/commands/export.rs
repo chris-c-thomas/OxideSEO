@@ -467,7 +467,7 @@ fn severity_badge(severity: &str) -> String {
     format!(r#"<span class="badge {class}">{severity}</span>"#)
 }
 
-fn build_top_issues_table(issues: &[(String, String, String, i64)]) -> String {
+fn build_top_issues_table(issues: &[queries::TopIssueEntry]) -> String {
     if issues.is_empty() {
         return "<p>No issues found.</p>".into();
     }
@@ -479,13 +479,13 @@ fn build_top_issues_table(issues: &[(String, String, String, i64)]) -> String {
 "#,
     );
 
-    for (rule_id, severity, category, count) in issues {
+    for issue in issues {
         html.push_str(&format!(
             "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n",
-            html_escape(rule_id),
-            severity_badge(severity),
-            html_escape(category),
-            count,
+            html_escape(&issue.rule_id),
+            severity_badge(&issue.severity),
+            html_escape(&issue.category),
+            issue.count,
         ));
     }
 
@@ -615,15 +615,15 @@ fn export_pdf_report(
         current_layer.use_text("Count", 8.0, Mm(left + 140.0), Mm(y), &font_bold);
         y -= 5.0;
 
-        for (rule_id, severity, category, count) in &report.top_issues {
+        for issue in &report.top_issues {
             if y < 20.0 {
                 break; // Avoid writing off the page.
             }
-            current_layer.use_text(rule_id, 8.0, Mm(left + 4.0), Mm(y), &font_regular);
-            current_layer.use_text(severity, 8.0, Mm(left + 70.0), Mm(y), &font_regular);
-            current_layer.use_text(category, 8.0, Mm(left + 100.0), Mm(y), &font_regular);
+            current_layer.use_text(&issue.rule_id, 8.0, Mm(left + 4.0), Mm(y), &font_regular);
+            current_layer.use_text(&issue.severity, 8.0, Mm(left + 70.0), Mm(y), &font_regular);
+            current_layer.use_text(&issue.category, 8.0, Mm(left + 100.0), Mm(y), &font_regular);
             current_layer.use_text(
-                count.to_string(),
+                issue.count.to_string(),
                 8.0,
                 Mm(left + 140.0),
                 Mm(y),
@@ -991,6 +991,7 @@ fn xlsx_write_ai_sheet(
 // ---------------------------------------------------------------------------
 
 /// Data gathered from a crawl for PDF and HTML reports.
+#[derive(Debug)]
 struct ReportData {
     start_url: String,
     started_at: Option<String>,
@@ -1004,7 +1005,7 @@ struct ReportData {
     status_3xx: u64,
     status_4xx: u64,
     status_5xx: u64,
-    top_issues: Vec<(String, String, String, i64)>,
+    top_issues: Vec<queries::TopIssueEntry>,
 }
 
 fn gather_report_data(conn: &rusqlite::Connection, crawl_id: &str) -> anyhow::Result<ReportData> {

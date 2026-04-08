@@ -599,13 +599,13 @@ pub async fn get_comparison_summary(
                     info: ci,
                 },
             ),
-            new_pages: counts.0,
-            removed_pages: counts.1,
-            changed_status_code: counts.2,
-            changed_title: counts.3,
-            changed_meta_desc: counts.4,
-            new_issues: counts.5,
-            resolved_issues: counts.6,
+            new_pages: counts.new_pages,
+            removed_pages: counts.removed_pages,
+            changed_status_code: counts.changed_status,
+            changed_title: counts.changed_title,
+            changed_meta_desc: counts.changed_meta,
+            new_issues: counts.new_issues,
+            resolved_issues: counts.resolved_issues,
         })
     })
     .map_err(|e| format!("{e:#}"))

@@ -1035,6 +1035,7 @@ fn get_memory_rss() -> Option<u64> {
             if kr == KERN_SUCCESS {
                 Some(info.resident_size)
             } else {
+                tracing::debug!(kern_return = kr, "task_info failed, memory RSS unavailable");
                 None
             }
         }
@@ -1043,21 +1044,28 @@ fn get_memory_rss() -> Option<u64> {
     #[cfg(target_os = "linux")]
     {
         // Parse VmRSS from /proc/self/status (value is in kB).
-        std::fs::read_to_string("/proc/self/status")
-            .ok()
-            .and_then(|s| {
-                for line in s.lines() {
-                    if let Some(rest) = line.strip_prefix("VmRSS:") {
-                        let kb: u64 = rest.trim().trim_end_matches(" kB").trim().parse().ok()?;
-                        return Some(kb * 1024);
-                    }
+        match std::fs::read_to_string("/proc/self/status") {
+            Ok(s) => {
+                let rss = s.lines().find_map(|line| {
+                    let rest = line.strip_prefix("VmRSS:")?;
+                    let kb: u64 = rest.trim().trim_end_matches(" kB").trim().parse().ok()?;
+                    Some(kb * 1024)
+                });
+                if rss.is_none() {
+                    tracing::debug!("VmRSS line not found in /proc/self/status");
                 }
+                rss
+            }
+            Err(e) => {
+                tracing::debug!(error = %e, "failed to read /proc/self/status, memory RSS unavailable");
                 None
-            })
+            }
+        }
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
+        tracing::debug!("memory RSS monitoring not supported on this platform");
         None
     }
 }

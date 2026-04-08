@@ -935,12 +935,21 @@ pub fn count_pages_by_status_group(
     Ok(row)
 }
 
+/// A top issue entry grouped by rule_id with its count.
+#[derive(Debug)]
+pub struct TopIssueEntry {
+    pub rule_id: String,
+    pub severity: String,
+    pub category: String,
+    pub count: i64,
+}
+
 /// Top issues grouped by rule_id, ordered by severity then count descending.
 pub fn select_top_issues_by_rule(
     conn: &Connection,
     crawl_id: &str,
     limit: u32,
-) -> Result<Vec<(String, String, String, i64)>> {
+) -> Result<Vec<TopIssueEntry>> {
     let sql = r#"
         SELECT rule_id, severity, category, COUNT(*) as cnt
         FROM issues
@@ -954,12 +963,12 @@ pub fn select_top_issues_by_rule(
     let mut stmt = conn.prepare(sql)?;
     let rows = stmt
         .query_map(params![crawl_id, limit], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
-            ))
+            Ok(TopIssueEntry {
+                rule_id: row.get(0)?,
+                severity: row.get(1)?,
+                category: row.get(2)?,
+                count: row.get(3)?,
+            })
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(rows)
@@ -1499,13 +1508,24 @@ pub fn delete_plugin(conn: &Connection, name: &str) -> Result<()> {
 
 use super::models::{IssueDiffRow, IssueDiffType, PageDiffRow, PageDiffType, PageTreeEntry};
 
+/// Aggregated counts of differences between two crawls.
+#[derive(Debug)]
+pub struct ComparisonCounts {
+    pub new_pages: u64,
+    pub removed_pages: u64,
+    pub changed_status: u64,
+    pub changed_title: u64,
+    pub changed_meta: u64,
+    pub new_issues: u64,
+    pub resolved_issues: u64,
+}
+
 /// Count all diff categories between two crawls.
-/// Returns (new_pages, removed_pages, changed_status, changed_title, changed_meta, new_issues, resolved_issues).
 pub fn count_comparison_summary(
     conn: &Connection,
     base_id: &str,
     compare_id: &str,
-) -> Result<(u64, u64, u64, u64, u64, u64, u64)> {
+) -> Result<ComparisonCounts> {
     let new_pages: i64 = conn.query_row(
         "SELECT COUNT(*) FROM pages WHERE crawl_id = ?1 AND url NOT IN (SELECT url FROM pages WHERE crawl_id = ?2)",
         params![compare_id, base_id],
@@ -1556,15 +1576,15 @@ pub fn count_comparison_summary(
         |row| row.get(0),
     )?;
 
-    Ok((
-        new_pages as u64,
-        removed_pages as u64,
-        changed_status as u64,
-        changed_title as u64,
-        changed_meta as u64,
-        new_issues as u64,
-        resolved_issues as u64,
-    ))
+    Ok(ComparisonCounts {
+        new_pages: new_pages as u64,
+        removed_pages: removed_pages as u64,
+        changed_status: changed_status as u64,
+        changed_title: changed_title as u64,
+        changed_meta: changed_meta as u64,
+        new_issues: new_issues as u64,
+        resolved_issues: resolved_issues as u64,
+    })
 }
 
 /// Count page diffs with optional filters.
