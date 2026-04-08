@@ -302,7 +302,10 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
             }
             let has_async = el.get_attribute("async").is_some();
             let has_defer = el.get_attribute("defer").is_some();
-            if !has_async && !has_defer {
+            let is_module = el
+                .get_attribute("type")
+                .is_some_and(|t| t.eq_ignore_ascii_case("module"));
+            if !has_async && !has_defer && !is_module {
                 *rb_scr.borrow_mut() += 1;
             }
             Ok(())
@@ -479,7 +482,10 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
             let attrs = el.value();
             let has_async = attrs.attr("async").is_some();
             let has_defer = attrs.attr("defer").is_some();
-            if !has_async && !has_defer {
+            let is_module = attrs
+                .attr("type")
+                .is_some_and(|t| t.eq_ignore_ascii_case("module"));
+            if !has_async && !has_defer && !is_module {
                 render_blocking_scripts += 1;
             }
             let src = attrs.attr("src")?;

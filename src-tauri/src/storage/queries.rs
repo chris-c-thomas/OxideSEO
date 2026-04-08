@@ -1655,6 +1655,15 @@ fn build_page_diff_sql(
 
     let url_like = url_search.map(|s| format!("%{}%", escape_like_pattern(s)));
 
+    // MetadataChanged is handled by the separate metadata diff endpoint, not here.
+    if matches!(diff_type, Some(PageDiffType::MetadataChanged)) {
+        let empty = "SELECT NULL AS url, NULL AS diff_type, NULL AS base_sc, NULL AS compare_sc, \
+             NULL AS base_title, NULL AS compare_title, NULL AS base_meta, NULL AS compare_meta \
+             WHERE 0"
+            .to_string();
+        return (empty, values);
+    }
+
     let include_new = diff_type.is_none() || matches!(diff_type, Some(PageDiffType::New));
     let include_removed = diff_type.is_none() || matches!(diff_type, Some(PageDiffType::Removed));
     let include_changed =

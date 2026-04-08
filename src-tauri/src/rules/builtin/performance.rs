@@ -238,14 +238,13 @@ impl SeoRule for RenderBlocking {
 
     fn configure(&mut self, params: &serde_json::Value) -> anyhow::Result<()> {
         if let Some(val) = params.get("max_blocking_scripts") {
-            self.max_blocking_scripts = val
-                .as_u64()
-                .ok_or_else(|| anyhow::anyhow!("max_blocking_scripts must be a positive integer"))?
-                as u32;
+            self.max_blocking_scripts = val.as_u64().ok_or_else(|| {
+                anyhow::anyhow!("max_blocking_scripts must be a non-negative integer")
+            })? as u32;
         }
         if let Some(val) = params.get("max_blocking_stylesheets") {
             self.max_blocking_stylesheets = val.as_u64().ok_or_else(|| {
-                anyhow::anyhow!("max_blocking_stylesheets must be a positive integer")
+                anyhow::anyhow!("max_blocking_stylesheets must be a non-negative integer")
             })? as u32;
         }
         Ok(())
