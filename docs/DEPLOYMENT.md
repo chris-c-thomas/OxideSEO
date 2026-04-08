@@ -96,11 +96,11 @@ The app registers `.seocrawl` files (MIME: `application/x-seocrawl`). Double-cli
 
 ## Code Signing (Not Yet Configured)
 
-Code signing is required for distribution on macOS (Gatekeeper) and recommended on Windows (SmartScreen). This is a pre-release task -- see `.claude/plans/release-tasks.md`. Until code signing is configured, users may see OS security warnings when installing.
+Code signing is required for distribution on macOS (Gatekeeper) and recommended on Windows (SmartScreen). This remains a pre-release task. Until code signing is configured, users may see OS security warnings when installing.
 
 ## Auto-Update (Planned)
 
-Auto-update via `tauri-plugin-updater` is planned but not yet implemented. See `.claude/plans/release-tasks.md` for status.
+Auto-update via `tauri-plugin-updater` is planned but not yet implemented.
 
 ## Bundle Identifier
 

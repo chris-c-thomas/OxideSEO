@@ -2,9 +2,6 @@
 
 Open-source, cross-platform desktop application for SEO site crawling and technical auditing. Built with Rust, Tauri v2, and React.
 
-<!-- TODO: Add screenshot here -->
-<!-- ![OxideSEO screenshot](docs/assets/screenshot.png) -->
-
 [![CI](https://github.com/chris-c-thomas/OxideSEO/actions/workflows/ci.yml/badge.svg)](https://github.com/chris-c-thomas/OxideSEO/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
