@@ -8,6 +8,9 @@ node_modules/
 dist/
 src-tauri/target/
 
+# Docs
+docs/_working
+
 # Lock files — keep both Cargo.lock and package-lock.json
 # (this is an application, not a library)
 

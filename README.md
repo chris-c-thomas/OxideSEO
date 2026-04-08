@@ -1,112 +1,175 @@
 # OxideSEO
 
-Open-source, cross-platform desktop application for SEO site crawling and technical auditing. Built with Tauri v2, Rust, and React.
+Open-source, cross-platform desktop application for SEO site crawling and technical auditing. Built with Rust, Tauri v2, and React.
+
+<!-- TODO: Add screenshot here -->
+<!-- ![OxideSEO screenshot](docs/assets/screenshot.png) -->
+
+[![CI](https://github.com/chris-c-thomas/OxideSEO/actions/workflows/ci.yml/badge.svg)](https://github.com/chris-c-thomas/OxideSEO/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+
+## Overview
+
+OxideSEO crawls websites and evaluates them against 21 built-in SEO rules covering meta tags, content quality, links, images, performance, and security. It runs entirely on your machine with no external service dependencies, no URL limits, and no data leaving your computer.
+
+The Rust backend handles HTTP fetching, HTML parsing, and rule evaluation across concurrent workers. A channel-based engine coordinates tokio (async I/O), rayon (CPU-bound parsing), and a dedicated SQLite writer thread for high-throughput crawling. The React frontend provides a virtualized data explorer that handles datasets of 100k+ rows at 60fps.
+
+Optional AI analysis integrates with OpenAI, Anthropic, or local Ollama models via user-provided API keys. A plugin system supports WASM (sandboxed) and native extensions for custom rules, export formats, and post-crawl processors.
 
 ## Features
 
-- **Zero cost, no limits** — No URL caps, no seat licenses, no feature gating
-- **Native performance** — Rust crawl engine with configurable resource allocation
-- **Modern UI** — React + Tailwind + shadcn/ui with virtualized tables (500k+ rows at 60fps)
-- **Comprehensive auditing** — 25+ built-in SEO rules across meta, content, links, images, performance, and security
-- **AI-augmented analysis** — Optional LLM integration via BYOK (user-provided API keys)
-- **Extensible** — Plugin architecture for custom rules, exporters, and integrations
+- Crawls websites with configurable concurrency, depth limits, and URL pattern filtering
+- Evaluates pages against 21 built-in SEO rules across 6 categories (meta, content, links, images, performance, security)
+- Cross-page analysis detects duplicate titles, orphan pages, and broken internal links
+- Respects robots.txt (RFC 9309) with per-domain rate limiting and crawl delay
+- Discovers and cross-references XML sitemaps
+- Checks external links via HEAD requests
+- Renders JavaScript-heavy pages via headless webview for SPA support
+- Exports to CSV, NDJSON, HTML report, PDF report, and Excel (XLSX)
+- Saves and opens portable `.seocrawl` project files
+- Compares two crawls with page-level, issue-level, and metadata diffs
+- Hierarchical site tree visualization
+- Real-time crawl monitoring with memory and throughput gauges
+- AI-powered content analysis, meta description generation, and structured data recommendations (BYOK: OpenAI, Anthropic, Ollama)
+- Plugin system with WASM sandboxing and native plugin support
+- Dark mode with system preference detection
+- Keyboard shortcuts for navigation and actions
+- Privacy-first: no telemetry, no analytics, no data leaves your machine
 
-## Prerequisites
+## Quickstart
 
-- [Rust](https://rustup.rs/) (latest stable, 1.85+)
-- [Node.js](https://nodejs.org/) (22 LTS)
-- Platform-specific dependencies for Tauri v2:
-  - **macOS**: Xcode Command Line Tools
-  - **Windows**: Visual Studio Build Tools, WebView2
-  - **Linux**: `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+```bash
+git clone https://github.com/chris-c-thomas/OxideSEO.git
+cd OxideSEO
+npm install
+npx tauri dev
+```
 
-## Quick Start
+The app window opens automatically with the dashboard view.
+
+## Requirements
+
+| Tool | Version | Notes |
+|---|---|---|
+| Rust | 1.85+ (stable) | Install via [rustup](https://rustup.rs/) |
+| Node.js | 22 LTS | Install via [nodejs.org](https://nodejs.org/) |
+| npm | Included with Node.js | |
+
+Platform-specific dependencies:
+
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`)
+- **Windows:** [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), WebView2
+- **Linux (Debian/Ubuntu):** `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+
+For other Linux distributions, see the [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/).
+
+## Installation
+
+### Pre-built Binaries
+
+Download the installer for your platform from [GitHub Releases](https://github.com/chris-c-thomas/OxideSEO/releases).
+
+| Platform | Formats |
+|---|---|
+| macOS | `.dmg` |
+| Windows | `.msi`, `.exe` |
+| Linux | `.deb`, `.AppImage` |
+
+### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/oxide-seo/oxide-seo.git
-cd oxide-seo
+git clone https://github.com/chris-c-thomas/OxideSEO.git
+cd OxideSEO
 
 # Install frontend dependencies
 npm install
 
-# Run in development mode (starts both Vite dev server and Rust backend)
-npx tauri dev
-
-# Build for production
+# Build for your current platform
 npx tauri build
 ```
 
-## Development Commands
+Installers are output to `src-tauri/target/release/bundle/`.
 
-| Command | Description |
-|---|---|
-| `npx tauri dev` | Start dev mode (frontend + Rust backend with hot reload) |
-| `npx tauri build` | Production build for current platform |
-| `npm run dev` | Frontend dev server only (no Rust backend) |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Run Prettier |
-| `npm run test` | Run frontend tests (Vitest) |
-| `npm run typecheck` | TypeScript type checking |
-| `cd src-tauri && cargo test` | Run Rust unit and integration tests |
-| `cd src-tauri && cargo clippy` | Rust lint |
-| `cd src-tauri && cargo fmt` | Rust format |
+## Usage
+
+1. **Start a crawl:** Click "New Crawl" from the dashboard, enter a URL, configure options, and click Start.
+2. **Monitor progress:** The crawl monitor shows real-time stats: URLs crawled, throughput, memory usage, and recent URLs.
+3. **Explore results:** After completion, browse results across tabs: Pages, Issues, Links, Images, Sitemap, External Links, Site Tree, and AI Insights.
+4. **Export data:** Open the export dialog to save results as CSV, NDJSON, HTML, PDF, or XLSX.
+5. **Compare crawls:** Select two completed crawls from the dashboard to view page-level, issue-level, and metadata diffs.
+
+For development workflows, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│  FRONTEND (React + TypeScript + Tailwind)           │
-│  Dashboard │ Crawl Config │ Monitor │ Results       │
-└──────────────────────┬──────────────────────────────┘
-                       │ Tauri IPC (serde JSON)
-┌──────────────────────┴──────────────────────────────┐
-│  RUST BACKEND (Tauri main process)                  │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Crawl Engine                                │    │
-│  │  Frontier → Fetcher → Parser → Rule Engine   │    │
-│  └─────────────────────────────────────────────┘    │
-│  ┌──────────────┐ ┌─────────────┐ ┌────────────┐   │
-│  │ Storage      │ │ SEO Rules   │ │ AI (BYOK)  │   │
-│  │ (SQLite)     │ │ (25+ rules) │ │ (Phase 7)  │   │
-│  └──────────────┘ └─────────────┘ └────────────┘   │
-└─────────────────────────────────────────────────────┘
-```
+OxideSEO runs as a single Tauri v2 process with a React frontend in a system webview and a Rust backend. The crawl engine uses a channel-based actor model: a tokio orchestrator dispatches URLs to async fetch workers, which hand off to a rayon parse and rules pool, which sends batched write commands to a dedicated SQLite writer thread. 47 Tauri IPC commands handle all frontend-backend communication. All data processing, sorting, filtering, and pagination happen server-side in Rust.
+
+For the full architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Project Structure
 
 ```
-oxide-seo/
-├── src-tauri/               # Rust backend
+OxideSEO/
+├── src/                         # React frontend (TypeScript)
+│   ├── components/              # UI components by feature domain
+│   ├── hooks/                   # Custom React hooks
+│   ├── lib/                     # IPC wrappers, validation, utilities
+│   ├── stores/                  # Zustand state management
+│   └── types/                   # TypeScript types matching Rust IPC
+├── src-tauri/                   # Rust backend
 │   ├── src/
-│   │   ├── commands/        # Tauri IPC handlers
-│   │   ├── crawler/         # Crawl engine (frontier, fetcher, parser)
-│   │   ├── rules/           # SEO rule engine + built-in rules
-│   │   ├── storage/         # SQLite database layer
-│   │   └── ai/              # LLM provider adapters (Phase 7)
-│   └── migrations/          # SQL migration files
-├── src/                     # React frontend
-│   ├── components/          # UI components by feature area
-│   ├── hooks/               # Custom React hooks
-│   ├── lib/                 # Tauri IPC wrappers, validation, utilities
-│   ├── stores/              # Zustand state management
-│   └── types/               # Shared TypeScript types
-└── tests/                   # Test setup and fixtures
+│   │   ├── commands/            # Tauri IPC handlers (47 commands)
+│   │   ├── crawler/             # Crawl engine (frontier, fetcher, parser)
+│   │   ├── rules/               # SEO rule engine + 21 built-in rules
+│   │   ├── storage/             # SQLite database layer
+│   │   ├── ai/                  # LLM provider adapters
+│   │   └── plugin/              # Plugin system (WASM + native)
+│   └── migrations/              # SQL migration files
+├── docs/                        # Project documentation
+│   ├── ARCHITECTURE.md          # System design and data flow
+│   ├── DEVELOPMENT.md           # Setup, workflows, troubleshooting
+│   ├── CONTRIBUTING.md          # Contribution process and code style
+│   ├── DEPLOYMENT.md            # Build, CI, and distribution
+│   └── adr/                     # Architecture Decision Records
+├── plugins/examples/            # Example plugins
+└── tests/                       # Frontend test setup and fixtures
 ```
 
-## Development Phases
+## Scripts
 
-| Phase | Description | Status |
-|---|---|---|
-| 1 | Project Foundation & Scaffolding | **Current** |
-| 2 | Core Crawl Engine | Planned |
-| 3 | SEO Rule Engine | Planned |
-| 4 | Frontend UI & Data Presentation (MVP) | Planned |
-| 5 | Export, Reporting & Crawl Management | Planned |
-| 6 | Advanced Crawl Features | Planned |
-| 7 | AI Integration (BYOK) | Planned |
-| 8 | Plugin Architecture | Planned |
+| Script | Purpose |
+|---|---|
+| `npx tauri dev` | Start dev mode (frontend + Rust backend with hot reload) |
+| `npx tauri build` | Production build for current platform |
+| `npm run dev` | Frontend dev server only (port 1420) |
+| `npm run build` | TypeScript check + Vite production bundle |
+| `npm run lint` | ESLint (zero-warning policy) |
+| `npm run format` | Prettier auto-format |
+| `npm run format:check` | Check Prettier formatting |
+| `npm run test` | Frontend tests (Vitest) |
+| `npm run test:watch` | Frontend tests in watch mode |
+| `npm run typecheck` | TypeScript type checking |
+| `cd src-tauri && cargo test` | Rust unit and integration tests |
+| `cd src-tauri && cargo clippy --all-targets -- -D warnings` | Rust lint |
+| `cd src-tauri && cargo fmt --all` | Rust auto-format |
+
+## Testing
+
+```bash
+# Frontend
+npm run test
+
+# Rust (from src-tauri/)
+cd src-tauri && cargo test
+```
+
+For testing details, writing tests, and CI configuration, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#testing).
+
+## Contributing
+
+Contributions are welcome. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the contribution process, code style guidelines, and PR requirements.
 
 ## License
 
-Dual licensed under MIT and Apache 2.0. See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE).
+Dual licensed under [MIT](LICENSE-MIT) and [Apache 2.0](LICENSE-APACHE). Choose whichever you prefer.
