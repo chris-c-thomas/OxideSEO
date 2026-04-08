@@ -40,7 +40,7 @@ npx tauri icon app-icon.png
 
 ## Current State
 
-The project has been scaffolded with **all module stubs, types, traits, and IPC contracts in place**. Phase 1 scaffolding is largely complete. The codebase compiles structurally but many implementations are stubbed with `TODO` comments indicating which phase they belong to.
+**All 8 phases and 52 deliverables are complete.** The application is feature-complete per the development plan (`.claude/plans/seo-crawler-development-plan.pdf`). Deferred features D-1 through D-7 and D-9 are also implemented. Only D-8 (crawl scheduling) was intentionally skipped — it requires OS-native scheduling and headless CLI mode with poor effort-to-value ratio. See `.claude/plans/release-tasks.md` for remaining pre-release operational tasks (E2E tests, code signing, auto-update, crash reporting).
 
 ### What Exists and Works
 
@@ -69,95 +69,18 @@ The project has been scaffolded with **all module stubs, types, traits, and IPC 
 - husky + lint-staged configured for pre-commit hooks (eslint + prettier on staged `.ts`/`.tsx` files)
 - GitHub Actions CI for cross-platform builds
 
-### What Needs Implementation (by Phase)
+### Deferred Features (post-plan)
 
-**Phase 1 — Remaining (finish first):**
-- ~~Verify `cargo tauri dev` compiles and opens the webview window end-to-end~~ ✅
-- ~~Resolve any dependency version conflicts in `Cargo.toml`~~ ✅
-- ~~Install shadcn/ui components (run `npx shadcn@latest init` and add needed primitives)~~ ✅
-- ~~Verify the SQLite database file is created in the Tauri app data directory on launch~~ ✅
-- ~~Add husky + lint-staged for pre-commit hooks~~ ✅
-- ~~Ensure CI workflow runs successfully~~ ✅
-
-**Phase 2 — Core Crawl Engine:** ~~All work units implemented~~ ✅
-- Full crawl pipeline: parser (lol_html + scraper), streaming fetcher with blake3, texting_robots, batched storage writer, frontier SQLite overflow, engine orchestrator with rayon parse dispatch, Tauri command wiring
-- 6 integration tests (axum test server) + 21 new unit tests
-
-**Phase 3 — SEO Rule Engine:** ~~All work units implemented~~ ✅
-- Performance rules (`perf.large_page`, `perf.slow_response`) with configurable thresholds via `ParsedPage` fetch metadata
-- `PostCrawlAnalyzer` with 5 cross-page rules: `meta.title_duplicate`, `meta.desc_duplicate`, `content.h1_duplicate`, `links.broken_internal`, `links.orphan_page`
-- `FlushAck` storage command for synchronizing post-crawl analysis after all writes
-- 8 post-crawl unit tests + 8 performance rule tests + 1 integration test (7 total integration tests)
-
-**Phase 4 — Frontend UI (MVP gate):** ~~All work units implemented~~ ✅
-- `DataTable` component using TanStack Table v8 + TanStack Virtual v3 with infinite scroll
-- All 6 result commands implemented (`get_recent_crawls`, `get_crawl_results`, `get_crawl_summary`, `get_page_detail`, `get_issues`, `get_links`) with pagination, sorting, and filtering
-- Column definitions for all 4 tabs (pages, issues, links, images) with color-coded badges and formatted values
-- Filter toolbars per tab (URL search, status codes, content type, severity, category, link type, scope, broken status, missing alt text)
-- Page Detail slide-out sheet with SEO metadata, performance stats, issues, and link tables
-- Summary bar with issue counts, Dashboard with severity indicators
-- Images tab reuses `getLinks` with `linkType: "img"` filter; `anchorText` = alt text
-
-**Phase 5 — Export, Reporting & Crawl Management:** ~~All work units implemented~~ ✅
-- CSV export with streaming `for_each_*` callbacks and column selection
-- NDJSON (line-delimited JSON) export
-- HTML report generation with summary stats, status code distribution, top issues
-- Settings persistence (`get_settings`/`set_settings` backed by SQLite `settings` table)
-- `.seocrawl` file save/open via `ATTACH DATABASE` for data transfer between SQLite files
-- Export dialog frontend component with format/data type/column selection
-- Dashboard "Open File" and per-crawl "Save" buttons
-- See `.claude/plans/seo-crawler-development-plan.pdf` for Phases 6-8 roadmap
-
-**Phase 6 — Advanced Crawl Features:** ~~All work units implemented~~ ✅
-- See `.claude/plans/phase-6.md` for full plan (13 work units across 7 batches)
-- ~~WU-1: Schema migration 002_advanced_crawl.sql~~ ✅ (sitemap_urls, external_links tables; is_js_rendered, custom_extractions columns on pages)
-- ~~WU-2: CrawlConfig expanded with 10 new fields~~ ✅ (JS rendering, sitemap, external links, cookies, rewrite rules, CSS selectors)
-- ~~WU-3: Custom headers key-value editor UI~~ ✅
-- ~~WU-4: Cookie-based authenticated crawling~~ ✅ (reqwest cookie jar pre-seeded from config)
-- ~~WU-5: URL rewrite rules + include/exclude pattern evaluation~~ ✅ (regex crate, CompiledPatterns in engine.rs)
-- ~~WU-6: Sitemap auto-discovery and parsing~~ ✅ (quick-xml + flate2, crawler/sitemap.rs)
-- ~~WU-7: Sitemap vs. crawl cross-reference rules~~ ✅ (sitemap.url_not_crawled, sitemap.page_not_in_sitemap)
-- ~~WU-8: External link checking~~ ✅ (crawler/external_checker.rs, HEAD-only, dedup, per-domain rate limiting)
-- ~~WU-9: JavaScript rendering pipeline~~ ✅ (experimental — hidden Tauri webviews, `__TAURI_INTERNALS__` fallback)
-- ~~WU-10: Custom CSS extraction~~ ✅ (parser::extract_custom_css via scraper, stored as JSON blob)
-- ~~WU-11: Frontend advanced config form sections~~ ✅ (7 collapsible AdvancedSection components in CrawlConfig)
-- ~~WU-12: Frontend sitemap & external links tabs~~ ✅ (SitemapTab, ExternalLinksTab in ResultsExplorer)
-- ~~WU-13: Tests~~ ✅ (4 integration tests: sitemap discovery, include/exclude patterns, URL rewrite rules)
-
-**Phase 7 — AI Integration (BYOK):** ~~All work units implemented~~ ✅
-- See `.claude/plans/ticklish-waddling-spindle.md` for full plan (14 work units across 8 batches)
-- ~~WU-1: Schema migration 003_ai_analysis.sql~~ ✅ (ai_analyses, ai_usage, ai_crawl_summaries tables; body_text column on pages)
-- ~~WU-2: Provider adapters (OpenAI, Anthropic, Ollama)~~ ✅ (LlmProvider trait implementations, AiProviderType/AiProviderConfig, create_provider factory)
-- ~~WU-3: API key storage layer~~ ✅ (keyring crate, OS-native credential storage)
-- ~~WU-4: AI Tauri commands~~ ✅ (12 IPC commands: config, key management, analysis, batch, summary, usage)
-- ~~WU-5: Prompt templates + analysis engine~~ ✅ (content_quality, meta_desc, title_tag, crawl_summary prompts; AiAnalysisEngine with caching, rate limiting, budget enforcement)
-- ~~WU-6: Storage layer for AI data~~ ✅ (AiAnalysisRow, AiUsageRow, AiCrawlSummaryRow; insert/select/upsert queries)
-- ~~WU-7: Capture body text during crawl~~ ✅ (body_text on ParsedPage/PageRow, first 8000 chars of visible text)
-- ~~WU-8: TypeScript types and command wrappers~~ ✅ (AI types in types/index.ts, 12 command wrappers)
-- ~~WU-9: AI provider settings UI~~ ✅ (provider selector, API key management, model/endpoint/budget config, test connection)
-- ~~WU-10: AI analysis in Page Detail~~ ✅ (content score, meta desc, title suggestions with copy-to-clipboard)
-- ~~WU-11: AI Insights tab~~ ✅ (crawl summary, batch analysis controls with progress bar, cost tracking dashboard)
-- ~~WU-12: AI progress events~~ ✅ (ai://progress Tauri events, useAiProgress hook)
-
-**Phase 8 — Plugin Architecture:** ~~All work units implemented~~ ✅
-- See `.claude/plans/phase-8.md` for full plan (19 work units across 8 batches)
-- ~~WU-0: Remove stale Phase-3 TODO comments~~ ✅
-- ~~WU-1: Plugin module structure and manifest types~~ ✅ (plugin/mod.rs, manifest.rs, error.rs; PluginManifest, PluginKind, Capability)
-- ~~WU-2: Plugin manager (discovery and lifecycle)~~ ✅ (plugin/manager.rs; discovery, enable/disable, install/uninstall with DB persistence)
-- ~~WU-3: Schema migration 004_plugins.sql~~ ✅ (plugins table with name, version, kind, enabled, config_json)
-- ~~WU-4: WIT interface definitions and wasmtime host~~ ✅ (wit/oxide-seo-plugin.wit; plugin/wasm_host.rs with wasmtime engine, fuel metering)
-- ~~WU-5: WASM rule adapter~~ ✅ (plugin/wasm_rule.rs; WasmRuleAdapter implements SeoRule, ephemeral Store per evaluate)
-- ~~WU-6: Native plugin loading~~ ✅ (plugin/native_host.rs; libloading with C-ABI constructor, trust flag)
-- ~~WU-7: Plugin rule registration in crawl engine~~ ✅ (plugin rules loaded after builtins in spawn_crawl)
-- ~~WU-8: Plugin exporter integration~~ ✅ (ExportFormat::Plugin variant, plugin/exporter.rs trait)
-- ~~WU-9: Plugin post-processor support~~ ✅ (plugin/post_processor.rs; SQL validation for WASM, &Database for native)
-- ~~WU-10: Plugin Tauri commands~~ ✅ (7 commands: list/enable/disable/detail/reload/install/uninstall)
-- ~~WU-11: TypeScript types and command wrappers~~ ✅ (PluginInfo, PluginDetail, PluginKind types; 7 command wrappers)
-- ~~WU-12: Plugin manager UI~~ ✅ (PluginManagerView with card grid, enable/disable toggles, detail sheet, install/uninstall)
-- ~~WU-13: UI extension slots~~ ✅ (PluginSlot, usePluginExtensions hook; results-tab slot stub)
-- ~~WU-14: Example WASM plugin~~ ✅ (plugins/examples/schema-validator/ — JSON-LD validator)
-- ~~WU-15: Example native exporter~~ ✅ (plugins/examples/markdown-exporter/ — Markdown report)
-- ~~WU-16/17/18: Docs, stability, tests~~ ✅ (docs/plugin-*.md; PluginManagerView.test.tsx with 9 tests)
+Beyond the 52 plan deliverables, these features were added:
+- **D-1: Crawl deletion** — Delete crawl + cascade pages/issues/links
+- **D-2: Crawl re-run** — Clone config from a completed crawl into a new crawl
+- **D-3: Keyboard shortcuts** — Global hotkeys for navigation and actions
+- **D-4: ResourceMeter** — Real-time memory RSS gauge + throughput stats in CrawlMonitor (raw FFI on macOS, `/proc/self/status` on Linux)
+- **D-5: PDF export** — A4 summary report via `printpdf` crate
+- **D-6: XLSX export** — Multi-sheet Excel with severity color-coding via `rust_xlsxwriter` crate
+- **D-7: SiteTreeView** — Collapsible hierarchical URL tree in results explorer
+- **D-9: Crawl comparison** — Cross-crawl diff with overview, page/issue/metadata diff tabs, Dashboard compare mode
+- **D-8: Crawl scheduling** — NOT implemented (requires OS-native cron/Task Scheduler + headless mode)
 
 ## Architecture Invariants
 
@@ -194,6 +117,10 @@ These types cross the IPC boundary. Changes must be synchronized between Rust an
 | `PaginatedResponse<T>` | `PaginatedResponse<T>` | `commands/results.rs` ↔ `types/index.ts` |
 | `PluginInfo` | `PluginInfo` | `plugin/manager.rs` ↔ `types/index.ts` |
 | `PluginDetail` | `PluginDetail` | `plugin/manager.rs` ↔ `types/index.ts` |
+| `CrawlComparisonSummary` | `CrawlComparisonSummary` | `commands/results.rs` ↔ `types/index.ts` |
+| `PageDiffRow` | `PageDiffRow` | `commands/results.rs` ↔ `types/index.ts` |
+| `IssueDiffRow` | `IssueDiffRow` | `commands/results.rs` ↔ `types/index.ts` |
+| `SiteTreeNode` | `SiteTreeNode` | `commands/results.rs` ↔ `types/index.ts` |
 
 All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use camelCase natively. These must match exactly.
 
@@ -206,8 +133,8 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `main.rs` | Tauri entry point, logging init, command registration | Complete |
 | `lib.rs` | Module declarations, shared enums | Complete |
 | `commands/crawl.rs` | Crawl lifecycle IPC handlers | Complete |
-| `commands/results.rs` | Data query IPC handlers | Complete (all 6 commands with pagination, sorting, filtering) |
-| `commands/settings.rs` | Settings IPC handlers | Signatures complete, bodies stubbed |
+| `commands/results.rs` | Data query IPC handlers + comparison commands | Complete (10+ commands: results, summary, page detail, site tree, comparison) |
+| `commands/settings.rs` | Settings IPC handlers | Complete |
 | `crawler/mod.rs` | Crawler types: FetchResult, ParsedPage, ExtractedLink | Complete |
 | `crawler/engine.rs` | Crawl orchestrator | Complete |
 | `crawler/frontier.rs` | URL priority queue + dedup + SQLite overflow | Complete with tests |
@@ -277,6 +204,26 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `commands/plugin.rs` | 7 Tauri IPC commands for plugin management | Complete |
 | `wit/oxide-seo-plugin.wit` | WIT interface definitions for WASM plugins | Complete |
 | `migrations/004_plugins.sql` | plugins table | Complete |
+
+### Deferred Feature Files
+
+| File | Purpose | Status |
+|---|---|---|
+| `migrations/005_crawl_comparison.sql` | Index on pages(crawl_id, url) for cross-crawl joins | Complete |
+
+### Frontend — Deferred Features
+
+| File | Purpose | Status |
+|---|---|---|
+| `components/crawl/ResourceMeter.tsx` | Memory RSS gauge + throughput stats | Complete |
+| `components/results/SiteTreeTab.tsx` | Collapsible URL tree visualization | Complete |
+| `components/comparison/CrawlComparison.tsx` | Comparison container with tabs | Complete |
+| `components/comparison/ComparisonOverview.tsx` | Side-by-side summary + delta cards | Complete |
+| `components/comparison/PageDiffTab.tsx` | Paginated page diff table | Complete |
+| `components/comparison/IssueDiffTab.tsx` | Paginated issue diff table | Complete |
+| `components/comparison/MetadataDiffTab.tsx` | Metadata diff table | Complete |
+| `components/comparison/columns/pageDiffColumns.tsx` | Page diff column definitions | Complete |
+| `components/comparison/columns/issueDiffColumns.tsx` | Issue diff column definitions | Complete |
 
 ### Frontend (`src/`)
 
@@ -397,6 +344,8 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **libloading v0.8** — Dynamic library loading for native plugins. Loads `.dylib`/`.so`/`.dll` via C-ABI constructor.
 - **toml v0.8** — TOML parser for plugin manifests (`plugin.toml`).
 - **semver v1** — Semver parsing and version requirement matching for plugin compatibility checks.
+- **printpdf v0.7** — PDF generation with built-in fonts. Used for PDF report export in `commands/export.rs`.
+- **rust_xlsxwriter v0.82** — Excel XLSX writer with multi-sheet support and cell formatting. Used for XLSX export in `commands/export.rs`.
 
 ## Gotchas
 
@@ -420,3 +369,4 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **`spawn_crawl` signature change (Phase 8)** — Added `plugin_manager: Option<Arc<tokio::sync::Mutex<PluginManager>>>` as the 6th parameter. Integration tests pass `None`. Tauri commands pass `Some(pm.inner().clone())`.
 - **Plugin directory must exist** — `{app_data_dir}/plugins/` is created in `main.rs` setup. Plugin discovery silently skips if the directory doesn't exist.
 - **Native plugin ABI stability** — Native plugins use Rust `dyn` trait objects. Vtable layout is not stable across Rust compiler versions. Native plugins must be compiled with the same toolchain as the host.
+- **Memory RSS uses raw FFI, not `mach2` crate** — `get_memory_rss()` in `crawler/engine.rs` uses manually defined `MachTaskBasicInfo` struct + `task_info()` extern on macOS, and reads `/proc/self/status` on Linux. The `mach2` crate was intentionally avoided because its type definitions didn't match what was needed. Do not refactor to use `mach2` without verifying the struct layout.
