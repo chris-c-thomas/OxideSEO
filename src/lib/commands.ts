@@ -35,6 +35,12 @@ import type {
   ExternalLinkRow,
   SitemapReportEntry,
   SiteTreeNode,
+  CrawlComparisonSummary,
+  PageDiffRow,
+  PageDiffFilters,
+  IssueDiffRow,
+  IssueDiffFilters,
+  MetadataDiffFilters,
   PluginInfo,
   PluginDetail,
 } from "@/types";
@@ -134,6 +140,66 @@ export function getExternalLinks(
 /** Fetch hierarchical site tree for a crawl. */
 export function getSiteTree(crawlId: string): Promise<SiteTreeNode[]> {
   return invoke<SiteTreeNode[]>("get_site_tree", { crawlId });
+}
+
+// ---------------------------------------------------------------------------
+// Crawl comparison
+// ---------------------------------------------------------------------------
+
+/** Fetch comparison summary between two crawls. */
+export function getComparisonSummary(
+  baseCrawlId: string,
+  compareCrawlId: string,
+): Promise<CrawlComparisonSummary> {
+  return invoke<CrawlComparisonSummary>("get_comparison_summary", {
+    baseCrawlId,
+    compareCrawlId,
+  });
+}
+
+/** Fetch paginated page diffs between two crawls. */
+export function getPageDiffs(
+  baseCrawlId: string,
+  compareCrawlId: string,
+  pagination: PaginationParams,
+  filters?: PageDiffFilters,
+): Promise<PaginatedResponse<PageDiffRow>> {
+  return invoke<PaginatedResponse<PageDiffRow>>("get_page_diffs", {
+    baseCrawlId,
+    compareCrawlId,
+    pagination,
+    filters: filters ?? null,
+  });
+}
+
+/** Fetch paginated issue diffs between two crawls. */
+export function getIssueDiffs(
+  baseCrawlId: string,
+  compareCrawlId: string,
+  pagination: PaginationParams,
+  filters?: IssueDiffFilters,
+): Promise<PaginatedResponse<IssueDiffRow>> {
+  return invoke<PaginatedResponse<IssueDiffRow>>("get_issue_diffs", {
+    baseCrawlId,
+    compareCrawlId,
+    pagination,
+    filters: filters ?? null,
+  });
+}
+
+/** Fetch paginated metadata diffs between two crawls. */
+export function getMetadataDiffs(
+  baseCrawlId: string,
+  compareCrawlId: string,
+  pagination: PaginationParams,
+  filters?: MetadataDiffFilters,
+): Promise<PaginatedResponse<PageDiffRow>> {
+  return invoke<PaginatedResponse<PageDiffRow>>("get_metadata_diffs", {
+    baseCrawlId,
+    compareCrawlId,
+    pagination,
+    filters: filters ?? null,
+  });
 }
 
 /** Fetch paginated links for a crawl. */

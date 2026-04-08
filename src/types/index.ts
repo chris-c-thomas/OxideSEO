@@ -172,6 +172,58 @@ export interface SiteTreeNode {
   children: SiteTreeNode[];
 }
 
+// ---------------------------------------------------------------------------
+// Crawl comparison
+// ---------------------------------------------------------------------------
+
+export type PageDiffType = "new" | "removed" | "status_code_changed";
+export type IssueDiffType = "new" | "resolved";
+
+export interface CrawlComparisonSummary {
+  baseCrawl: CrawlSummary;
+  compareCrawl: CrawlSummary;
+  newPages: number;
+  removedPages: number;
+  changedStatusCode: number;
+  changedTitle: number;
+  changedMetaDesc: number;
+  newIssues: number;
+  resolvedIssues: number;
+}
+
+export interface PageDiffRow {
+  url: string;
+  diffType: PageDiffType;
+  baseStatusCode: number | null;
+  compareStatusCode: number | null;
+  baseTitle: string | null;
+  compareTitle: string | null;
+  baseMetaDesc: string | null;
+  compareMetaDesc: string | null;
+}
+
+export interface IssueDiffRow {
+  url: string;
+  ruleId: string;
+  severity: Severity;
+  category: RuleCategory;
+  message: string;
+  diffType: IssueDiffType;
+}
+
+export interface PageDiffFilters {
+  diffType: PageDiffType | null;
+  urlSearch: string | null;
+}
+
+export interface IssueDiffFilters {
+  diffType: IssueDiffType | null;
+}
+
+export interface MetadataDiffFilters {
+  urlSearch: string | null;
+}
+
 export type Severity = "error" | "warning" | "info";
 
 export type RuleCategory =

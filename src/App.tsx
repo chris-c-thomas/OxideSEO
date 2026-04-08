@@ -7,6 +7,7 @@ import { CrawlMonitor } from "@/components/crawl/CrawlMonitor";
 import { ResultsExplorer } from "@/components/results/ResultsExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { PluginManagerView } from "@/components/plugins/PluginManagerView";
+import { CrawlComparison } from "@/components/comparison/CrawlComparison";
 
 /** Application views mapped to sidebar navigation items. */
 export type AppView =
@@ -15,18 +16,23 @@ export type AppView =
   | "crawl-monitor"
   | "results"
   | "plugins"
-  | "settings";
+  | "settings"
+  | "crawl-comparison";
 
 export function App() {
   const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [activeCrawlId, setActiveCrawlId] = useState<string | null>(null);
+  const [compareCrawlId, setCompareCrawlId] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
 
-  /** Navigate to a view. Optionally set the active crawl context. */
-  const navigate = (view: AppView, crawlId?: string) => {
+  /** Navigate to a view. Optionally set crawl context (1 or 2 IDs for comparison). */
+  const navigate = (view: AppView, crawlId?: string, secondCrawlId?: string) => {
     setActiveView(view);
     if (crawlId !== undefined) {
       setActiveCrawlId(crawlId);
+    }
+    if (secondCrawlId !== undefined) {
+      setCompareCrawlId(secondCrawlId);
     }
   };
 
@@ -56,6 +62,10 @@ export function App() {
         return <PluginManagerView />;
       case "settings":
         return <SettingsView />;
+      case "crawl-comparison":
+        return (
+          <CrawlComparison baseCrawlId={activeCrawlId} compareCrawlId={compareCrawlId} />
+        );
       default:
         return <Dashboard onNavigate={navigate} />;
     }
