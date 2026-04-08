@@ -88,28 +88,19 @@ Push / PR to main
 
 ## Distribution
 
-Pre-built binaries are available from:
-- [GitHub Releases](https://github.com/chris-c-thomas/OxideSEO/releases) -- all platforms
-- Project website -- download links for each platform
+Pre-built binaries will be available from [GitHub Releases](https://github.com/chris-c-thomas/OxideSEO/releases) once the first release is published. Until then, build from source (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 
 ### File Association
 
 The app registers `.seocrawl` files (MIME: `application/x-seocrawl`). Double-clicking a `.seocrawl` file opens it in OxideSEO. These files are portable SQLite databases containing a complete crawl.
 
-## Code Signing
+## Code Signing (Not Yet Configured)
 
-Code signing is required for distribution on macOS (Gatekeeper) and recommended on Windows (SmartScreen). The signing key is stored as a CI secret and applied during the build job.
+Code signing is required for distribution on macOS (Gatekeeper) and recommended on Windows (SmartScreen). This is a pre-release task -- see `.claude/plans/release-tasks.md`. Until code signing is configured, users may see OS security warnings when installing.
 
-The public key for update verification is configured in `src-tauri/tauri.conf.json`. The private signing key must never be committed to the repository.
+## Auto-Update (Planned)
 
-## Auto-Update
-
-OxideSEO uses `tauri-plugin-updater` for self-updating. When a new version is available:
-
-1. The app checks the update endpoint on launch
-2. If an update is found, the user is notified
-3. The update downloads and applies in the background
-4. The user restarts the app to complete the update
+Auto-update via `tauri-plugin-updater` is planned but not yet implemented. See `.claude/plans/release-tasks.md` for status.
 
 ## Bundle Identifier
 
@@ -122,7 +113,7 @@ OxideSEO follows [Semantic Versioning](https://semver.org/). The version is decl
 - `src-tauri/Cargo.toml` (`version` field)
 - `package.json` (`version` field)
 
-All three must stay in sync. The changelog is generated from conventional commits via [git-cliff](https://git-cliff.org/).
+All three must stay in sync. The changelog is generated from conventional commits via [git-cliff](https://git-cliff.org/) by maintainers during the release process.
 
 ## System Diagnostics
 

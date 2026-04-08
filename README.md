@@ -103,7 +103,7 @@ For development workflows, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Architecture
 
-OxideSEO runs as a single Tauri v2 process with a React frontend in a system webview and a Rust backend. The crawl engine uses a channel-based actor model: a tokio orchestrator dispatches URLs to async fetch workers, which hand off to a rayon parse and rules pool, which sends batched write commands to a dedicated SQLite writer thread. 47 Tauri IPC commands handle all frontend-backend communication. All data processing, sorting, filtering, and pagination happen server-side in Rust.
+OxideSEO runs as a single Tauri v2 process with a React frontend in a system webview and a Rust backend. The crawl engine uses a channel-based actor model: a tokio orchestrator dispatches URLs to async fetch workers, which hand off to a rayon parse and rules pool, which sends batched write commands to a dedicated SQLite writer thread. 46 Tauri IPC commands handle all frontend-backend communication. All data processing, sorting, filtering, and pagination happen server-side in Rust.
 
 For the full architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -119,7 +119,7 @@ OxideSEO/
 │   └── types/                   # TypeScript types matching Rust IPC
 ├── src-tauri/                   # Rust backend
 │   ├── src/
-│   │   ├── commands/            # Tauri IPC handlers (47 commands)
+│   │   ├── commands/            # Tauri IPC handlers (46 commands)
 │   │   ├── crawler/             # Crawl engine (frontier, fetcher, parser)
 │   │   ├── rules/               # SEO rule engine + 21 built-in rules
 │   │   ├── storage/             # SQLite database layer

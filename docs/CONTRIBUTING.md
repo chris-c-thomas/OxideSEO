@@ -50,7 +50,7 @@ refactor(storage): extract query builder for paginated results
 test(frontier): add property-based tests for dedup consistency
 ```
 
-The changelog is generated from these messages via [git-cliff](https://git-cliff.org/).
+The changelog is generated from these messages via [git-cliff](https://git-cliff.org/). Maintainers generate the changelog; contributors do not need git-cliff installed.
 
 ## Pull Request Process
 
@@ -85,8 +85,8 @@ Every PR must pass before merge:
 | Check | Command | Runs On |
 |---|---|---|
 | Rust format | `cargo fmt --all -- --check` | Ubuntu, macOS, Windows |
-| Rust lint | `cargo clippy --all-targets -- -D warnings` | Ubuntu, macOS, Windows |
-| Rust tests | `cargo test --lib` | Ubuntu, macOS, Windows |
+| Rust lint | `cargo clippy --all-targets --all-features -- -D warnings` | Ubuntu, macOS, Windows |
+| Rust tests | `cargo test --lib --all-features` | Ubuntu, macOS, Windows |
 | Frontend lint | `npm run lint` | Ubuntu |
 | Frontend format | `npm run format:check` | Ubuntu |
 | Frontend typecheck | `npm run typecheck` | Ubuntu |
@@ -109,7 +109,6 @@ Every PR must pass before merge:
 - No `any` type. Use `unknown` and narrow with type guards.
 - Use function declarations for components: `export function MyComponent()`, not arrow assignments
 - Use `cn()` from `lib/utils.ts` for conditional Tailwind class merging
-- Use path aliases (`@/components/...`) for imports
 
 ### IPC Types
 

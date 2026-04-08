@@ -164,41 +164,13 @@ Path aliases configured:
 
 ## Common Workflows
 
-### Adding a New SEO Rule
+Step-by-step instructions for common development tasks are maintained in [`CLAUDE.md`](../CLAUDE.md#common-tasks) (the authoritative source). This includes:
 
-1. Create a struct in the appropriate `src-tauri/src/rules/builtin/` file
-2. Implement the `SeoRule` trait (`id`, `name`, `category`, `default_severity`, `evaluate`)
-3. Register it in `RuleRegistry::register_builtins()` in `rules/engine.rs`
-4. Write unit tests with HTML fixture `ParsedPage` structs
-5. If configurable, implement `config_schema()` and `configure()`
-
-### Adding a New Tauri Command
-
-1. Define the command function with `#[tauri::command]` in the appropriate `src-tauri/src/commands/` file
-2. Add the command to the `invoke_handler![]` macro in `main.rs`
-3. Add a typed wrapper function in `src/lib/commands.ts`
-4. Add request/response types to both `src-tauri/src/` (Rust) and `src/types/index.ts` (TypeScript)
-
-### Adding a New Frontend View
-
-1. Create the component in the appropriate `src/components/` subdirectory
-2. Add the view ID to the `AppView` type in `App.tsx`
-3. Add a route case in `App.tsx`'s `renderView()` switch
-4. Add a nav item in `Sidebar.tsx`'s `NAV_ITEMS` array
-
-### Adding a New SQLite Migration
-
-1. Create `src-tauri/migrations/NNN_description.sql`
-2. Add the entry to the `MIGRATIONS` array in `storage/db.rs`
-3. Use `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`
-4. Migrations run automatically on app start
-
-### Adding a New Export Format
-
-1. Add a variant to `ExportFormat` enum in `commands/settings.rs`
-2. Add a match arm in `export_data()` in `commands/export.rs`
-3. Implement the export function following the CSV/NDJSON pattern: dialog -> stream -> write
-4. Use `for_each_page`/`for_each_issue`/`for_each_link` from `queries.rs` for streaming
+- Adding a new SEO rule
+- Adding a new Tauri command
+- Adding a new frontend view
+- Adding a new SQLite migration
+- Adding a new export format
 
 ### Generating App Icons
 
@@ -231,7 +203,7 @@ version = "0.1.0"
 description = "What this plugin does"
 author = "Your Name"
 license = "MIT"
-min_app_version = ">=0.4.0"
+min_app_version = ">=0.3.0"
 kind = "rule"                    # rule | exporter | post_processor | ui_extension
 capabilities = ["log"]           # log | http_read | db_read | fs_read_plugin_dir
 

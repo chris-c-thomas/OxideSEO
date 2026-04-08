@@ -18,7 +18,7 @@ graph TD
     subgraph "OxideSEO Process"
         WV[System Webview<br/>React Frontend]
         IPC[Tauri IPC Bridge<br/>serde JSON]
-        CMD[Command Handlers<br/>47 commands]
+        CMD[Command Handlers<br/>46 commands]
 
         subgraph "Crawl Engine"
             ORCH[Orchestrator<br/>tokio task]
@@ -224,13 +224,13 @@ The Tauri IPC layer separates the React frontend from the Rust backend. This is 
 
 ### Commands (Frontend -> Backend)
 
-47 async Tauri commands organized into groups:
+46 async Tauri commands organized into groups:
 
 | Group | Count | Examples |
 |---|---|---|
 | Crawl lifecycle | 5 | `start_crawl`, `pause_crawl`, `resume_crawl`, `stop_crawl`, `get_crawl_status` |
 | Result queries | 9 | `get_crawl_results`, `get_issues`, `get_links`, `get_site_tree` |
-| Comparison | 4 | `get_comparison_summary`, `get_page_diffs`, `get_issue_diffs` |
+| Comparison | 4 | `get_comparison_summary`, `get_page_diffs`, `get_issue_diffs`, `get_metadata_diffs` |
 | Settings | 4 | `get_settings`, `set_settings`, `get_rule_config`, `set_rule_config` |
 | Export | 3 | `export_data`, `save_crawl_file`, `open_crawl_file` |
 | AI | 14 | `analyze_page`, `batch_analyze_pages`, `generate_crawl_summary` |
