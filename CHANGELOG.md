@@ -5,10 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2026-04-06
+## [0.4.0] - 2026-04-08
 
 ### Bug Fixes
 
+- GitHub Copilot PR Review issues
+- **results:** Address PR review issues in comparison queries, types, and error handling
+- **deps:** Update vite to 6.4.2 and vitest to 3.2.4 to resolve esbuild vulnerability
+- **plugin:** Address PR review feedback on persistence, ordering, a11y, and log spam
+- **plugin:** Fix async deadlock, path traversal, SQL validation, and type safety issues
+- **ai:** Fix false-positive connection test, error handling, and input validation
+- Vitest issues
 - **ai:** Improve error handling, safety, and code quality from PR review
 - **crawler:** Address Copilot PR review feedback across 6 issues
 - **crawler:** Harden error handling across Phase 6 crawl features
@@ -16,12 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **export:** Improve type safety, error handling, and UI correctness
 - **export:** Harden ATTACH DATABASE lifecycle and error handling
 - **storage,rules,frontend:** Address PR review issues 5-16
-- **crawler,storage:** Handle channel send errors and flush failures in crawl pipeline
-- **storage,rules:** Propagate row deserialization errors and fix UTF-8 truncation panic
-- Formatting
+
+### Documentation
+
+- Update CHANGELOG.md for v0.4.0
 
 ### Features
 
+- **results:** Add crawl comparison / diff view
+- **results:** Add site tree visualization tab (D-7)
+- **export:** Add PDF report and Excel (XLSX) export formats (D-5, D-6)
+- **crawler:** Add render-blocking rule, AI prompts, and resource meter (D-1–D-4)
+- **ai:** Add summary regeneration, cost estimation, Ollama model discovery, and frontend tests
 - **ai:** Phase 7 - export integration and tests
 - **ai:** Implement Phase 7 - AI integration with BYOK provider support
 - **frontend:** Add Sitemap and External Links result tabs
@@ -37,16 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **export:** Implement CSV export with streaming and column selection
 - **storage:** Add streaming export queries, report aggregates, and settings persistence
 - **export:** Scaffold Phase 5 export module with IPC types and command stubs
-- **ui:** Implement Phase 4 frontend UI with results tables and page detail
 
 ### Miscellaneous
 
+- Update CLAUDE.md
 - Update CLAUDE.md
 - Update CLAUDE.md files
 - Update CLAUDE.md
 
 ### Refactoring
 
+- Replace positional tuples with named structs and add error logging
+- **plugin:** Improve type safety, error specificity, validation schemas, and load error surfacing
+- **ai:** Extract cost helper, name constants, improve error messages and test coverage
 - **ai:** Improve type safety, JSON validation, and test coverage
 - **rules:** Replace stringly-typed severity and category with enums
 
@@ -54,10 +70,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **crawler:** Add Phase 6 tests and fix sitemap discovery port handling
 
-## [0.3.0] - 2026-04-04
+### Update
+
+- Conventions.md
+
+## [0.3.0] - 2026-04-05
+
+### Bug Fixes
+
+- **crawler,storage:** Handle channel send errors and flush failures in crawl pipeline
+- **storage,rules:** Propagate row deserialization errors and fix UTF-8 truncation panic
+- Formatting
 
 ### Features
 
+- **ui:** Implement Phase 4 frontend UI with results tables and page detail
 - **rules:** Implement Phase 3 SEO rule engine
 
 ### Miscellaneous
