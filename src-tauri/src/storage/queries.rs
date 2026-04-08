@@ -973,6 +973,25 @@ pub fn avg_response_time(conn: &Connection, crawl_id: &str) -> Result<Option<f64
     Ok(avg)
 }
 
+/// Select lightweight page data (id, url, status_code) for site tree building.
+pub fn select_page_tree_data(
+    conn: &Connection,
+    crawl_id: &str,
+) -> Result<Vec<crate::commands::results::PageTreeEntry>> {
+    let sql = "SELECT id, url, status_code FROM pages WHERE crawl_id = ?1 ORDER BY url";
+    let mut stmt = conn.prepare(sql)?;
+    let rows = stmt
+        .query_map(params![crawl_id], |row| {
+            Ok(crate::commands::results::PageTreeEntry {
+                page_id: row.get(0)?,
+                url: row.get(1)?,
+                status_code: row.get(2)?,
+            })
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 // ---------------------------------------------------------------------------
 // Sitemap URL queries
 // ---------------------------------------------------------------------------

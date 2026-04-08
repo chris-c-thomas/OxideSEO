@@ -20,7 +20,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 type ExportFormat = "csv" | "json" | "html" | "pdf" | "xlsx";
 
 /** Union of all tab IDs used by ResultsExplorer. */
-type ResultsTab = "pages" | "issues" | "links" | "images" | "sitemap" | "external" | "ai";
+type ResultsTab =
+  | "pages"
+  | "issues"
+  | "links"
+  | "images"
+  | "sitemap"
+  | "external"
+  | "ai"
+  | "tree";
 
 interface ExportDialogProps {
   crawlId: string;

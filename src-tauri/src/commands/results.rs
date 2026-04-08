@@ -1,9 +1,10 @@
 //! Result query commands: paginated pages, issues, links, detail views.
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use tauri::State;
-
-use std::sync::Arc;
 
 use crate::storage::db::Database;
 use crate::storage::models::*;
@@ -412,4 +413,140 @@ pub async fn get_external_links(
         })
     })
     .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Site tree
+// ---------------------------------------------------------------------------
+
+/// A node in the hierarchical site tree built from crawled URL paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteTreeNode {
+    /// Path segment label (e.g. "blog", "about", or the hostname for root).
+    pub label: String,
+    /// Full URL if this node corresponds to a crawled page.
+    pub url: Option<String>,
+    /// Page ID for navigating to page detail.
+    pub page_id: Option<i64>,
+    /// HTTP status code of the page (None if not a leaf / not crawled).
+    pub status_code: Option<i32>,
+    /// Number of descendant pages (including self if it is a page).
+    pub page_count: u32,
+    /// Child nodes sorted alphabetically.
+    pub children: Vec<SiteTreeNode>,
+}
+
+/// Build a hierarchical site tree from all crawled pages.
+#[tauri::command]
+pub async fn get_site_tree(
+    crawl_id: String,
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<SiteTreeNode>, String> {
+    db.with_conn(|conn| {
+        let pages = queries::select_page_tree_data(conn, &crawl_id)?;
+        Ok(build_site_tree(&pages))
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Lightweight page data for tree building.
+pub struct PageTreeEntry {
+    pub page_id: i64,
+    pub url: String,
+    pub status_code: Option<i32>,
+}
+
+/// Build a forest of site tree nodes from flat page data.
+///
+/// Groups pages by host, then splits each URL path into segments to
+/// create a nested tree. Each host becomes a root node.
+fn build_site_tree(pages: &[PageTreeEntry]) -> Vec<SiteTreeNode> {
+    let mut by_host: HashMap<String, Vec<&PageTreeEntry>> = HashMap::new();
+    for page in pages {
+        let host = url::Url::parse(&page.url)
+            .ok()
+            .and_then(|u| u.host_str().map(String::from))
+            .unwrap_or_else(|| "unknown".into());
+        by_host.entry(host).or_default().push(page);
+    }
+
+    let mut roots: Vec<SiteTreeNode> = Vec::new();
+
+    for (host, host_pages) in &by_host {
+        let mut root = SiteTreeNode {
+            label: host.clone(),
+            url: None,
+            page_id: None,
+            status_code: None,
+            page_count: 0,
+            children: Vec::new(),
+        };
+
+        for page in host_pages {
+            let path = url::Url::parse(&page.url)
+                .map(|u| u.path().to_string())
+                .unwrap_or_else(|_| "/".into());
+
+            let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+            let mut current_children = &mut root.children;
+            for (i, &segment) in segments.iter().enumerate() {
+                let is_leaf = i == segments.len() - 1;
+                let pos = current_children.iter().position(|n| n.label == segment);
+                let idx = match pos {
+                    Some(idx) => idx,
+                    None => {
+                        current_children.push(SiteTreeNode {
+                            label: segment.to_string(),
+                            url: None,
+                            page_id: None,
+                            status_code: None,
+                            page_count: 0,
+                            children: Vec::new(),
+                        });
+                        current_children.len() - 1
+                    }
+                };
+                if is_leaf {
+                    current_children[idx].url = Some(page.url.clone());
+                    current_children[idx].page_id = Some(page.page_id);
+                    current_children[idx].status_code = page.status_code;
+                }
+                current_children = &mut current_children[idx].children;
+            }
+
+            // Handle root path "/" — assign to the host node itself.
+            if segments.is_empty() {
+                root.url = Some(page.url.clone());
+                root.page_id = Some(page.page_id);
+                root.status_code = page.status_code;
+            }
+        }
+
+        compute_page_counts(&mut root);
+        sort_tree(&mut root);
+        roots.push(root);
+    }
+
+    roots.sort_by(|a, b| a.label.cmp(&b.label));
+    roots
+}
+
+/// Recursively compute the page_count for each node.
+fn compute_page_counts(node: &mut SiteTreeNode) -> u32 {
+    let mut count: u32 = if node.page_id.is_some() { 1 } else { 0 };
+    for child in &mut node.children {
+        count += compute_page_counts(child);
+    }
+    node.page_count = count;
+    count
+}
+
+/// Recursively sort children alphabetically.
+fn sort_tree(node: &mut SiteTreeNode) {
+    node.children.sort_by(|a, b| a.label.cmp(&b.label));
+    for child in &mut node.children {
+        sort_tree(child);
+    }
 }

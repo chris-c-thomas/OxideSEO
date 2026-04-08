@@ -34,6 +34,7 @@ import type {
   RuleConfigOverride,
   ExternalLinkRow,
   SitemapReportEntry,
+  SiteTreeNode,
   PluginInfo,
   PluginDetail,
 } from "@/types";
@@ -128,6 +129,11 @@ export function getExternalLinks(
     pagination,
     isBroken: isBroken ?? null,
   });
+}
+
+/** Fetch hierarchical site tree for a crawl. */
+export function getSiteTree(crawlId: string): Promise<SiteTreeNode[]> {
+  return invoke<SiteTreeNode[]>("get_site_tree", { crawlId });
 }
 
 /** Fetch paginated links for a crawl. */

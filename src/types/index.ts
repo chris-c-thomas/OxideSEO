@@ -163,6 +163,15 @@ export interface SitemapReportEntry {
   pageStatusCode: number | null;
 }
 
+export interface SiteTreeNode {
+  label: string;
+  url: string | null;
+  pageId: number | null;
+  statusCode: number | null;
+  pageCount: number;
+  children: SiteTreeNode[];
+}
+
 export type Severity = "error" | "warning" | "info";
 
 export type RuleCategory =
