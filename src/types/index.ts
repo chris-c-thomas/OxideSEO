@@ -211,7 +211,7 @@ export interface PageDetail {
 export interface AppSettings {
   defaultCrawlConfig: Record<string, unknown>;
   theme: "system" | "light" | "dark";
-  defaultExportFormat: "csv" | "json" | "html";
+  defaultExportFormat: "csv" | "json" | "html" | "pdf" | "xlsx";
 }
 
 export interface RuleConfigOverride {
@@ -258,7 +258,7 @@ export type ExportDataType =
 
 export interface ExportRequest {
   crawlId: string;
-  format: "csv" | "json" | "html";
+  format: "csv" | "json" | "html" | "pdf" | "xlsx";
   dataType: ExportDataType;
   columns: string[] | null;
 }

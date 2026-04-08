@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type ExportFormat = "csv" | "json" | "html";
+type ExportFormat = "csv" | "json" | "html" | "pdf" | "xlsx";
 
 /** Union of all tab IDs used by ResultsExplorer. */
 type ResultsTab = "pages" | "issues" | "links" | "images" | "sitemap" | "external" | "ai";
@@ -33,10 +33,13 @@ interface ExportDialogProps {
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; description: string }[] = [
   { value: "csv", label: "CSV", description: "Spreadsheet-compatible data" },
   { value: "json", label: "JSON Lines", description: "Line-delimited JSON" },
+  { value: "xlsx", label: "Excel", description: "Multi-sheet workbook" },
+  { value: "pdf", label: "PDF Report", description: "Printable summary report" },
   { value: "html", label: "HTML Report", description: "Summary report with stats" },
 ];
 
 const DATA_TYPE_OPTIONS: { value: ExportDataType; label: string }[] = [
+  { value: "full_report", label: "All (multi-sheet)" },
   { value: "pages", label: "Pages" },
   { value: "issues", label: "Issues" },
   { value: "links", label: "Links" },
@@ -112,9 +115,14 @@ export function ExportDialog({ crawlId, open, onClose, activeTab }: ExportDialog
     }
   }, [open, activeTab]);
 
-  const isReport = format === "html";
+  const isReport = format === "html" || format === "pdf";
+  const showDataType = !isReport;
   const showColumns = format === "csv";
   const availableColumns = COLUMNS_BY_TYPE[dataType] ?? [];
+  const dataTypeOptions =
+    format === "xlsx"
+      ? DATA_TYPE_OPTIONS
+      : DATA_TYPE_OPTIONS.filter((o) => o.value !== "full_report");
 
   const handleDataTypeChange = (dt: ExportDataType) => {
     setDataType(dt);
@@ -125,6 +133,11 @@ export function ExportDialog({ crawlId, open, onClose, activeTab }: ExportDialog
 
   const handleFormatChange = (f: ExportFormat) => {
     setFormat(f);
+    // Reset dataType if switching away from xlsx and full_report is selected.
+    if (f !== "xlsx" && dataType === "full_report") {
+      setDataType("pages");
+      setSelectedColumns(new Set(COLUMNS_BY_TYPE["pages"]?.map((c) => c.key) ?? []));
+    }
     setResult(null);
     setError(null);
   };
@@ -226,12 +239,12 @@ export function ExportDialog({ crawlId, open, onClose, activeTab }: ExportDialog
             </div>
           </div>
 
-          {/* Data type selector (hidden for HTML report) */}
-          {!isReport && (
+          {/* Data type selector (hidden for report-only formats) */}
+          {showDataType && (
             <div className="space-y-2">
               <Label>Data Type</Label>
               <div className="flex gap-2">
-                {DATA_TYPE_OPTIONS.map((opt) => (
+                {dataTypeOptions.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => handleDataTypeChange(opt.value)}
