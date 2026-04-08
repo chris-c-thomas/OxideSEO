@@ -45,6 +45,7 @@ export function PageDiffTab({ baseCrawlId, compareCrawlId }: PageDiffTabProps) {
     loadMore,
     sorting,
     setSorting,
+    error,
   } = useServerData(fetcher, { filters });
 
   return (
@@ -88,17 +89,25 @@ export function PageDiffTab({ baseCrawlId, compareCrawlId }: PageDiffTabProps) {
         </span>
       </div>
       <div className="min-h-0 flex-1">
-        <DataTable
-          columns={columns}
-          data={items}
-          total={total}
-          isLoading={isLoading}
-          isLoadingMore={isLoadingMore}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          sorting={sorting}
-          onSortingChange={setSorting}
-        />
+        {error ? (
+          <div className="flex h-32 items-center justify-center">
+            <p style={{ color: "var(--color-severity-error)" }}>
+              Failed to load page diffs: {error}
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={items}
+            total={total}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            sorting={sorting}
+            onSortingChange={setSorting}
+          />
+        )}
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ export function IssueDiffTab({ baseCrawlId, compareCrawlId }: IssueDiffTabProps)
     loadMore,
     sorting,
     setSorting,
+    error,
   } = useServerData(fetcher, { filters });
 
   return (
@@ -75,17 +76,25 @@ export function IssueDiffTab({ baseCrawlId, compareCrawlId }: IssueDiffTabProps)
         </span>
       </div>
       <div className="min-h-0 flex-1">
-        <DataTable
-          columns={columns}
-          data={items}
-          total={total}
-          isLoading={isLoading}
-          isLoadingMore={isLoadingMore}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          sorting={sorting}
-          onSortingChange={setSorting}
-        />
+        {error ? (
+          <div className="flex h-32 items-center justify-center">
+            <p style={{ color: "var(--color-severity-error)" }}>
+              Failed to load issue diffs: {error}
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={items}
+            total={total}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            sorting={sorting}
+            onSortingChange={setSorting}
+          />
+        )}
       </div>
     </div>
   );

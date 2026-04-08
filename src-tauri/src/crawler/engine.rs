@@ -990,7 +990,7 @@ fn extract_domain(url: &str) -> String {
 
 /// Return the resident set size (RSS) of the current process in bytes.
 ///
-/// Platform-specific: uses `mach` task_info on macOS, `/proc/self/statm`
+/// Platform-specific: uses `mach` task_info on macOS, `/proc/self/status`
 /// on Linux. Returns `None` on unsupported platforms or on error.
 fn get_memory_rss() -> Option<u64> {
     #[cfg(target_os = "macos")]

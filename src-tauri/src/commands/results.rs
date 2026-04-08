@@ -1,4 +1,5 @@
-//! Result query commands: paginated pages, issues, links, detail views.
+//! Result query commands: paginated pages, issues, links, detail views,
+//! site tree, and crawl comparison.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -412,7 +413,7 @@ pub async fn get_external_links(
             limit: clamp_limit(pagination.limit),
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +430,7 @@ pub struct SiteTreeNode {
     pub url: Option<String>,
     /// Page ID for navigating to page detail.
     pub page_id: Option<i64>,
-    /// HTTP status code of the page (None if not a leaf / not crawled).
+    /// HTTP status code of the page (None if this path segment was not itself a crawled page).
     pub status_code: Option<i32>,
     /// Number of descendant pages (including self if it is a page).
     pub page_count: u32,
@@ -447,14 +448,7 @@ pub async fn get_site_tree(
         let pages = queries::select_page_tree_data(conn, &crawl_id)?;
         Ok(build_site_tree(&pages))
     })
-    .map_err(|e| e.to_string())
-}
-
-/// Lightweight page data for tree building.
-pub struct PageTreeEntry {
-    pub page_id: i64,
-    pub url: String,
-    pub status_code: Option<i32>,
+    .map_err(|e| format!("{e:#}"))
 }
 
 /// Build a forest of site tree nodes from flat page data.
@@ -570,71 +564,6 @@ pub struct CrawlComparisonSummary {
     pub resolved_issues: u64,
 }
 
-/// The type of change detected for a page between two crawls.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PageDiffType {
-    New,
-    Removed,
-    StatusCodeChanged,
-}
-
-/// A row in the paginated page diff result.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PageDiffRow {
-    pub url: String,
-    pub diff_type: PageDiffType,
-    pub base_status_code: Option<i32>,
-    pub compare_status_code: Option<i32>,
-    pub base_title: Option<String>,
-    pub compare_title: Option<String>,
-    pub base_meta_desc: Option<String>,
-    pub compare_meta_desc: Option<String>,
-}
-
-/// The type of change detected for an issue.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IssueDiffType {
-    New,
-    Resolved,
-}
-
-/// A row in the paginated issue diff result.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IssueDiffRow {
-    pub url: String,
-    pub rule_id: String,
-    pub severity: Severity,
-    pub category: RuleCategory,
-    pub message: String,
-    pub diff_type: IssueDiffType,
-}
-
-/// Filter for page diff queries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PageDiffFilters {
-    pub diff_type: Option<PageDiffType>,
-    pub url_search: Option<String>,
-}
-
-/// Filter for issue diff queries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IssueDiffFilters {
-    pub diff_type: Option<IssueDiffType>,
-}
-
-/// Filter for metadata diff queries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MetadataDiffFilters {
-    pub url_search: Option<String>,
-}
-
 /// Fetch a summary of differences between two crawls.
 #[tauri::command]
 pub async fn get_comparison_summary(
@@ -679,7 +608,7 @@ pub async fn get_comparison_summary(
             resolved_issues: counts.6,
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
 }
 
 /// Fetch paginated page diff between two crawls.
@@ -719,7 +648,7 @@ pub async fn get_page_diffs(
             limit: clamp_limit(pagination.limit),
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
 }
 
 /// Fetch paginated issue diff between two crawls.
@@ -751,7 +680,7 @@ pub async fn get_issue_diffs(
             limit: clamp_limit(pagination.limit),
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
 }
 
 /// Fetch paginated metadata diff (title/meta_desc changes) between two crawls.
@@ -788,5 +717,5 @@ pub async fn get_metadata_diffs(
             limit: clamp_limit(pagination.limit),
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
 }

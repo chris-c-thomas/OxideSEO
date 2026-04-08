@@ -974,15 +974,12 @@ pub fn avg_response_time(conn: &Connection, crawl_id: &str) -> Result<Option<f64
 }
 
 /// Select lightweight page data (id, url, status_code) for site tree building.
-pub fn select_page_tree_data(
-    conn: &Connection,
-    crawl_id: &str,
-) -> Result<Vec<crate::commands::results::PageTreeEntry>> {
+pub fn select_page_tree_data(conn: &Connection, crawl_id: &str) -> Result<Vec<PageTreeEntry>> {
     let sql = "SELECT id, url, status_code FROM pages WHERE crawl_id = ?1 ORDER BY url";
     let mut stmt = conn.prepare(sql)?;
     let rows = stmt
         .query_map(params![crawl_id], |row| {
-            Ok(crate::commands::results::PageTreeEntry {
+            Ok(PageTreeEntry {
                 page_id: row.get(0)?,
                 url: row.get(1)?,
                 status_code: row.get(2)?,
@@ -1500,7 +1497,7 @@ pub fn delete_plugin(conn: &Connection, name: &str) -> Result<()> {
 // Crawl comparison queries
 // ---------------------------------------------------------------------------
 
-use crate::commands::results::{IssueDiffRow, IssueDiffType, PageDiffRow, PageDiffType};
+use super::models::{IssueDiffRow, IssueDiffType, PageDiffRow, PageDiffType, PageTreeEntry};
 
 /// Count all diff categories between two crawls.
 /// Returns (new_pages, removed_pages, changed_status, changed_title, changed_meta, new_issues, resolved_issues).
@@ -1578,9 +1575,10 @@ pub fn count_page_diffs(
     diff_type: Option<PageDiffType>,
     url_search: Option<&str>,
 ) -> Result<i64> {
-    let parts = build_page_diff_sql(base_id, compare_id, diff_type, url_search, true, 0, 0);
-    let sql = format!("SELECT COUNT(*) FROM ({parts})");
-    let count: i64 = conn.query_row(&sql, [], |row| row.get(0))?;
+    let (inner, values) =
+        build_page_diff_sql(base_id, compare_id, diff_type, url_search, true, 0, 0);
+    let sql = format!("SELECT COUNT(*) FROM ({inner})");
+    let count: i64 = conn.query_row(&sql, rusqlite::params_from_iter(&values), |row| row.get(0))?;
     Ok(count)
 }
 
@@ -1594,12 +1592,12 @@ pub fn select_page_diffs(
     diff_type: Option<PageDiffType>,
     url_search: Option<&str>,
 ) -> Result<Vec<PageDiffRow>> {
-    let sql = build_page_diff_sql(
+    let (sql, values) = build_page_diff_sql(
         base_id, compare_id, diff_type, url_search, false, offset, limit,
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(rusqlite::params_from_iter(&values), |row| {
             let diff_str: String = row.get(1)?;
             let diff_type = match diff_str.as_str() {
                 "new" => PageDiffType::New,
@@ -1621,7 +1619,7 @@ pub fn select_page_diffs(
     Ok(rows)
 }
 
-/// Build the UNION ALL query for page diffs.
+/// Build the UNION ALL query for page diffs with parameterized values.
 /// When `count_only` is true, omits ORDER BY and LIMIT.
 fn build_page_diff_sql(
     base_id: &str,
@@ -1631,20 +1629,11 @@ fn build_page_diff_sql(
     count_only: bool,
     offset: i64,
     limit: i64,
-) -> String {
-    let esc = |s: &str| s.replace('\'', "''");
-    let base = esc(base_id);
-    let compare = esc(compare_id);
+) -> (String, Vec<Value>) {
+    let mut values: Vec<Value> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
 
-    let url_filter = url_search
-        .map(|s| format!(" AND url LIKE '%{}%'", esc(s)))
-        .unwrap_or_default();
-
-    let url_filter_p1 = url_search
-        .map(|s| format!(" AND p1.url LIKE '%{}%'", esc(s)))
-        .unwrap_or_default();
-
-    let mut parts = Vec::new();
+    let url_like = url_search.map(|s| format!("%{}%", escape_like_pattern(s)));
 
     let include_new = diff_type.is_none() || matches!(diff_type, Some(PageDiffType::New));
     let include_removed = diff_type.is_none() || matches!(diff_type, Some(PageDiffType::Removed));
@@ -1652,41 +1641,59 @@ fn build_page_diff_sql(
         diff_type.is_none() || matches!(diff_type, Some(PageDiffType::StatusCodeChanged));
 
     if include_new {
-        parts.push(format!(
-            "SELECT url, 'new' AS diff_type, NULL AS base_sc, status_code AS compare_sc, \
+        let mut sql = "SELECT url, 'new' AS diff_type, NULL AS base_sc, status_code AS compare_sc, \
              NULL AS base_title, title AS compare_title, NULL AS base_meta, meta_desc AS compare_meta \
-             FROM pages WHERE crawl_id = '{compare}' \
-             AND url NOT IN (SELECT url FROM pages WHERE crawl_id = '{base}'){url_filter}"
-        ));
+             FROM pages WHERE crawl_id = ? \
+             AND url NOT IN (SELECT url FROM pages WHERE crawl_id = ?)".to_string();
+        values.push(Value::Text(compare_id.to_string()));
+        values.push(Value::Text(base_id.to_string()));
+        if let Some(ref like_val) = url_like {
+            sql.push_str(" AND url LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(like_val.clone()));
+        }
+        parts.push(sql);
     }
 
     if include_removed {
-        parts.push(format!(
-            "SELECT url, 'removed' AS diff_type, status_code AS base_sc, NULL AS compare_sc, \
+        let mut sql = "SELECT url, 'removed' AS diff_type, status_code AS base_sc, NULL AS compare_sc, \
              title AS base_title, NULL AS compare_title, meta_desc AS base_meta, NULL AS compare_meta \
-             FROM pages WHERE crawl_id = '{base}' \
-             AND url NOT IN (SELECT url FROM pages WHERE crawl_id = '{compare}'){url_filter}"
-        ));
+             FROM pages WHERE crawl_id = ? \
+             AND url NOT IN (SELECT url FROM pages WHERE crawl_id = ?)".to_string();
+        values.push(Value::Text(base_id.to_string()));
+        values.push(Value::Text(compare_id.to_string()));
+        if let Some(ref like_val) = url_like {
+            sql.push_str(" AND url LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(like_val.clone()));
+        }
+        parts.push(sql);
     }
 
     if include_changed {
-        parts.push(format!(
-            "SELECT p1.url, 'status_code_changed' AS diff_type, \
+        let mut sql = "SELECT p1.url, 'status_code_changed' AS diff_type, \
              p1.status_code AS base_sc, p2.status_code AS compare_sc, \
              p1.title AS base_title, p2.title AS compare_title, \
              p1.meta_desc AS base_meta, p2.meta_desc AS compare_meta \
-             FROM pages p1 JOIN pages p2 ON p1.url = p2.url AND p2.crawl_id = '{compare}' \
-             WHERE p1.crawl_id = '{base}' \
-             AND COALESCE(p1.status_code, -1) != COALESCE(p2.status_code, -1){url_filter_p1}"
-        ));
+             FROM pages p1 JOIN pages p2 ON p1.url = p2.url AND p2.crawl_id = ? \
+             WHERE p1.crawl_id = ? \
+             AND COALESCE(p1.status_code, -1) != COALESCE(p2.status_code, -1)"
+            .to_string();
+        values.push(Value::Text(compare_id.to_string()));
+        values.push(Value::Text(base_id.to_string()));
+        if let Some(ref like_val) = url_like {
+            sql.push_str(" AND p1.url LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(like_val.clone()));
+        }
+        parts.push(sql);
     }
 
     let union = parts.join(" UNION ALL ");
 
     if count_only {
-        union
+        (union, values)
     } else {
-        format!("{union} ORDER BY url LIMIT {limit} OFFSET {offset}")
+        values.push(Value::Integer(limit));
+        values.push(Value::Integer(offset));
+        (format!("{union} ORDER BY url LIMIT ? OFFSET ?"), values)
     }
 }
 
@@ -1697,10 +1704,9 @@ pub fn count_issue_diffs(
     compare_id: &str,
     diff_type: Option<IssueDiffType>,
 ) -> Result<i64> {
-    let sql = build_issue_diff_sql(base_id, compare_id, diff_type, true, 0, 0);
-    let count: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM ({sql})"), [], |row| {
-        row.get(0)
-    })?;
+    let (inner, values) = build_issue_diff_sql(base_id, compare_id, diff_type, true, 0, 0);
+    let sql = format!("SELECT COUNT(*) FROM ({inner})");
+    let count: i64 = conn.query_row(&sql, rusqlite::params_from_iter(&values), |row| row.get(0))?;
     Ok(count)
 }
 
@@ -1713,10 +1719,10 @@ pub fn select_issue_diffs(
     limit: i64,
     diff_type: Option<IssueDiffType>,
 ) -> Result<Vec<IssueDiffRow>> {
-    let sql = build_issue_diff_sql(base_id, compare_id, diff_type, false, offset, limit);
+    let (sql, values) = build_issue_diff_sql(base_id, compare_id, diff_type, false, offset, limit);
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(rusqlite::params_from_iter(&values), |row| {
             let diff_str: String = row.get(5)?;
             let diff_type = if diff_str == "new" {
                 IssueDiffType::New
@@ -1728,8 +1734,14 @@ pub fn select_issue_diffs(
             Ok(IssueDiffRow {
                 url: row.get(0)?,
                 rule_id: row.get(1)?,
-                severity: severity_str.parse().unwrap_or(crate::Severity::Warning),
-                category: category_str.parse().unwrap_or(crate::RuleCategory::Meta),
+                severity: severity_str.parse().unwrap_or_else(|_| {
+                    tracing::warn!(severity = %severity_str, "unknown severity in issue diff, defaulting to Warning");
+                    crate::Severity::Warning
+                }),
+                category: category_str.parse().unwrap_or_else(|_| {
+                    tracing::warn!(category = %category_str, "unknown category in issue diff, defaulting to Meta");
+                    crate::RuleCategory::Meta
+                }),
                 message: row.get(4)?,
                 diff_type,
             })
@@ -1738,7 +1750,7 @@ pub fn select_issue_diffs(
     Ok(rows)
 }
 
-/// Build the UNION ALL query for issue diffs.
+/// Build the UNION ALL query for issue diffs with parameterized values.
 fn build_issue_diff_sql(
     base_id: &str,
     compare_id: &str,
@@ -1746,12 +1758,9 @@ fn build_issue_diff_sql(
     count_only: bool,
     offset: i64,
     limit: i64,
-) -> String {
-    let esc = |s: &str| s.replace('\'', "''");
-    let base = esc(base_id);
-    let compare = esc(compare_id);
-
-    let mut parts = Vec::new();
+) -> (String, Vec<Value>) {
+    let mut values: Vec<Value> = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
 
     let include_new = diff_type.is_none() || matches!(diff_type, Some(IssueDiffType::New));
     let include_resolved =
@@ -1759,36 +1768,51 @@ fn build_issue_diff_sql(
 
     // New issues: in compare but not in base (by rule_id + url)
     if include_new {
-        parts.push(format!(
+        parts.push(
             "SELECT p.url, i.rule_id, i.severity, i.category, i.message, 'new' AS diff_type \
-             FROM issues i JOIN pages p ON i.page_id = p.id AND p.crawl_id = '{compare}' \
-             WHERE i.crawl_id = '{compare}' \
+             FROM issues i JOIN pages p ON i.page_id = p.id AND p.crawl_id = ? \
+             WHERE i.crawl_id = ? \
              AND NOT EXISTS ( \
-                 SELECT 1 FROM issues i2 JOIN pages p2 ON i2.page_id = p2.id AND p2.crawl_id = '{base}' \
-                 WHERE i2.crawl_id = '{base}' AND i2.rule_id = i.rule_id AND p2.url = p.url \
+                 SELECT 1 FROM issues i2 JOIN pages p2 ON i2.page_id = p2.id AND p2.crawl_id = ? \
+                 WHERE i2.crawl_id = ? AND i2.rule_id = i.rule_id AND p2.url = p.url \
              )"
-        ));
+            .to_string(),
+        );
+        values.push(Value::Text(compare_id.to_string()));
+        values.push(Value::Text(compare_id.to_string()));
+        values.push(Value::Text(base_id.to_string()));
+        values.push(Value::Text(base_id.to_string()));
     }
 
     // Resolved issues: in base but not in compare
     if include_resolved {
-        parts.push(format!(
+        parts.push(
             "SELECT p.url, i.rule_id, i.severity, i.category, i.message, 'resolved' AS diff_type \
-             FROM issues i JOIN pages p ON i.page_id = p.id AND p.crawl_id = '{base}' \
-             WHERE i.crawl_id = '{base}' \
+             FROM issues i JOIN pages p ON i.page_id = p.id AND p.crawl_id = ? \
+             WHERE i.crawl_id = ? \
              AND NOT EXISTS ( \
-                 SELECT 1 FROM issues i2 JOIN pages p2 ON i2.page_id = p2.id AND p2.crawl_id = '{compare}' \
-                 WHERE i2.crawl_id = '{compare}' AND i2.rule_id = i.rule_id AND p2.url = p.url \
+                 SELECT 1 FROM issues i2 JOIN pages p2 ON i2.page_id = p2.id AND p2.crawl_id = ? \
+                 WHERE i2.crawl_id = ? AND i2.rule_id = i.rule_id AND p2.url = p.url \
              )"
-        ));
+            .to_string(),
+        );
+        values.push(Value::Text(base_id.to_string()));
+        values.push(Value::Text(base_id.to_string()));
+        values.push(Value::Text(compare_id.to_string()));
+        values.push(Value::Text(compare_id.to_string()));
     }
 
     let union = parts.join(" UNION ALL ");
 
     if count_only {
-        union
+        (union, values)
     } else {
-        format!("{union} ORDER BY url, rule_id LIMIT {limit} OFFSET {offset}")
+        values.push(Value::Integer(limit));
+        values.push(Value::Integer(offset));
+        (
+            format!("{union} ORDER BY url, rule_id LIMIT ? OFFSET ?"),
+            values,
+        )
     }
 }
 
@@ -1799,10 +1823,9 @@ pub fn count_metadata_diffs(
     compare_id: &str,
     url_search: Option<&str>,
 ) -> Result<i64> {
-    let sql = build_metadata_diff_sql(base_id, compare_id, url_search, true, 0, 0);
-    let count: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM ({sql})"), [], |row| {
-        row.get(0)
-    })?;
+    let (inner, values) = build_metadata_diff_sql(base_id, compare_id, url_search, true, 0, 0);
+    let sql = format!("SELECT COUNT(*) FROM ({inner})");
+    let count: i64 = conn.query_row(&sql, rusqlite::params_from_iter(&values), |row| row.get(0))?;
     Ok(count)
 }
 
@@ -1815,13 +1838,14 @@ pub fn select_metadata_diffs(
     limit: i64,
     url_search: Option<&str>,
 ) -> Result<Vec<PageDiffRow>> {
-    let sql = build_metadata_diff_sql(base_id, compare_id, url_search, false, offset, limit);
+    let (sql, values) =
+        build_metadata_diff_sql(base_id, compare_id, url_search, false, offset, limit);
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(rusqlite::params_from_iter(&values), |row| {
             Ok(PageDiffRow {
                 url: row.get(0)?,
-                diff_type: PageDiffType::StatusCodeChanged, // Reuse type; metadata changes are between shared pages.
+                diff_type: PageDiffType::MetadataChanged,
                 base_status_code: row.get(1)?,
                 compare_status_code: row.get(2)?,
                 base_title: row.get(3)?,
@@ -1834,7 +1858,7 @@ pub fn select_metadata_diffs(
     Ok(rows)
 }
 
-/// Build the query for metadata diffs.
+/// Build the query for metadata diffs with parameterized values.
 fn build_metadata_diff_sql(
     base_id: &str,
     compare_id: &str,
@@ -1842,28 +1866,32 @@ fn build_metadata_diff_sql(
     count_only: bool,
     offset: i64,
     limit: i64,
-) -> String {
-    let esc = |s: &str| s.replace('\'', "''");
-    let base = esc(base_id);
-    let compare = esc(compare_id);
+) -> (String, Vec<Value>) {
+    let mut values: Vec<Value> = Vec::new();
 
-    let url_filter = url_search
-        .map(|s| format!(" AND p1.url LIKE '%{}%'", esc(s)))
-        .unwrap_or_default();
-
-    let sql = format!(
-        "SELECT p1.url, p1.status_code AS base_sc, p2.status_code AS compare_sc, \
+    let mut sql = "SELECT p1.url, p1.status_code AS base_sc, p2.status_code AS compare_sc, \
          p1.title AS base_title, p2.title AS compare_title, \
          p1.meta_desc AS base_meta, p2.meta_desc AS compare_meta \
-         FROM pages p1 JOIN pages p2 ON p1.url = p2.url AND p2.crawl_id = '{compare}' \
-         WHERE p1.crawl_id = '{base}' \
+         FROM pages p1 JOIN pages p2 ON p1.url = p2.url AND p2.crawl_id = ? \
+         WHERE p1.crawl_id = ? \
          AND (COALESCE(p1.title, '') != COALESCE(p2.title, '') \
-              OR COALESCE(p1.meta_desc, '') != COALESCE(p2.meta_desc, '')){url_filter}"
-    );
+              OR COALESCE(p1.meta_desc, '') != COALESCE(p2.meta_desc, ''))"
+        .to_string();
+    values.push(Value::Text(compare_id.to_string()));
+    values.push(Value::Text(base_id.to_string()));
+
+    if let Some(search) = url_search {
+        if !search.is_empty() {
+            sql.push_str(" AND p1.url LIKE ? ESCAPE '\\'");
+            values.push(Value::Text(format!("%{}%", escape_like_pattern(search))));
+        }
+    }
 
     if count_only {
-        sql
+        (sql, values)
     } else {
-        format!("{sql} ORDER BY p1.url LIMIT {limit} OFFSET {offset}")
+        values.push(Value::Integer(limit));
+        values.push(Value::Integer(offset));
+        (format!("{sql} ORDER BY p1.url LIMIT ? OFFSET ?"), values)
     }
 }

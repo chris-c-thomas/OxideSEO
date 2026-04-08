@@ -31,12 +31,10 @@ export function MetadataDiffTab({ baseCrawlId, compareCrawlId }: MetadataDiffTab
     [baseCrawlId, compareCrawlId],
   );
 
-  const { items, total, isLoading, isLoadingMore, hasMore, loadMore } = useServerData(
-    fetcher,
-    {
+  const { items, total, isLoading, isLoadingMore, hasMore, loadMore, error } =
+    useServerData(fetcher, {
       filters,
-    },
-  );
+    });
 
   return (
     <div className="flex h-full flex-col">
@@ -65,7 +63,13 @@ export function MetadataDiffTab({ baseCrawlId, compareCrawlId }: MetadataDiffTab
           className="custom-scrollbar overflow-auto"
           style={{ maxHeight: "calc(100vh - 260px)" }}
         >
-          {isLoading ? (
+          {error ? (
+            <div className="flex h-32 items-center justify-center">
+              <p style={{ color: "var(--color-severity-error)" }}>
+                Failed to load metadata diffs: {error}
+              </p>
+            </div>
+          ) : isLoading ? (
             <div className="flex h-32 items-center justify-center">
               <p style={{ color: "var(--color-muted-foreground)" }}>Loading...</p>
             </div>

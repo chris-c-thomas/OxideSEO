@@ -176,7 +176,7 @@ export interface SiteTreeNode {
 // Crawl comparison
 // ---------------------------------------------------------------------------
 
-export type PageDiffType = "new" | "removed" | "status_code_changed";
+export type PageDiffType = "new" | "removed" | "status_code_changed" | "metadata_changed";
 export type IssueDiffType = "new" | "resolved";
 
 export interface CrawlComparisonSummary {
