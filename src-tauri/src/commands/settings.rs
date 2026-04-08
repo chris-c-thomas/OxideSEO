@@ -36,6 +36,8 @@ pub enum ExportFormat {
     Csv,
     Json,
     Html,
+    Pdf,
+    Xlsx,
     /// Plugin-provided export format. The string is the plugin name.
     Plugin(String),
 }

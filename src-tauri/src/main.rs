@@ -74,6 +74,11 @@ fn main() {
             commands::results::get_links,
             commands::results::get_sitemap_report,
             commands::results::get_external_links,
+            commands::results::get_site_tree,
+            commands::results::get_comparison_summary,
+            commands::results::get_page_diffs,
+            commands::results::get_issue_diffs,
+            commands::results::get_metadata_diffs,
             // Settings
             commands::settings::get_settings,
             commands::settings::set_settings,

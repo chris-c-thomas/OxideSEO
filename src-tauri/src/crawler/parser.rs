@@ -72,6 +72,8 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
     let images: Rc<RefCell<Vec<ExtractedImage>>> = Rc::new(RefCell::new(Vec::new()));
     let scripts: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
     let stylesheets: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let render_blocking_scripts: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+    let render_blocking_stylesheets: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
     let body_text: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
 
     // Capture copies for closures
@@ -171,9 +173,10 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         }));
     }
 
-    // <link rel="stylesheet">
+    // <link rel="stylesheet"> — also detect render-blocking stylesheets (no media or media="all")
     {
         let ss = stylesheets.clone();
+        let rb_ss = render_blocking_stylesheets.clone();
         let base = base_url.clone();
         let url = pg_url.clone();
         handlers.push(element!("link", move |el| {
@@ -184,6 +187,11 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
                         if let Some(resolved) = resolve_url(&href, &resolved_base) {
                             ss.borrow_mut().push(resolved);
                         }
+                    }
+                    // Stylesheets without media or with media="all" are render-blocking.
+                    let media = el.get_attribute("media").unwrap_or_default();
+                    if media.is_empty() || media.eq_ignore_ascii_case("all") {
+                        *rb_ss.borrow_mut() += 1;
                     }
                 }
             }
@@ -279,9 +287,10 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         }));
     }
 
-    // <script src="...">
+    // <script src="..."> — also detect render-blocking scripts (no async or defer)
     {
         let scr = scripts.clone();
+        let rb_scr = render_blocking_scripts.clone();
         let base = base_url.clone();
         let url = pg_url.clone();
         handlers.push(element!("script[src]", move |el| {
@@ -290,6 +299,14 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
                 if let Some(resolved) = resolve_url(&src, &resolved_base) {
                     scr.borrow_mut().push(resolved);
                 }
+            }
+            let has_async = el.get_attribute("async").is_some();
+            let has_defer = el.get_attribute("defer").is_some();
+            let is_module = el
+                .get_attribute("type")
+                .is_some_and(|t| t.eq_ignore_ascii_case("module"));
+            if !has_async && !has_defer && !is_module {
+                *rb_scr.borrow_mut() += 1;
             }
             Ok(())
         }));
@@ -341,6 +358,8 @@ fn parse_with_lol_html(html_bytes: &[u8], page_url: &str, root_domain: &str) -> 
         images: images.borrow().clone(),
         scripts: scripts.borrow().clone(),
         stylesheets: stylesheets.borrow().clone(),
+        render_blocking_scripts: *render_blocking_scripts.borrow(),
+        render_blocking_stylesheets: *render_blocking_stylesheets.borrow(),
         word_count: count_words(&body_text.borrow()),
         body_text: truncate_body_text(&body_text.borrow()),
         base_url: base_resolved,
@@ -456,18 +475,33 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
         .collect();
 
     let script_sel = sel("script[src]");
+    let mut render_blocking_scripts: u32 = 0;
     let scripts: Vec<String> = document
         .select(&script_sel)
         .filter_map(|el| {
-            let src = el.value().attr("src")?;
+            let attrs = el.value();
+            let has_async = attrs.attr("async").is_some();
+            let has_defer = attrs.attr("defer").is_some();
+            let is_module = attrs
+                .attr("type")
+                .is_some_and(|t| t.eq_ignore_ascii_case("module"));
+            if !has_async && !has_defer && !is_module {
+                render_blocking_scripts += 1;
+            }
+            let src = attrs.attr("src")?;
             resolve_url(src, resolve_base)
         })
         .collect();
 
     let ss_sel = sel("link[rel='stylesheet']");
+    let mut render_blocking_stylesheets: u32 = 0;
     let stylesheets: Vec<String> = document
         .select(&ss_sel)
         .filter_map(|el| {
+            let media = el.value().attr("media").unwrap_or("");
+            if media.is_empty() || media.eq_ignore_ascii_case("all") {
+                render_blocking_stylesheets += 1;
+            }
             let href = el.value().attr("href")?;
             resolve_url(href, resolve_base)
         })
@@ -497,6 +531,8 @@ fn parse_with_scraper(html_bytes: &[u8], page_url: &str, root_domain: &str) -> R
         images,
         scripts,
         stylesheets,
+        render_blocking_scripts,
+        render_blocking_stylesheets,
         word_count: count_words(&body_text),
         body_text: truncate_body_text(&body_text),
         base_url,

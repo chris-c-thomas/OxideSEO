@@ -1,9 +1,11 @@
-//! Result query commands: paginated pages, issues, links, detail views.
+//! Result query commands: paginated pages, issues, links, detail views,
+//! site tree, and crawl comparison.
+
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
-
-use std::sync::Arc;
 
 use crate::storage::db::Database;
 use crate::storage::models::*;
@@ -411,5 +413,309 @@ pub async fn get_external_links(
             limit: clamp_limit(pagination.limit),
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| format!("{e:#}"))
+}
+
+// ---------------------------------------------------------------------------
+// Site tree
+// ---------------------------------------------------------------------------
+
+/// A node in the hierarchical site tree built from crawled URL paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteTreeNode {
+    /// Path segment label (e.g. "blog", "about", or the hostname for root).
+    pub label: String,
+    /// Full URL if this node corresponds to a crawled page.
+    pub url: Option<String>,
+    /// Page ID for navigating to page detail.
+    pub page_id: Option<i64>,
+    /// HTTP status code of the page (None if this path segment was not itself a crawled page).
+    pub status_code: Option<i32>,
+    /// Number of descendant pages (including self if it is a page).
+    pub page_count: u32,
+    /// Child nodes sorted alphabetically.
+    pub children: Vec<SiteTreeNode>,
+}
+
+/// Build a hierarchical site tree from all crawled pages.
+#[tauri::command]
+pub async fn get_site_tree(
+    crawl_id: String,
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<SiteTreeNode>, String> {
+    db.with_conn(|conn| {
+        let pages = queries::select_page_tree_data(conn, &crawl_id)?;
+        Ok(build_site_tree(&pages))
+    })
+    .map_err(|e| format!("{e:#}"))
+}
+
+/// Build a forest of site tree nodes from flat page data.
+///
+/// Groups pages by host, then splits each URL path into segments to
+/// create a nested tree. Each host becomes a root node.
+fn build_site_tree(pages: &[PageTreeEntry]) -> Vec<SiteTreeNode> {
+    let mut by_host: HashMap<String, Vec<&PageTreeEntry>> = HashMap::new();
+    for page in pages {
+        let host = url::Url::parse(&page.url)
+            .ok()
+            .and_then(|u| u.host_str().map(String::from))
+            .unwrap_or_else(|| "unknown".into());
+        by_host.entry(host).or_default().push(page);
+    }
+
+    let mut roots: Vec<SiteTreeNode> = Vec::new();
+
+    for (host, host_pages) in &by_host {
+        let mut root = SiteTreeNode {
+            label: host.clone(),
+            url: None,
+            page_id: None,
+            status_code: None,
+            page_count: 0,
+            children: Vec::new(),
+        };
+
+        for page in host_pages {
+            let path = url::Url::parse(&page.url)
+                .map(|u| u.path().to_string())
+                .unwrap_or_else(|_| "/".into());
+
+            let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+            let mut current_children = &mut root.children;
+            for (i, &segment) in segments.iter().enumerate() {
+                let is_leaf = i == segments.len() - 1;
+                let pos = current_children.iter().position(|n| n.label == segment);
+                let idx = match pos {
+                    Some(idx) => idx,
+                    None => {
+                        current_children.push(SiteTreeNode {
+                            label: segment.to_string(),
+                            url: None,
+                            page_id: None,
+                            status_code: None,
+                            page_count: 0,
+                            children: Vec::new(),
+                        });
+                        current_children.len() - 1
+                    }
+                };
+                if is_leaf {
+                    current_children[idx].url = Some(page.url.clone());
+                    current_children[idx].page_id = Some(page.page_id);
+                    current_children[idx].status_code = page.status_code;
+                }
+                current_children = &mut current_children[idx].children;
+            }
+
+            // Handle root path "/" — assign to the host node itself.
+            if segments.is_empty() {
+                root.url = Some(page.url.clone());
+                root.page_id = Some(page.page_id);
+                root.status_code = page.status_code;
+            }
+        }
+
+        compute_page_counts(&mut root);
+        sort_tree(&mut root);
+        roots.push(root);
+    }
+
+    roots.sort_by(|a, b| a.label.cmp(&b.label));
+    roots
+}
+
+/// Recursively compute the page_count for each node.
+fn compute_page_counts(node: &mut SiteTreeNode) -> u32 {
+    let mut count: u32 = if node.page_id.is_some() { 1 } else { 0 };
+    for child in &mut node.children {
+        count += compute_page_counts(child);
+    }
+    node.page_count = count;
+    count
+}
+
+/// Recursively sort children alphabetically.
+fn sort_tree(node: &mut SiteTreeNode) {
+    node.children.sort_by(|a, b| a.label.cmp(&b.label));
+    for child in &mut node.children {
+        sort_tree(child);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Crawl comparison
+// ---------------------------------------------------------------------------
+
+/// Summary of differences between two crawls.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlComparisonSummary {
+    pub base_crawl: CrawlSummary,
+    pub compare_crawl: CrawlSummary,
+    pub new_pages: u64,
+    pub removed_pages: u64,
+    pub changed_status_code: u64,
+    pub changed_title: u64,
+    pub changed_meta_desc: u64,
+    pub new_issues: u64,
+    pub resolved_issues: u64,
+}
+
+/// Fetch a summary of differences between two crawls.
+#[tauri::command]
+pub async fn get_comparison_summary(
+    base_crawl_id: String,
+    compare_crawl_id: String,
+    db: State<'_, Arc<Database>>,
+) -> Result<CrawlComparisonSummary, String> {
+    db.with_conn(|conn| {
+        let base = queries::select_crawl_by_id(conn, &base_crawl_id)?
+            .ok_or_else(|| anyhow::anyhow!("Base crawl not found: {base_crawl_id}"))?;
+        let compare = queries::select_crawl_by_id(conn, &compare_crawl_id)?
+            .ok_or_else(|| anyhow::anyhow!("Compare crawl not found: {compare_crawl_id}"))?;
+
+        let (be, bw, bi) = queries::count_issues_by_severity(conn, &base_crawl_id)?;
+        let (ce, cw, ci) = queries::count_issues_by_severity(conn, &compare_crawl_id)?;
+
+        let counts = queries::count_comparison_summary(conn, &base_crawl_id, &compare_crawl_id)?;
+
+        Ok(CrawlComparisonSummary {
+            base_crawl: crawl_row_to_summary(
+                &base,
+                IssueCounts {
+                    errors: be,
+                    warnings: bw,
+                    info: bi,
+                },
+            ),
+            compare_crawl: crawl_row_to_summary(
+                &compare,
+                IssueCounts {
+                    errors: ce,
+                    warnings: cw,
+                    info: ci,
+                },
+            ),
+            new_pages: counts.new_pages,
+            removed_pages: counts.removed_pages,
+            changed_status_code: counts.changed_status,
+            changed_title: counts.changed_title,
+            changed_meta_desc: counts.changed_meta,
+            new_issues: counts.new_issues,
+            resolved_issues: counts.resolved_issues,
+        })
+    })
+    .map_err(|e| format!("{e:#}"))
+}
+
+/// Fetch paginated page diff between two crawls.
+#[tauri::command]
+pub async fn get_page_diffs(
+    base_crawl_id: String,
+    compare_crawl_id: String,
+    pagination: PaginationParams,
+    filters: Option<PageDiffFilters>,
+    db: State<'_, Arc<Database>>,
+) -> Result<PaginatedResponse<PageDiffRow>, String> {
+    db.with_conn(|conn| {
+        let diff_type = filters.as_ref().and_then(|f| f.diff_type);
+        let url_search = filters.as_ref().and_then(|f| f.url_search.clone());
+
+        let total = queries::count_page_diffs(
+            conn,
+            &base_crawl_id,
+            &compare_crawl_id,
+            diff_type,
+            url_search.as_deref(),
+        )?;
+        let items = queries::select_page_diffs(
+            conn,
+            &base_crawl_id,
+            &compare_crawl_id,
+            pagination.offset as i64,
+            clamp_limit(pagination.limit) as i64,
+            diff_type,
+            url_search.as_deref(),
+        )?;
+
+        Ok(PaginatedResponse {
+            items,
+            total: total as u64,
+            offset: pagination.offset,
+            limit: clamp_limit(pagination.limit),
+        })
+    })
+    .map_err(|e| format!("{e:#}"))
+}
+
+/// Fetch paginated issue diff between two crawls.
+#[tauri::command]
+pub async fn get_issue_diffs(
+    base_crawl_id: String,
+    compare_crawl_id: String,
+    pagination: PaginationParams,
+    filters: Option<IssueDiffFilters>,
+    db: State<'_, Arc<Database>>,
+) -> Result<PaginatedResponse<IssueDiffRow>, String> {
+    db.with_conn(|conn| {
+        let diff_type = filters.as_ref().and_then(|f| f.diff_type);
+
+        let total = queries::count_issue_diffs(conn, &base_crawl_id, &compare_crawl_id, diff_type)?;
+        let items = queries::select_issue_diffs(
+            conn,
+            &base_crawl_id,
+            &compare_crawl_id,
+            pagination.offset as i64,
+            clamp_limit(pagination.limit) as i64,
+            diff_type,
+        )?;
+
+        Ok(PaginatedResponse {
+            items,
+            total: total as u64,
+            offset: pagination.offset,
+            limit: clamp_limit(pagination.limit),
+        })
+    })
+    .map_err(|e| format!("{e:#}"))
+}
+
+/// Fetch paginated metadata diff (title/meta_desc changes) between two crawls.
+#[tauri::command]
+pub async fn get_metadata_diffs(
+    base_crawl_id: String,
+    compare_crawl_id: String,
+    pagination: PaginationParams,
+    filters: Option<MetadataDiffFilters>,
+    db: State<'_, Arc<Database>>,
+) -> Result<PaginatedResponse<PageDiffRow>, String> {
+    db.with_conn(|conn| {
+        let url_search = filters.as_ref().and_then(|f| f.url_search.clone());
+
+        let total = queries::count_metadata_diffs(
+            conn,
+            &base_crawl_id,
+            &compare_crawl_id,
+            url_search.as_deref(),
+        )?;
+        let items = queries::select_metadata_diffs(
+            conn,
+            &base_crawl_id,
+            &compare_crawl_id,
+            pagination.offset as i64,
+            clamp_limit(pagination.limit) as i64,
+            url_search.as_deref(),
+        )?;
+
+        Ok(PaginatedResponse {
+            items,
+            total: total as u64,
+            offset: pagination.offset,
+            limit: clamp_limit(pagination.limit),
+        })
+    })
+    .map_err(|e| format!("{e:#}"))
 }

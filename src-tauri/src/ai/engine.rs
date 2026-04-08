@@ -95,6 +95,23 @@ impl AiAnalysisEngine {
                 "title_tag" => {
                     prompts::title_tag_request(body_text, page.title.as_deref(), &page.url)
                 }
+                "structured_data" => {
+                    prompts::structured_data_request(body_text, &page.url, page.title.as_deref())
+                }
+                "accessibility" => {
+                    let h1s: Vec<String> = page
+                        .h1
+                        .as_deref()
+                        .map(|h| vec![h.to_string()])
+                        .unwrap_or_default();
+                    prompts::accessibility_request(
+                        body_text,
+                        &page.url,
+                        page.title.as_deref(),
+                        &h1s,
+                        0, // Image alt count not available from PageRow; rule engine tracks this.
+                    )
+                }
                 other => {
                     tracing::warn!(analysis_type = other, "Unknown analysis type, skipping");
                     continue;

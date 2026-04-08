@@ -177,6 +177,88 @@ pub struct PluginRow {
     pub updated_at: String,
 }
 
+// ---------------------------------------------------------------------------
+// Crawl comparison models
+// ---------------------------------------------------------------------------
+
+/// Lightweight page data for tree building.
+#[derive(Debug)]
+pub struct PageTreeEntry {
+    pub page_id: i64,
+    pub url: String,
+    pub status_code: Option<i32>,
+}
+
+/// The type of change detected for a page between two crawls.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PageDiffType {
+    New,
+    Removed,
+    StatusCodeChanged,
+    MetadataChanged,
+}
+
+/// A row in the paginated page diff result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageDiffRow {
+    pub url: String,
+    pub diff_type: PageDiffType,
+    pub base_status_code: Option<i32>,
+    pub compare_status_code: Option<i32>,
+    pub base_title: Option<String>,
+    pub compare_title: Option<String>,
+    pub base_meta_desc: Option<String>,
+    pub compare_meta_desc: Option<String>,
+}
+
+/// The type of change detected for an issue.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueDiffType {
+    New,
+    Resolved,
+}
+
+/// A row in the paginated issue diff result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDiffRow {
+    pub url: String,
+    pub rule_id: String,
+    pub severity: Severity,
+    pub category: RuleCategory,
+    pub message: String,
+    pub diff_type: IssueDiffType,
+}
+
+/// Filter for page diff queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageDiffFilters {
+    pub diff_type: Option<PageDiffType>,
+    pub url_search: Option<String>,
+}
+
+/// Filter for issue diff queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDiffFilters {
+    pub diff_type: Option<IssueDiffType>,
+}
+
+/// Filter for metadata diff queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataDiffFilters {
+    pub url_search: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Storage commands
+// ---------------------------------------------------------------------------
+
 /// Batch of items to write to the database.
 ///
 /// The storage writer thread receives these via a channel and flushes

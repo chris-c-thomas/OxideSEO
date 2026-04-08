@@ -9,6 +9,7 @@ import { ImagesTab } from "./ImagesTab";
 import { SitemapTab } from "./SitemapTab";
 import { ExternalLinksTab } from "./ExternalLinksTab";
 import { AiInsightsTab } from "./AiInsightsTab";
+import { SiteTreeTab } from "./SiteTreeTab";
 import { PageDetail } from "./PageDetail";
 import { ExportDialog } from "@/components/export/ExportDialog";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,15 @@ interface ResultsExplorerProps {
   crawlId: string | null;
 }
 
-type ResultsTab = "pages" | "issues" | "links" | "images" | "sitemap" | "external" | "ai";
+type ResultsTab =
+  | "pages"
+  | "issues"
+  | "links"
+  | "images"
+  | "sitemap"
+  | "external"
+  | "ai"
+  | "tree";
 
 const TABS: { id: ResultsTab; label: string }[] = [
   { id: "pages", label: "All Pages" },
@@ -27,6 +36,7 @@ const TABS: { id: ResultsTab; label: string }[] = [
   { id: "sitemap", label: "Sitemap" },
   { id: "external", label: "External Links" },
   { id: "ai", label: "AI Insights" },
+  { id: "tree", label: "Site Tree" },
 ];
 
 export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
@@ -157,6 +167,12 @@ export function ResultsExplorer({ crawlId }: ResultsExplorerProps) {
         {activeTab === "sitemap" && <SitemapTab crawlId={crawlId} />}
         {activeTab === "external" && <ExternalLinksTab crawlId={crawlId} />}
         {activeTab === "ai" && <AiInsightsTab crawlId={crawlId} />}
+        {activeTab === "tree" && (
+          <SiteTreeTab
+            crawlId={crawlId}
+            onPageClick={(pageId) => setSelectedPageId(pageId)}
+          />
+        )}
       </div>
 
       {/* Page detail sheet */}

@@ -28,6 +28,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "004_plugins",
         include_str!("../../migrations/004_plugins.sql"),
     ),
+    (
+        "005_crawl_comparison",
+        include_str!("../../migrations/005_crawl_comparison.sql"),
+    ),
 ];
 
 /// Application database handle.
