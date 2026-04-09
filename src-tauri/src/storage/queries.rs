@@ -289,10 +289,18 @@ pub fn select_crawl_config(conn: &Connection, crawl_id: &str) -> Result<Option<S
 ///
 /// Must delete in reverse FK dependency order since no CASCADE is configured.
 pub fn delete_crawl(conn: &mut Connection, crawl_id: &str) -> Result<()> {
-    let tx = conn.transaction().context("failed to begin delete transaction")?;
+    let tx = conn
+        .transaction()
+        .context("failed to begin delete transaction")?;
 
-    tx.execute("DELETE FROM ai_analyses WHERE crawl_id = ?1", params![crawl_id])?;
-    tx.execute("DELETE FROM ai_usage WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute(
+        "DELETE FROM ai_analyses WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute(
+        "DELETE FROM ai_usage WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
     tx.execute(
         "DELETE FROM ai_crawl_summaries WHERE crawl_id = ?1",
         params![crawl_id],
