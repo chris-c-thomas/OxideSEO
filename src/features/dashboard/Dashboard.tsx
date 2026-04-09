@@ -68,7 +68,10 @@ function stateVariant(
   return "secondary";
 }
 
-type PendingAction = { type: "stop" | "delete"; crawlId: string } | null;
+interface PendingAction {
+  type: "stop" | "delete";
+  crawlId: string;
+}
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [recentCrawls, setRecentCrawls] = useState<CrawlSummary[]>([]);
@@ -76,7 +79,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const loadCrawls = () => {
     setIsLoading(true);
@@ -135,26 +138,32 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     const { type, crawlId } = pendingAction;
     setPendingAction(null);
 
-    if (type === "stop") {
-      try {
-        await stopCrawl(crawlId);
-        toast.success("Crawl stopped.");
-        loadCrawls();
-      } catch (err) {
-        toast.error(`Failed to stop crawl: ${String(err)}`);
-      }
-    } else if (type === "delete") {
-      try {
-        await deleteCrawl(crawlId);
-        setRecentCrawls((prev) => prev.filter((c) => c.crawlId !== crawlId));
-        // Clear the global crawl store if this was the active crawl.
-        const { activeCrawlId, clearCrawl } = useCrawlStore.getState();
-        if (crawlId === activeCrawlId) {
-          clearCrawl();
+    switch (type) {
+      case "stop":
+        try {
+          await stopCrawl(crawlId);
+          toast.success("Crawl stopped.");
+          loadCrawls();
+        } catch (err) {
+          toast.error(`Failed to stop crawl: ${String(err)}`);
         }
-        toast.success("Crawl deleted.");
-      } catch (err) {
-        toast.error(`Failed to delete crawl: ${String(err)}`);
+        break;
+      case "delete":
+        try {
+          await deleteCrawl(crawlId);
+          setRecentCrawls((prev) => prev.filter((c) => c.crawlId !== crawlId));
+          const { activeCrawlId, clearCrawl } = useCrawlStore.getState();
+          if (crawlId === activeCrawlId) {
+            clearCrawl();
+          }
+          toast.success("Crawl deleted.");
+        } catch (err) {
+          toast.error(`Failed to delete crawl: ${String(err)}`);
+        }
+        break;
+      default: {
+        const _exhaustive: never = type;
+        void _exhaustive;
       }
     }
   };
@@ -446,7 +455,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         )}
       </Panel>
 
-      {/* Confirmation dialog */}
       <ConfirmDialog
         open={pendingAction !== null}
         title={pendingAction?.type === "delete" ? "Delete Crawl" : "Stop Crawl"}
