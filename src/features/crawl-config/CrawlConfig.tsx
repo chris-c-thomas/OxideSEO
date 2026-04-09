@@ -1,8 +1,5 @@
 /**
  * Crawl configuration form with Zod validation and shadcn/ui components.
- *
- * Replaces the original src/components/crawl/CrawlConfig.tsx with proper
- * design tokens and shadcn primitives. All IPC wiring preserved.
  */
 
 import { useState } from "react";

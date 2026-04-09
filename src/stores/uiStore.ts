@@ -3,7 +3,8 @@
  *
  * Manages sidebar collapsed state, density mode, and per-view table
  * persistence (column order, visibility, sizing, sorting). Persisted
- * to localStorage so UI preferences survive app restarts.
+ * to localStorage so UI preferences survive app restarts. Hydrated
+ * from localStorage at module load time.
  */
 
 import type { SortingState } from "@tanstack/react-table";
@@ -46,10 +47,37 @@ type UiStore = UiState & UiActions;
 
 const STORAGE_KEY = "oxide-seo-ui";
 
+const VALID_DENSITIES = new Set<string>(["compact", "default", "comfortable"]);
+
+/** Load and validate persisted UI state from localStorage. */
 function loadState(): Partial<UiState> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as Partial<UiState>;
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+
+    const obj = parsed as Record<string, unknown>;
+    const result: Partial<UiState> = {};
+
+    if (typeof obj.sidebarCollapsed === "boolean") {
+      result.sidebarCollapsed = obj.sidebarCollapsed;
+    }
+    if (typeof obj.sidebarWidth === "number" && obj.sidebarWidth > 0) {
+      result.sidebarWidth = obj.sidebarWidth;
+    }
+    if (typeof obj.density === "string" && VALID_DENSITIES.has(obj.density)) {
+      result.density = obj.density as Density;
+    }
+    if (
+      typeof obj.tableStates === "object" &&
+      obj.tableStates !== null &&
+      !Array.isArray(obj.tableStates)
+    ) {
+      result.tableStates = obj.tableStates as Record<string, TablePersistedState>;
+    }
+
+    return result;
   } catch {
     // Corrupted storage -- fall through to defaults.
   }

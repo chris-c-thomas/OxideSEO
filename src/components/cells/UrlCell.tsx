@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { Copy, ExternalLink, Check } from "lucide-react";
+import { Copy, ExternalLink, Check, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,8 @@ interface UrlCellProps {
   maxLength?: number;
   className?: string;
 }
+
+type CopyState = "idle" | "copied" | "failed";
 
 function formatDisplayUrl(url: string): string {
   try {
@@ -26,7 +28,7 @@ function formatDisplayUrl(url: string): string {
 }
 
 export function UrlCell({ url, maxLength = 60, className }: UrlCellProps) {
-  const [isCopied, setIsCopied] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const displayUrl = formatDisplayUrl(url);
   const isTruncated = displayUrl.length > maxLength;
@@ -36,10 +38,11 @@ export function UrlCell({ url, maxLength = 60, className }: UrlCellProps) {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(url);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 1500);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 1500);
     } catch {
-      // Clipboard access denied -- ignore.
+      setCopyState("failed");
+      setTimeout(() => setCopyState("idle"), 2000);
     }
   };
 
@@ -52,11 +55,24 @@ export function UrlCell({ url, maxLength = 60, className }: UrlCellProps) {
           </span>
           <button
             onClick={handleCopy}
-            className="text-fg-subtle hover:text-fg-default hidden shrink-0 rounded-[var(--radius-xs)] p-0.5 group-hover:inline-flex"
-            aria-label="Copy URL"
+            className={cn(
+              "hidden shrink-0 rounded-[var(--radius-xs)] p-0.5 group-hover:inline-flex",
+              copyState === "failed"
+                ? "text-danger"
+                : "text-fg-subtle hover:text-fg-default",
+            )}
+            aria-label={
+              copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed"
+                  : "Copy URL"
+            }
           >
-            {isCopied ? (
+            {copyState === "copied" ? (
               <Check className="size-3" strokeWidth={1.75} />
+            ) : copyState === "failed" ? (
+              <X className="size-3" strokeWidth={1.75} />
             ) : (
               <Copy className="size-3" strokeWidth={1.75} />
             )}

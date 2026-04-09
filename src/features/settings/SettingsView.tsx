@@ -1,8 +1,5 @@
 /**
  * Settings view with left sub-navigation and sectioned forms.
- *
- * Replaces src/components/settings/SettingsView.tsx. Preserves all
- * IPC wiring for settings and AI configuration.
  */
 
 import { useEffect, useState } from "react";
@@ -20,6 +17,7 @@ import {
 import type { AppSettings, AiProviderConfig, AiProviderType } from "@/types";
 import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useUiStore, type Density } from "@/stores/uiStore";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,9 +319,9 @@ function AiProviderSection() {
     setMessage(null);
     try {
       await setAiConfig(config);
-      setMessage("AI configuration saved.");
+      toast.success("AI configuration saved.");
     } catch (err) {
-      setMessage(`Error: ${err}`);
+      toast.error(`Failed to save AI config: ${err}`);
     } finally {
       setIsSaving(false);
     }
@@ -337,9 +335,9 @@ function AiProviderSection() {
       await setApiKey(config.providerType, apiKeyInput.trim());
       setApiKeyInput("");
       setKeyStored(true);
-      setMessage("API key saved to OS keychain.");
+      toast.success("API key saved to OS keychain.");
     } catch (err) {
-      setMessage(`Error saving key: ${err}`);
+      toast.error(`Failed to save API key: ${err}`);
     } finally {
       setIsSaving(false);
     }
@@ -350,9 +348,9 @@ function AiProviderSection() {
     try {
       await deleteApiKey(config.providerType);
       setKeyStored(false);
-      setMessage("API key deleted.");
+      toast.success("API key deleted.");
     } catch (err) {
-      setMessage(`Error deleting key: ${err}`);
+      toast.error(`Failed to delete API key: ${err}`);
     }
   };
 
@@ -363,7 +361,7 @@ function AiProviderSection() {
       const result = await testAiConnection();
       setMessage(result);
     } catch (err) {
-      setMessage(`Connection failed: ${err}`);
+      toast.error(`Connection failed: ${err}`);
     } finally {
       setIsTesting(false);
     }

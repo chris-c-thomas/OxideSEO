@@ -1,8 +1,5 @@
 /**
  * Live crawl monitor: ProgressRing, live counters, URL stream, controls.
- *
- * Replaces src/components/crawl/CrawlMonitor.tsx with the new design system.
- * All IPC wiring preserved.
  */
 
 import { useCrawlProgress } from "@/hooks/useCrawlProgress";

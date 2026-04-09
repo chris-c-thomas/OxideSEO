@@ -1,14 +1,12 @@
 /**
  * Dashboard view: recent crawls, summary metrics, and quick-start actions.
- *
- * Replaces the original src/components/layout/Dashboard.tsx with the new
- * design system (token classes, shadcn components, MetricCard, etc.).
  */
 
 import { useEffect, useState } from "react";
 import type { AppView } from "@/App";
 import { getRecentCrawls, openCrawlFile, saveCrawlFile, stopCrawl } from "@/lib/commands";
 import { cn, formatNumber } from "@/lib/utils";
+import { toast } from "sonner";
 import type { CrawlSummary } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,8 +79,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     e.stopPropagation();
     try {
       await saveCrawlFile(crawlId);
+      toast.success("Crawl saved to file.");
     } catch (err) {
-      setError(String(err));
+      toast.error(`Failed to save crawl: ${String(err)}`);
     }
   };
 
@@ -90,9 +89,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     e.stopPropagation();
     try {
       await stopCrawl(crawlId);
+      toast.success("Crawl stopped.");
       loadCrawls();
     } catch (err) {
-      setError(String(err));
+      toast.error(`Failed to stop crawl: ${String(err)}`);
     }
   };
 

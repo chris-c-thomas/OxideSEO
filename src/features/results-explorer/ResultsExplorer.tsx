@@ -1,9 +1,9 @@
 /**
  * Results explorer with tabbed data views and detail drawer.
  *
- * Replaces src/components/results/ResultsExplorer.tsx with shadcn Tabs
- * and token-based styling. Keeps existing tab sub-components for now
- * (PagesTab, IssuesTab, etc.) which still use the old DataTable.
+ * Tab sub-components (PagesTab, IssuesTab, etc.) reference
+ * src/components/results/DataTable.tsx (legacy). These should be
+ * migrated to src/components/DataTable/DataTable.tsx.
  */
 
 import { useEffect, useState } from "react";
