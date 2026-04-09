@@ -5,6 +5,7 @@ import { toggleCommandPalette } from "@/hooks/useCommandPalette";
 import { commandRegistry } from "@/lib/commandRegistry";
 import { SHORTCUTS, shortcutToKeys } from "@/lib/shortcuts";
 import { AppShell } from "@/components/AppShell";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Dashboard } from "@/features/dashboard/Dashboard";
 import { CrawlConfig } from "@/features/crawl-config/CrawlConfig";
@@ -141,6 +142,7 @@ export function App() {
               setActiveCrawlId(crawlId);
               setActiveView("crawl-monitor");
             }}
+            onCancel={() => setActiveView("dashboard")}
           />
         );
       case "crawl-monitor":
@@ -169,7 +171,7 @@ export function App() {
 
   return (
     <AppShell activeView={activeView} onNavigate={navigate}>
-      {renderView()}
+      <ErrorBoundary>{renderView()}</ErrorBoundary>
       <CommandPalette />
     </AppShell>
   );

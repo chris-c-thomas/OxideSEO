@@ -24,15 +24,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Loader2, Plus, X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, ChevronDown, Loader2, Plus, X } from "lucide-react";
 
 interface CrawlConfigProps {
   onCrawlStarted: (crawlId: string) => void;
+  onCancel?: () => void;
 }
 
-export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
+export function CrawlConfig({ onCrawlStarted, onCancel }: CrawlConfigProps) {
   const [formData, setFormData] = useState<CrawlConfigFormValues>(defaultCrawlConfig);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const setCrawlStarted = useCrawlStore((s) => s.setCrawlStarted);
 
@@ -66,7 +69,7 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
       setCrawlStarted(crawlId, config);
       onCrawlStarted(crawlId);
     } catch (err) {
-      setErrors({ startUrl: String(err) });
+      setSubmitError(String(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -82,6 +85,13 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
           Set the target URL and tune crawler parameters.
         </p>
       </div>
+
+      {submitError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="size-4" />
+          <AlertDescription>Failed to start crawl: {submitError}</AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardContent className="flex flex-col gap-6 pt-6">
@@ -369,9 +379,11 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
 
       {/* Sticky footer */}
       <div className="mt-6 flex items-center justify-end gap-3 pb-6">
-        <Button variant="ghost" size="sm">
-          Cancel
-        </Button>
+        {onCancel && (
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
         <Button size="sm" onClick={handleSubmit} disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
           {isSubmitting ? "Starting..." : "Start Crawl"}

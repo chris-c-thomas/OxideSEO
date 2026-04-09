@@ -6,7 +6,14 @@
  */
 
 import { useCrawlStore } from "@/stores/crawlStore";
-import { formatNumber, formatRps, formatBytes } from "@/lib/utils";
+import { cn, formatNumber, formatRps, formatBytes } from "@/lib/utils";
+
+const STATE_DOT_COLOR: Record<string, string> = {
+  running: "bg-status-running",
+  paused: "bg-status-paused",
+  error: "bg-status-error",
+  completed: "bg-status-completed",
+};
 
 export function StatusBar() {
   const state = useCrawlStore((s) => s.state);
@@ -19,17 +26,10 @@ export function StatusBar() {
       {/* Left: crawl state */}
       <div className="flex items-center gap-2">
         <span
-          className={`size-1.5 rounded-full ${
-            state === "running"
-              ? "bg-status-running"
-              : state === "paused"
-                ? "bg-status-paused"
-                : state === "error"
-                  ? "bg-status-error"
-                  : state === "completed"
-                    ? "bg-status-completed"
-                    : "bg-fg-subtle"
-          }`}
+          className={cn(
+            "size-1.5 rounded-full",
+            state ? (STATE_DOT_COLOR[state] ?? "bg-fg-subtle") : "bg-fg-subtle",
+          )}
         />
         <span className="capitalize">{state ?? "Ready"}</span>
       </div>

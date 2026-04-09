@@ -18,6 +18,7 @@ import { Panel } from "@/components/Panel";
 import { StatusCodeBadge } from "@/components/badges/StatusCodeBadge";
 import { Pause, Play, Square, ArrowRight, Activity } from "lucide-react";
 import { formatBytes } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface CrawlMonitorProps {
   crawlId: string | null;
@@ -39,7 +40,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
           icon={Activity}
           title="No active crawl"
           description="Start a new crawl from the configuration page."
-          action={{ label: "New Crawl", onClick: () => {} }}
+          /* No action -- navigation is handled by the sidebar */
         />
       </div>
     );
@@ -50,7 +51,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
       await pauseCrawl(crawlId);
       setCrawlState("paused");
     } catch (err) {
-      console.error("Failed to pause:", err);
+      toast.error(`Failed to pause crawl: ${String(err)}`);
     }
   };
 
@@ -59,7 +60,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
       await resumeCrawl(crawlId);
       setCrawlState("running");
     } catch (err) {
-      console.error("Failed to resume:", err);
+      toast.error(`Failed to resume crawl: ${String(err)}`);
     }
   };
 
@@ -68,7 +69,7 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
       await stopCrawl(crawlId);
       setCrawlState("stopped");
     } catch (err) {
-      console.error("Failed to stop:", err);
+      toast.error(`Failed to stop crawl: ${String(err)}`);
     }
   };
 

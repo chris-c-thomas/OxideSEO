@@ -137,10 +137,10 @@
   --color-fg-subtle: var(--fg-subtle);
   --color-fg-on-accent: var(--fg-on-accent);
 
-  /* Accent */
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-subtle: var(--accent-subtle);
+  /* Brand (the blue accent color -- separate from shadcn's "accent" which means hover bg) */
+  --color-brand: var(--accent);
+  --color-brand-hover: var(--accent-hover);
+  --color-brand-subtle: var(--accent-subtle);
 
   /* Semantic */
   --color-success: var(--success);

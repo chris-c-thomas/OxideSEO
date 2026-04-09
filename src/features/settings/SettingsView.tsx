@@ -49,22 +49,28 @@ export function SettingsView() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const [settings, setLocalSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   useEffect(() => {
-    getSettings().then(setLocalSettings).catch(console.error);
+    getSettings()
+      .then(setLocalSettings)
+      .catch((err) => setSettingsError(String(err)));
   }, []);
 
   const handleSave = async () => {
     if (!settings) return;
     setIsSaving(true);
-    setSaveMessage(null);
+    setSaveStatus(null);
     try {
       await setSettings(settings);
-      setSaveMessage("Settings saved.");
-      setTimeout(() => setSaveMessage(null), 3000);
+      setSaveStatus({ type: "success", message: "Settings saved." });
+      setTimeout(() => setSaveStatus(null), 3000);
     } catch (err) {
-      setSaveMessage(`Error: ${err}`);
+      setSaveStatus({ type: "error", message: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -94,6 +100,15 @@ export function SettingsView() {
       {/* Right content */}
       <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-2xl">
+          {settingsError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="size-4" />
+              <AlertDescription>
+                Failed to load settings: {settingsError}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {activeSection === "general" && (
             <GeneralSection settings={settings} onSettingsChange={setLocalSettings} />
           )}
@@ -108,10 +123,19 @@ export function SettingsView() {
                 {isSaving && <Loader2 className="size-3.5 animate-spin" />}
                 {isSaving ? "Saving..." : "Save Settings"}
               </Button>
-              {saveMessage && (
-                <span className="text-fg-muted flex items-center gap-1 text-xs">
-                  <Check className="text-success size-3" />
-                  {saveMessage}
+              {saveStatus && (
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-xs",
+                    saveStatus.type === "success" ? "text-success" : "text-danger",
+                  )}
+                >
+                  {saveStatus.type === "success" ? (
+                    <Check className="size-3" />
+                  ) : (
+                    <AlertCircle className="size-3" />
+                  )}
+                  {saveStatus.message}
                 </span>
               )}
             </div>
@@ -269,8 +293,9 @@ function AiProviderSection() {
     try {
       const has = await hasApiKey(provider);
       setKeyStored(has);
-    } catch {
+    } catch (err) {
       setKeyStored(false);
+      setMessage(`Warning: could not check key status: ${err}`);
     }
   };
 

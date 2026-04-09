@@ -1,10 +1,9 @@
 /**
  * Virtualized data table using TanStack Table v8 + TanStack Virtual v3.
  *
- * Production-grade table with column resize, reorder, pinning, row
- * selection, and infinite scroll. Designed for 500k+ rows at 60fps.
- *
- * Sorting is server-side via the parent hook (useServerData).
+ * Supports column resize and infinite scroll with server-side sorting
+ * (manualSorting: true -- the parent is responsible for fetching
+ * re-sorted data). Designed for large datasets using row virtualization.
  */
 
 import React, { useCallback, useEffect, useRef } from "react";
@@ -80,7 +79,7 @@ const VirtualRowInner = React.memo(function VirtualRowInner<TData>({
       className={cn(
         "border-border-subtle flex w-full border-b",
         onClick && "cursor-pointer",
-        isSelected ? "bg-accent-subtle" : "hover:bg-bg-hover",
+        isSelected ? "bg-brand-subtle" : "hover:bg-bg-hover",
       )}
       style={{ height }}
       onClick={onClick ? () => onClick(row.original) : undefined}
@@ -251,7 +250,7 @@ export function DataTable<TData>({
                           className={cn(
                             "absolute top-0 right-0 z-10 h-full w-1 cursor-col-resize touch-none select-none",
                             header.column.getIsResizing()
-                              ? "bg-accent"
+                              ? "bg-brand"
                               : "hover:bg-border-strong",
                           )}
                         />

@@ -90,7 +90,7 @@ export function FacetedFilter({
                     <div
                       className={cn(
                         "border-border-default flex size-4 items-center justify-center rounded-[var(--radius-xs)] border",
-                        isSelected && "border-accent bg-accent text-fg-on-accent",
+                        isSelected && "border-brand bg-brand text-fg-on-accent",
                       )}
                     >
                       {isSelected && <Check className="size-3" strokeWidth={2} />}
