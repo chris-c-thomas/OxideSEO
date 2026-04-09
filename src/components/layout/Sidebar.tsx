@@ -66,7 +66,17 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
       <nav className="flex flex-1 flex-col gap-1 p-2">
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
-          const showDot = item.id === "crawl-monitor" && crawlState === "running";
+          const dotColor =
+            item.id === "crawl-monitor"
+              ? crawlState === "running"
+                ? "bg-status-running"
+                : crawlState === "paused"
+                  ? "bg-status-paused"
+                  : crawlState === "error"
+                    ? "bg-status-error"
+                    : null
+              : null;
+          const showDot = dotColor !== null;
           const Icon = item.icon;
 
           const button = (
@@ -84,7 +94,13 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
               <Icon className="size-4 shrink-0" strokeWidth={1.75} />
               {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
               {!collapsed && showDot && (
-                <span className="bg-status-running size-2 rounded-full" />
+                <span
+                  className={cn(
+                    "size-2 rounded-full",
+                    dotColor,
+                    crawlState === "running" && "animate-pulse",
+                  )}
+                />
               )}
             </button>
           );

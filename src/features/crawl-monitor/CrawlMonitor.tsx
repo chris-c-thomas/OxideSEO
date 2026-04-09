@@ -2,9 +2,10 @@
  * Live crawl monitor: ProgressRing, live counters, URL stream, controls.
  */
 
+import { useState } from "react";
 import { useCrawlProgress } from "@/hooks/useCrawlProgress";
 import { pauseCrawl, resumeCrawl, stopCrawl } from "@/lib/commands";
-import { formatDuration, formatNumber, formatRps } from "@/lib/utils";
+import { formatDuration, formatNumber, formatRps, formatBytes } from "@/lib/utils";
 import { useCrawlStore } from "@/stores/crawlStore";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -13,8 +14,8 @@ import { MetricCard } from "@/components/MetricCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Panel } from "@/components/Panel";
 import { StatusCodeBadge } from "@/components/badges/StatusCodeBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Pause, Play, Square, ArrowRight, Activity } from "lucide-react";
-import { formatBytes } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface CrawlMonitorProps {
@@ -23,6 +24,7 @@ interface CrawlMonitorProps {
 }
 
 export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
   useCrawlProgress(crawlId);
 
   const progress = useCrawlStore((s) => s.progress);
@@ -101,7 +103,11 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
             </Button>
           )}
           {(state === "running" || state === "paused") && (
-            <Button variant="destructive" size="sm" onClick={handleStop}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowStopConfirm(true)}
+            >
               <Square className="size-3.5" strokeWidth={1.75} />
               Stop
             </Button>
@@ -196,6 +202,19 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
           </table>
         </div>
       </Panel>
+
+      <ConfirmDialog
+        open={showStopConfirm}
+        title="Stop Crawl"
+        description="This will stop the crawl. In-flight requests will complete but no new URLs will be fetched."
+        confirmLabel="Stop"
+        variant="destructive"
+        onConfirm={() => {
+          setShowStopConfirm(false);
+          handleStop();
+        }}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </div>
   );
 }

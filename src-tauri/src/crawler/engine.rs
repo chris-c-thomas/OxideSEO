@@ -73,6 +73,9 @@ impl CrawlHandle {
 /// Trait for progress event emission — allows test mocking.
 pub trait ProgressEmitter: Send + Sync + 'static {
     fn emit_progress(&self, progress: &CrawlProgress);
+
+    /// Emit a crawl state change event. Default no-op for test emitters.
+    fn emit_state_change(&self, _crawl_id: &str, _state: &str) {}
 }
 
 /// Real emitter using Tauri's AppHandle.
@@ -90,6 +93,14 @@ impl ProgressEmitter for TauriEmitter {
     fn emit_progress(&self, progress: &CrawlProgress) {
         use tauri::Emitter;
         let _ = self.app_handle.emit("crawl://progress", progress);
+    }
+
+    fn emit_state_change(&self, crawl_id: &str, state: &str) {
+        use tauri::Emitter;
+        let _ = self.app_handle.emit(
+            "crawl://state",
+            serde_json::json!({ "crawlId": crawl_id, "state": state }),
+        );
     }
 }
 
@@ -882,6 +893,9 @@ pub async fn spawn_crawl(
             recent_urls: vec![],
             memory_rss_bytes: get_memory_rss(),
         });
+
+        // Emit state change so the frontend can auto-detect completion.
+        emitter.emit_state_change(&crawl_id, final_status);
 
         tracing::info!(
             %crawl_id,

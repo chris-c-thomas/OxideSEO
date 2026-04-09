@@ -4,7 +4,7 @@
 //! writer uses these for batched inserts; the command handlers use them
 //! for reads with LIMIT/OFFSET pagination.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rusqlite::{Connection, params, types::Value};
 
 use super::models::{
@@ -271,6 +271,50 @@ pub fn update_crawl_stats(
         UPDATE_CRAWL_STATS,
         params![crawl_id, urls_crawled, urls_errored],
     )?;
+    Ok(())
+}
+
+/// Retrieve the config_json for a crawl (used by re-run).
+pub fn select_crawl_config(conn: &Connection, crawl_id: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT config_json FROM crawls WHERE id = ?1")?;
+    let result = stmt.query_row(params![crawl_id], |row| row.get::<_, String>(0));
+    match result {
+        Ok(json) => Ok(Some(json)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Delete a crawl and all child records in a single transaction.
+///
+/// Must delete in reverse FK dependency order since no CASCADE is configured.
+pub fn delete_crawl(conn: &mut Connection, crawl_id: &str) -> Result<()> {
+    let tx = conn.transaction().context("failed to begin delete transaction")?;
+
+    tx.execute("DELETE FROM ai_analyses WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute("DELETE FROM ai_usage WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute(
+        "DELETE FROM ai_crawl_summaries WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute(
+        "DELETE FROM external_links WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute("DELETE FROM links WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute("DELETE FROM issues WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute(
+        "DELETE FROM sitemap_urls WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute("DELETE FROM pages WHERE crawl_id = ?1", params![crawl_id])?;
+    let changes = tx.execute("DELETE FROM crawls WHERE id = ?1", params![crawl_id])?;
+
+    if changes == 0 {
+        anyhow::bail!("crawl not found: {crawl_id}");
+    }
+
+    tx.commit().context("failed to commit delete transaction")?;
     Ok(())
 }
 

@@ -74,6 +74,16 @@ export function getCrawlStatus(crawlId: string): Promise<CrawlStatus> {
   return invoke<CrawlStatus>("get_crawl_status", { crawlId });
 }
 
+/** Delete a crawl and all associated data. Stops it first if active. */
+export function deleteCrawl(crawlId: string): Promise<void> {
+  return invoke<void>("delete_crawl", { crawlId });
+}
+
+/** Re-run a crawl using the same configuration. Returns new crawl ID. */
+export function rerunCrawl(crawlId: string): Promise<string> {
+  return invoke<string>("rerun_crawl", { crawlId });
+}
+
 // ---------------------------------------------------------------------------
 // Result queries
 // ---------------------------------------------------------------------------

@@ -139,33 +139,33 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 
 ### Frontend (`src/`)
 
-| File                                       | Purpose                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| `App.tsx`                                  | Root component, view routing (`AppView` union type)                       |
-| `types/index.ts`                           | All TypeScript types matching Rust IPC                                    |
-| `lib/commands.ts`                          | Typed Tauri invoke wrappers                                               |
-| `lib/commandRegistry.ts`                   | Command palette registry (separate from IPC commands)                     |
-| `lib/shortcuts.ts`                         | Global keyboard shortcut definitions                                      |
-| `hooks/useServerData.ts`                   | Infinite-scroll data fetching with sort/filter                            |
-| `hooks/useTheme.ts`                        | Theme management (light/dark/system via `data-theme` attribute)           |
-| `hooks/useHotkeys.ts`                      | Lightweight keyboard shortcut hook                                        |
-| `hooks/useCommandPalette.ts`               | Command palette open/close state                                          |
-| `stores/uiStore.ts`                        | Sidebar, density, table state persistence (localStorage)                  |
-| `styles/tokens.css`                        | OKLCH design tokens, `@theme` directives for Tailwind v4                  |
-| `styles/globals.css`                       | Tailwind import, fonts, base styles, scrollbar, reduced-motion            |
-| `components/AppShell.tsx`                  | Root grid layout: TitleBar + Sidebar + Main + StatusBar                   |
-| `components/CommandPalette.tsx`            | Cmd/Ctrl+K command palette (shadcn Command + Dialog)                      |
-| `components/DataTable/DataTable.tsx`       | Virtualized table with column resize/reorder/pin                          |
-| `components/DataTable/DataTableToolbar.tsx` | Search, filters, column visibility, density toggle                       |
-| `features/dashboard/Dashboard.tsx`         | Recent crawls, metrics, compare mode                                      |
-| `features/crawl-config/CrawlConfig.tsx`   | Crawl config form with shadcn components                                  |
-| `features/crawl-monitor/CrawlMonitor.tsx` | Live crawl monitor with ProgressRing                                      |
+| File                                            | Purpose                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `App.tsx`                                       | Root component, view routing (`AppView` union type)                       |
+| `types/index.ts`                                | All TypeScript types matching Rust IPC                                    |
+| `lib/commands.ts`                               | Typed Tauri invoke wrappers                                               |
+| `lib/commandRegistry.ts`                        | Command palette registry (separate from IPC commands)                     |
+| `lib/shortcuts.ts`                              | Global keyboard shortcut definitions                                      |
+| `hooks/useServerData.ts`                        | Infinite-scroll data fetching with sort/filter                            |
+| `hooks/useTheme.ts`                             | Theme management (light/dark/system via `data-theme` attribute)           |
+| `hooks/useHotkeys.ts`                           | Lightweight keyboard shortcut hook                                        |
+| `hooks/useCommandPalette.ts`                    | Command palette open/close state                                          |
+| `stores/uiStore.ts`                             | Sidebar, density, table state persistence (localStorage)                  |
+| `styles/tokens.css`                             | OKLCH design tokens, `@theme` directives for Tailwind v4                  |
+| `styles/globals.css`                            | Tailwind import, fonts, base styles, scrollbar, reduced-motion            |
+| `components/AppShell.tsx`                       | Root grid layout: TitleBar + Sidebar + Main + StatusBar                   |
+| `components/CommandPalette.tsx`                 | Cmd/Ctrl+K command palette (shadcn Command + Dialog)                      |
+| `components/DataTable/DataTable.tsx`            | Virtualized table with column resize/reorder/pin                          |
+| `components/DataTable/DataTableToolbar.tsx`     | Search, filters, column visibility, density toggle                        |
+| `features/dashboard/Dashboard.tsx`              | Recent crawls, metrics, compare mode                                      |
+| `features/crawl-config/CrawlConfig.tsx`         | Crawl config form with shadcn components                                  |
+| `features/crawl-monitor/CrawlMonitor.tsx`       | Live crawl monitor with ProgressRing                                      |
 | `features/results-explorer/ResultsExplorer.tsx` | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
-| `features/issues/IssuesView.tsx`           | Issues grouped by rule with collapsible sections                          |
-| `features/settings/SettingsView.tsx`       | Settings with left sub-nav (General, Appearance, AI, About)               |
-| `components/comparison/*.tsx`              | Crawl comparison: overview, page/issue/metadata diff tabs                 |
-| `components/export/ExportDialog.tsx`       | Export dialog with format/type/column selection                           |
-| `components/plugins/PluginManagerView.tsx` | Plugin manager grid with detail sheet                                     |
+| `features/issues/IssuesView.tsx`                | Issues grouped by rule with collapsible sections                          |
+| `features/settings/SettingsView.tsx`            | Settings with left sub-nav (General, Appearance, AI, About)               |
+| `components/comparison/*.tsx`                   | Crawl comparison: overview, page/issue/metadata diff tabs                 |
+| `components/export/ExportDialog.tsx`            | Export dialog with format/type/column selection                           |
+| `components/plugins/PluginManagerView.tsx`      | Plugin manager grid with detail sheet                                     |
 
 ## Testing Approach
 
