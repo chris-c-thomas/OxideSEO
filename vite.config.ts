@@ -9,6 +9,12 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      (await import("./package.json", { with: { type: "json" } })).default.version,
+    ),
+  },
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

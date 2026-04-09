@@ -8,6 +8,8 @@
 
 import type { ReactNode } from "react";
 
+declare const __APP_VERSION__: string;
+
 const IS_MAC =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
@@ -30,7 +32,7 @@ export function TitleBar({ actions }: TitleBarProps) {
         >
           OxideSEO
         </span>
-        <span className="text-fg-subtle text-[0.6875rem]">v0.4</span>
+        <span className="text-fg-subtle text-[0.6875rem]">v{__APP_VERSION__}</span>
       </div>
 
       {/* Spacer with drag region */}

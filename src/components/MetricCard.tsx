@@ -54,7 +54,7 @@ export function MetricCard({
             )}
           >
             {delta.trend === "up" && "+"}
-            {delta.trend === "down" && ""}
+            {delta.trend === "down" && "\u2212"}
             {delta.value}%
           </span>
         )}

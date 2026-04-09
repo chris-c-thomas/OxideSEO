@@ -3,7 +3,8 @@
  *
  * Detects system preference via `prefers-color-scheme`, allows manual
  * override (light / dark / system), and persists choice to localStorage.
- * Applies the `data-theme` attribute to the document root.
+ * Applies `data-theme` attribute to the document root and toggles the
+ * `dark` class for Tailwind `dark:` variant compatibility.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -18,10 +19,6 @@ function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function resolveTheme(theme: Theme): ResolvedTheme {
-  return theme === "system" ? getSystemTheme() : theme;
-}
-
 function getStoredTheme(): Theme | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -33,7 +30,11 @@ function getStoredTheme(): Theme | null {
 }
 
 function applyTheme(resolved: ResolvedTheme) {
-  document.documentElement.setAttribute("data-theme", resolved);
+  const root = document.documentElement;
+  root.setAttribute("data-theme", resolved);
+  // Toggle .dark class for Tailwind dark: variant compatibility
+  // (shadcn components use dark: utilities for fine-tuning).
+  root.classList.toggle("dark", resolved === "dark");
 }
 
 export function useTheme() {
@@ -41,25 +42,24 @@ export function useTheme() {
     return getStoredTheme() ?? "light";
   });
 
-  const resolved = resolveTheme(theme);
+  // Track system theme separately so changes trigger re-renders.
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
+
+  const resolved = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
     applyTheme(resolved);
   }, [resolved]);
 
-  // Listen for system theme changes when in "system" mode.
+  // Listen for OS theme changes.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      if (theme === "system") {
-        applyTheme(getSystemTheme());
-        // Force re-render so `resolved` updates.
-        setThemeState("system");
-      }
+    const handler = (e: MediaQueryListEvent) => {
+      setSystemTheme(e.matches ? "dark" : "light");
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [theme]);
+  }, []);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);

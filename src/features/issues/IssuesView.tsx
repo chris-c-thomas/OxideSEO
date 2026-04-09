@@ -36,7 +36,10 @@ export function IssuesView({ crawlId }: IssuesViewProps) {
     (
       pagination: PaginationParams,
       f: IssueFilters,
-    ): Promise<PaginatedResponse<IssueRow>> => getIssues(crawlId!, pagination, f),
+    ): Promise<PaginatedResponse<IssueRow>> => {
+      if (!crawlId) return Promise.resolve({ items: [], total: 0, offset: 0, limit: 0 });
+      return getIssues(crawlId, pagination, f);
+    },
     [crawlId],
   );
 
