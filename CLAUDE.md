@@ -144,12 +144,25 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `App.tsx`                                  | Root component, view routing (`AppView` union type)                       |
 | `types/index.ts`                           | All TypeScript types matching Rust IPC                                    |
 | `lib/commands.ts`                          | Typed Tauri invoke wrappers                                               |
+| `lib/commandRegistry.ts`                   | Command palette registry (separate from IPC commands)                     |
+| `lib/shortcuts.ts`                         | Global keyboard shortcut definitions                                      |
 | `hooks/useServerData.ts`                   | Infinite-scroll data fetching with sort/filter                            |
-| `components/layout/Dashboard.tsx`          | Recent crawls, compare mode, quick-start                                  |
-| `components/crawl/CrawlConfig.tsx`         | Crawl config form with advanced sections                                  |
-| `components/crawl/CrawlMonitor.tsx`        | Live crawl monitor + ResourceMeter                                        |
-| `components/results/ResultsExplorer.tsx`   | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
-| `components/results/DataTable.tsx`         | Virtualized table (TanStack Table + Virtual)                              |
+| `hooks/useTheme.ts`                        | Theme management (light/dark/system via `data-theme` attribute)           |
+| `hooks/useHotkeys.ts`                      | Lightweight keyboard shortcut hook                                        |
+| `hooks/useCommandPalette.ts`               | Command palette open/close state                                          |
+| `stores/uiStore.ts`                        | Sidebar, density, table state persistence (localStorage)                  |
+| `styles/tokens.css`                        | OKLCH design tokens, `@theme` directives for Tailwind v4                  |
+| `styles/globals.css`                       | Tailwind import, fonts, base styles, scrollbar, reduced-motion            |
+| `components/AppShell.tsx`                  | Root grid layout: TitleBar + Sidebar + Main + StatusBar                   |
+| `components/CommandPalette.tsx`            | Cmd/Ctrl+K command palette (shadcn Command + Dialog)                      |
+| `components/DataTable/DataTable.tsx`       | Virtualized table with column resize/reorder/pin                          |
+| `components/DataTable/DataTableToolbar.tsx` | Search, filters, column visibility, density toggle                       |
+| `features/dashboard/Dashboard.tsx`         | Recent crawls, metrics, compare mode                                      |
+| `features/crawl-config/CrawlConfig.tsx`   | Crawl config form with shadcn components                                  |
+| `features/crawl-monitor/CrawlMonitor.tsx` | Live crawl monitor with ProgressRing                                      |
+| `features/results-explorer/ResultsExplorer.tsx` | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
+| `features/issues/IssuesView.tsx`           | Issues grouped by rule with collapsible sections                          |
+| `features/settings/SettingsView.tsx`       | Settings with left sub-nav (General, Appearance, AI, About)               |
 | `components/comparison/*.tsx`              | Crawl comparison: overview, page/issue/metadata diff tabs                 |
 | `components/export/ExportDialog.tsx`       | Export dialog with format/type/column selection                           |
 | `components/plugins/PluginManagerView.tsx` | Plugin manager grid with detail sheet                                     |
@@ -264,3 +277,10 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Plugin directory must exist** — `{app_data_dir}/plugins/` is created in `main.rs` setup. Plugin discovery silently skips if the directory doesn't exist.
 - **Native plugin ABI stability** — Native plugins use Rust `dyn` trait objects. Vtable layout is not stable across Rust compiler versions. Native plugins must be compiled with the same toolchain as the host.
 - **Memory RSS uses raw FFI, not `mach2` crate** — `get_memory_rss()` in `crawler/engine.rs` uses manually defined `MachTaskBasicInfo` struct + `task_info()` extern on macOS, and reads `/proc/self/status` on Linux. The `mach2` crate was intentionally avoided because its type definitions didn't match what was needed. Do not refactor to use `mach2` without verifying the struct layout.
+- **Tailwind v4 requires `@tailwindcss/vite`** — The Vite plugin in `vite.config.ts` is what makes `@import "tailwindcss"` work. Without it, zero utility classes are generated and the app renders unstyled. Do not remove it.
+- **shadcn `sonner` patched for non-Next.js** — `src/components/ui/sonner.tsx` imports from `@/hooks/useTheme` instead of `next-themes`. If re-installing sonner via `npx shadcn@latest add sonner --overwrite`, manually re-apply this patch.
+- **CSS import order in `globals.css`** — Fonts must be imported before `@import "tailwindcss"`, and `tokens.css` must be imported after. Tailwind processes `@theme inline` blocks from imported files only if the Vite plugin is active.
+- **`useSyncExternalStore` snapshots must be stable** — Never return a new array/object from `getSnapshot`. Use `useState` + `useEffect` subscription for collection data, reserve `useSyncExternalStore` for primitives (booleans, strings, numbers).
+- **Theme defaults to light, uses `data-theme` attribute** — `useTheme` hook defaults to `"light"` when no stored preference exists. Theme toggle is in the sidebar bottom section. Applied via `data-theme` attribute on `<html>`, not the `.dark` class.
+- **Screen components live in `src/features/`** — Dashboard, CrawlConfig, CrawlMonitor, ResultsExplorer, IssuesView, and SettingsView are in `src/features/<name>/`. Shared components remain in `src/components/`. Old screen stubs still exist in `src/components/` but are no longer imported by `App.tsx`.
+- **No `deleteCrawl` IPC command exists** — Despite D-1 being listed as implemented, `src/lib/commands.ts` has no `deleteCrawl` wrapper and `commands/crawl.rs` lacks a delete command. Only `stopCrawl` is available for running crawls.
