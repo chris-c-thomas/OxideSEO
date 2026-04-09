@@ -37,6 +37,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `build`, `ci`
 
 Examples:
+
 ```
 feat(auth): add OAuth login via GitHub
 fix(api): handle null user in session check
@@ -109,11 +110,12 @@ Every PR must pass the following before merge:
 - User-facing changes require README or docs updates
 - New environment variables must be added to `.env.example`, `lib/env.ts`, and the env table in [DEVELOPMENT.md](DEVELOPMENT.md#environment-variables)
 - Architectural changes should be recorded as an ADR in `docs/adr/`
-- Inline comments should explain *why*, not *what*
+- Inline comments should explain _why_, not _what_
 
 ## Reporting Bugs
 
 Open an issue with:
+
 - A clear, descriptive title
 - Steps to reproduce
 - Expected vs. actual behavior
@@ -124,6 +126,7 @@ Open an issue with:
 ## Suggesting Features
 
 Open an issue describing:
+
 - The problem you're trying to solve
 - Your proposed solution
 - Alternatives you considered

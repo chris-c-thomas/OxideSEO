@@ -19,15 +19,15 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for prerequisites, installation, and common
 
 Create branches from `main` following this pattern:
 
-| Prefix | Use |
-|---|---|
-| `feat/` | New features |
-| `fix/` | Bug fixes |
-| `refactor/` | Code restructuring |
-| `docs/` | Documentation changes |
-| `test/` | Test additions or changes |
-| `chore/` | Tooling, dependencies, CI |
-| `perf/` | Performance improvements |
+| Prefix      | Use                       |
+| ----------- | ------------------------- |
+| `feat/`     | New features              |
+| `fix/`      | Bug fixes                 |
+| `refactor/` | Code restructuring        |
+| `docs/`     | Documentation changes     |
+| `test/`     | Test additions or changes |
+| `chore/`    | Tooling, dependencies, CI |
+| `perf/`     | Performance improvements  |
 
 ## Commit Messages
 
@@ -82,15 +82,15 @@ cargo test
 
 Every PR must pass before merge:
 
-| Check | Command | Runs On |
-|---|---|---|
-| Rust format | `cargo fmt --all -- --check` | Ubuntu, macOS, Windows |
-| Rust lint | `cargo clippy --all-targets --all-features -- -D warnings` | Ubuntu, macOS, Windows |
-| Rust tests | `cargo test --lib --all-features` | Ubuntu, macOS, Windows |
-| Frontend lint | `npm run lint` | Ubuntu |
-| Frontend format | `npm run format:check` | Ubuntu |
-| Frontend typecheck | `npm run typecheck` | Ubuntu |
-| Frontend tests | `npm run test` | Ubuntu |
+| Check              | Command                                                    | Runs On                |
+| ------------------ | ---------------------------------------------------------- | ---------------------- |
+| Rust format        | `cargo fmt --all -- --check`                               | Ubuntu, macOS, Windows |
+| Rust lint          | `cargo clippy --all-targets --all-features -- -D warnings` | Ubuntu, macOS, Windows |
+| Rust tests         | `cargo test --lib --all-features`                          | Ubuntu, macOS, Windows |
+| Frontend lint      | `npm run lint`                                             | Ubuntu                 |
+| Frontend format    | `npm run format:check`                                     | Ubuntu                 |
+| Frontend typecheck | `npm run typecheck`                                        | Ubuntu                 |
+| Frontend tests     | `npm run test`                                             | Ubuntu                 |
 
 ## Code Style
 
@@ -113,6 +113,7 @@ Every PR must pass before merge:
 ### IPC Types
 
 Types that cross the Tauri IPC boundary must be updated in both languages simultaneously:
+
 - Rust: struct with `#[serde(rename_all = "camelCase")]`
 - TypeScript: interface in `src/types/index.ts`
 
@@ -132,6 +133,7 @@ Types that cross the Tauri IPC boundary must be updated in both languages simult
 ## Reporting Bugs
 
 Open an issue with:
+
 - Steps to reproduce
 - Expected vs. actual behavior
 - OS and app version
@@ -140,6 +142,7 @@ Open an issue with:
 ## Suggesting Features
 
 Open an issue describing:
+
 - The problem you are trying to solve
 - Your proposed solution
 - Alternatives you considered

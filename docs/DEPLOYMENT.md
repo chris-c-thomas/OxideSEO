@@ -11,12 +11,12 @@ OxideSEO is a desktop application distributed as platform-specific installers. T
 
 ## Supported Platforms
 
-| Platform | Architecture | Bundle Formats | Status |
-|---|---|---|---|
-| macOS | aarch64 (Apple Silicon) | `.dmg`, `.app` | Supported |
-| macOS | x86_64 (Intel) | `.dmg`, `.app` | Supported |
-| Windows | x86_64 | `.msi`, `.exe` (NSIS) | Supported |
-| Linux | x86_64 | `.deb`, `.AppImage`, `.rpm` | Supported |
+| Platform | Architecture            | Bundle Formats              | Status    |
+| -------- | ----------------------- | --------------------------- | --------- |
+| macOS    | aarch64 (Apple Silicon) | `.dmg`, `.app`              | Supported |
+| macOS    | x86_64 (Intel)          | `.dmg`, `.app`              | Supported |
+| Windows  | x86_64                  | `.msi`, `.exe` (NSIS)       | Supported |
+| Linux    | x86_64                  | `.deb`, `.AppImage`, `.rpm` | Supported |
 
 ## Build Process
 
@@ -28,6 +28,7 @@ npx tauri build
 ```
 
 This runs:
+
 1. `npm run build` -- TypeScript compilation (`tsc -b`) + Vite production bundle -> `dist/`
 2. `cargo build --release` -- Optimized Rust binary
 3. Tauri packages `dist/` into the binary and produces platform-specific installers
@@ -80,11 +81,11 @@ Push / PR to main
 
 ### CI Environment
 
-| Variable | Value | Purpose |
-|---|---|---|
-| `CARGO_TERM_COLOR` | `always` | Colored Cargo output |
-| `RUST_BACKTRACE` | `1` | Enable Rust backtraces |
-| `TAURI_SIGNING_PRIVATE_KEY` | `""` (empty) | No code signing in CI |
+| Variable                    | Value        | Purpose                |
+| --------------------------- | ------------ | ---------------------- |
+| `CARGO_TERM_COLOR`          | `always`     | Colored Cargo output   |
+| `RUST_BACKTRACE`            | `1`          | Enable Rust backtraces |
+| `TAURI_SIGNING_PRIVATE_KEY` | `""` (empty) | No code signing in CI  |
 
 ## Distribution
 
@@ -109,6 +110,7 @@ The bundle identifier is `com.oxideseo.desktop`. This identifier is used by the 
 ## Versioning
 
 OxideSEO follows [Semantic Versioning](https://semver.org/). The version is declared in:
+
 - `src-tauri/tauri.conf.json` (`version` field)
 - `src-tauri/Cargo.toml` (`version` field)
 - `package.json` (`version` field)

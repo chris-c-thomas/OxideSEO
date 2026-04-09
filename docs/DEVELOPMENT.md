@@ -7,22 +7,25 @@ For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| Rust | 1.85+ (stable) | Install via [rustup](https://rustup.rs/) |
-| Node.js | 22 LTS | Install via [nodejs.org](https://nodejs.org/) or a version manager |
-| npm | Included with Node.js | Used as the package manager |
+| Tool    | Version               | Notes                                                              |
+| ------- | --------------------- | ------------------------------------------------------------------ |
+| Rust    | 1.85+ (stable)        | Install via [rustup](https://rustup.rs/)                           |
+| Node.js | 22 LTS                | Install via [nodejs.org](https://nodejs.org/) or a version manager |
+| npm     | Included with Node.js | Used as the package manager                                        |
 
 ### Platform-Specific Dependencies
 
 **macOS:**
+
 - Xcode Command Line Tools: `xcode-select --install`
 
 **Windows:**
+
 - [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 - WebView2 (pre-installed on Windows 11; download from Microsoft for Windows 10)
 
 **Linux (Debian/Ubuntu):**
+
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 ```
@@ -60,30 +63,30 @@ RUST_LOG=debug npx tauri dev
 
 All npm scripts are defined in `package.json`:
 
-| Script | Command | Purpose |
-|---|---|---|
-| `npm run dev` | `vite` | Frontend dev server only (port 1420) |
-| `npm run build` | `tsc -b && vite build` | TypeScript check + production bundle |
-| `npm run preview` | `vite preview` | Preview production build locally |
-| `npm run lint` | `eslint src/ --max-warnings 0` | Lint frontend (zero-warning policy) |
-| `npm run lint:fix` | `eslint src/ --fix` | Auto-fix ESLint violations |
-| `npm run format` | `prettier --write "src/**/*.{ts,tsx,css}"` | Auto-format frontend code |
-| `npm run format:check` | `prettier --check "src/**/*.{ts,tsx,css}"` | Check formatting without modifying |
-| `npm run test` | `vitest run` | Run frontend tests (single pass) |
-| `npm run test:watch` | `vitest` | Run frontend tests in watch mode |
-| `npm run typecheck` | `tsc --noEmit` | TypeScript type checking only |
-| `npm run changelog` | `git cliff -o CHANGELOG.md` | Generate changelog from commits |
-| `npm run changelog:preview` | `git cliff --unreleased` | Preview unreleased changelog |
+| Script                      | Command                                    | Purpose                              |
+| --------------------------- | ------------------------------------------ | ------------------------------------ |
+| `npm run dev`               | `vite`                                     | Frontend dev server only (port 1420) |
+| `npm run build`             | `tsc -b && vite build`                     | TypeScript check + production bundle |
+| `npm run preview`           | `vite preview`                             | Preview production build locally     |
+| `npm run lint`              | `eslint src/ --max-warnings 0`             | Lint frontend (zero-warning policy)  |
+| `npm run lint:fix`          | `eslint src/ --fix`                        | Auto-fix ESLint violations           |
+| `npm run format`            | `prettier --write "src/**/*.{ts,tsx,css}"` | Auto-format frontend code            |
+| `npm run format:check`      | `prettier --check "src/**/*.{ts,tsx,css}"` | Check formatting without modifying   |
+| `npm run test`              | `vitest run`                               | Run frontend tests (single pass)     |
+| `npm run test:watch`        | `vitest`                                   | Run frontend tests in watch mode     |
+| `npm run typecheck`         | `tsc --noEmit`                             | TypeScript type checking only        |
+| `npm run changelog`         | `git cliff -o CHANGELOG.md`                | Generate changelog from commits      |
+| `npm run changelog:preview` | `git cliff --unreleased`                   | Preview unreleased changelog         |
 
 Rust commands run from the `src-tauri/` directory:
 
-| Command | Purpose |
-|---|---|
-| `cargo test` | Run Rust unit and integration tests |
-| `cargo clippy --all-targets -- -D warnings` | Rust lint (zero-warning policy) |
-| `cargo fmt --all -- --check` | Check Rust formatting |
-| `cargo fmt --all` | Auto-format Rust code |
-| `cargo bench` | Run Criterion benchmarks |
+| Command                                     | Purpose                             |
+| ------------------------------------------- | ----------------------------------- |
+| `cargo test`                                | Run Rust unit and integration tests |
+| `cargo clippy --all-targets -- -D warnings` | Rust lint (zero-warning policy)     |
+| `cargo fmt --all -- --check`                | Check Rust formatting               |
+| `cargo fmt --all`                           | Auto-format Rust code               |
+| `cargo bench`                               | Run Criterion benchmarks            |
 
 ## Code Quality
 
@@ -143,24 +146,24 @@ cargo bench                        # Run benchmarks
 
 The project uses strict TypeScript with these non-default options:
 
-| Option | Value | Effect |
-|---|---|---|
-| `strict` | `true` | All strict checks enabled |
-| `noUncheckedIndexedAccess` | `true` | Array/object access returns `T \| undefined` |
-| `noUnusedLocals` | `true` | Errors on unused local variables |
-| `noUnusedParameters` | `true` | Errors on unused function parameters |
-| `moduleResolution` | `bundler` | Vite-compatible module resolution |
+| Option                     | Value     | Effect                                       |
+| -------------------------- | --------- | -------------------------------------------- |
+| `strict`                   | `true`    | All strict checks enabled                    |
+| `noUncheckedIndexedAccess` | `true`    | Array/object access returns `T \| undefined` |
+| `noUnusedLocals`           | `true`    | Errors on unused local variables             |
+| `noUnusedParameters`       | `true`    | Errors on unused function parameters         |
+| `moduleResolution`         | `bundler` | Vite-compatible module resolution            |
 
 Path aliases configured:
 
-| Alias | Target |
-|---|---|
-| `@/*` | `./src/*` |
+| Alias            | Target               |
+| ---------------- | -------------------- |
+| `@/*`            | `./src/*`            |
 | `@/components/*` | `./src/components/*` |
-| `@/hooks/*` | `./src/hooks/*` |
-| `@/lib/*` | `./src/lib/*` |
-| `@/stores/*` | `./src/stores/*` |
-| `@/types/*` | `./src/types/*` |
+| `@/hooks/*`      | `./src/hooks/*`      |
+| `@/lib/*`        | `./src/lib/*`        |
+| `@/stores/*`     | `./src/stores/*`     |
+| `@/types/*`      | `./src/types/*`      |
 
 ## Common Workflows
 
@@ -241,33 +244,33 @@ See `plugins/examples/markdown-exporter/` for a complete example.
 
 #### PluginParsedPage (data passed to rule plugins)
 
-| Field | Type | Description |
-|---|---|---|
-| `url` | `string` | Page URL |
-| `title` | `option<string>` | Page title |
-| `meta_description` | `option<string>` | Meta description |
-| `meta_robots` | `option<string>` | Meta robots directive |
-| `canonical` | `option<string>` | Canonical URL |
-| `viewport` | `option<string>` | Viewport meta tag |
-| `h1s` | `list<string>` | H1 heading texts |
-| `h2s` | `list<string>` | H2 heading texts |
-| `word_count` | `u32` | Body word count |
-| `body_text` | `option<string>` | Body text (first ~8000 chars) |
-| `body_size` | `option<u32>` | Response body size in bytes |
-| `response_time_ms` | `option<u32>` | Response time in milliseconds |
-| `links_count` | `u32` | Number of links on page |
-| `images_count` | `u32` | Number of images on page |
-| `scripts` | `list<string>` | Script URLs |
-| `stylesheets` | `list<string>` | Stylesheet URLs |
+| Field              | Type             | Description                   |
+| ------------------ | ---------------- | ----------------------------- |
+| `url`              | `string`         | Page URL                      |
+| `title`            | `option<string>` | Page title                    |
+| `meta_description` | `option<string>` | Meta description              |
+| `meta_robots`      | `option<string>` | Meta robots directive         |
+| `canonical`        | `option<string>` | Canonical URL                 |
+| `viewport`         | `option<string>` | Viewport meta tag             |
+| `h1s`              | `list<string>`   | H1 heading texts              |
+| `h2s`              | `list<string>`   | H2 heading texts              |
+| `word_count`       | `u32`            | Body word count               |
+| `body_text`        | `option<string>` | Body text (first ~8000 chars) |
+| `body_size`        | `option<u32>`    | Response body size in bytes   |
+| `response_time_ms` | `option<u32>`    | Response time in milliseconds |
+| `links_count`      | `u32`            | Number of links on page       |
+| `images_count`     | `u32`            | Number of images on page      |
+| `scripts`          | `list<string>`   | Script URLs                   |
+| `stylesheets`      | `list<string>`   | Stylesheet URLs               |
 
 #### Capabilities
 
-| Capability | Description | WASM | Native |
-|---|---|---|---|
-| `log` | Write log messages to host tracing | Yes | N/A (full access) |
-| `http_read` | Outbound HTTP GET requests | Yes | N/A |
-| `db_read` | Read-only SQL queries | Yes | N/A |
-| `fs_read_plugin_dir` | Read files in plugin directory | Yes | N/A |
+| Capability           | Description                        | WASM | Native            |
+| -------------------- | ---------------------------------- | ---- | ----------------- |
+| `log`                | Write log messages to host tracing | Yes  | N/A (full access) |
+| `http_read`          | Outbound HTTP GET requests         | Yes  | N/A               |
+| `db_read`            | Read-only SQL queries              | Yes  | N/A               |
+| `fs_read_plugin_dir` | Read files in plugin directory     | Yes  | N/A               |
 
 #### API Stability
 

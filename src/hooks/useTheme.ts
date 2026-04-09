@@ -2,17 +2,19 @@
  * Theme management hook.
  *
  * Detects system preference via `prefers-color-scheme`, allows manual
- * override, and persists choice to localStorage. Applies the `dark`
- * class to the document root.
+ * override (light / dark / system), and persists choice to localStorage.
+ * Applies `data-theme` attribute to the document root and toggles the
+ * `dark` class for Tailwind `dark:` variant compatibility.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+export type Theme = "light" | "dark" | "system";
+type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "oxide-seo-theme";
 
-function getSystemTheme(): Theme {
+function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
@@ -20,52 +22,53 @@ function getSystemTheme(): Theme {
 function getStoredTheme(): Theme | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
+    if (stored === "light" || stored === "dark" || stored === "system") return stored;
   } catch {
-    // localStorage unavailable — fall through.
+    // localStorage unavailable -- fall through.
   }
   return null;
 }
 
-function applyTheme(theme: Theme) {
+function applyTheme(resolved: ResolvedTheme) {
   const root = document.documentElement;
-  if (theme === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+  root.setAttribute("data-theme", resolved);
+  // Toggle .dark class for Tailwind dark: variant compatibility
+  // (shadcn components use dark: utilities for fine-tuning).
+  root.classList.toggle("dark", resolved === "dark");
 }
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return getStoredTheme() ?? getSystemTheme();
+    return getStoredTheme() ?? "light";
   });
 
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+  // Track system theme separately so changes trigger re-renders.
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
 
-  // Listen for system theme changes.
+  const resolved = theme === "system" ? systemTheme : theme;
+
+  useEffect(() => {
+    applyTheme(resolved);
+  }, [resolved]);
+
+  // Listen for OS theme changes.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
-      // Only react to system changes if the user hasn't set an explicit preference.
-      if (!getStoredTheme()) {
-        setThemeState(e.matches ? "dark" : "light");
-      }
+      setSystemTheme(e.matches ? "dark" : "light");
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
     try {
       localStorage.setItem(STORAGE_KEY, newTheme);
     } catch {
       // Ignore.
     }
-  };
+  }, []);
 
-  return { theme, setTheme };
+  return { theme, resolved, setTheme };
 }

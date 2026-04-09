@@ -5,11 +5,13 @@ Stack-specific guidance for documenting TypeScript projects. Read this in additi
 ## Detection
 
 The repo is a TypeScript project if:
+
 - `tsconfig.json` exists at the root or in workspace packages
 - `typescript` is in `devDependencies`
 - `.ts` or `.tsx` files dominate the source
 
 Determine the **shape** of the TypeScript project:
+
 - **Application** (private, deployed): Strictness is internal policy
 - **Published library** (npm package): Strictness is part of the public contract
 - **Monorepo** (multiple tsconfigs): Project references and path mapping matter
@@ -18,6 +20,7 @@ Determine the **shape** of the TypeScript project:
 ## Phase 1 Additions: Discovery
 
 ### TypeScript Version
+
 ```bash
 jq '.devDependencies.typescript' package.json
 ```
@@ -25,6 +28,7 @@ jq '.devDependencies.typescript' package.json
 Capture the major version (5.0+, 5.4+, 5.5+, 5.6+, 5.7+) — features and behavior differ meaningfully.
 
 ### tsconfig Analysis
+
 Read every `tsconfig*.json` and capture:
 
 ```bash
@@ -32,6 +36,7 @@ find . -name 'tsconfig*.json' -not -path '*/node_modules/*'
 ```
 
 For each:
+
 - `extends` chain — what base config is in use (`@tsconfig/strictest`, `@tsconfig/node20`, custom)
 - `compilerOptions.strict` — true means all strict flags on
 - `compilerOptions.target` and `module` — output format
@@ -44,7 +49,9 @@ For each:
 The most important question: **is `noUncheckedIndexedAccess` enabled?** This single flag has more impact on code style than almost any other.
 
 ### Strictness Audit
+
 Capture the actual strictness level explicitly. Run:
+
 ```bash
 jq '.compilerOptions | {
   strict,
@@ -67,7 +74,9 @@ jq '.compilerOptions | {
 Document the chosen level. "Strict mode" means different things to different teams.
 
 ### Module System
+
 Detect the module strategy:
+
 - **CJS** (`"type": "commonjs"` or absent, `module: "commonjs"`)
 - **ESM** (`"type": "module"`, `module: "esnext"`/`"node16"`/`"nodenext"`)
 - **Dual** (separate builds via `exports` field)
@@ -80,22 +89,24 @@ jq '{type, exports, main, module, types}' package.json
 The `exports` field is critical for libraries — document it explicitly.
 
 ### Build Tooling
-| Tool | Detection | Purpose |
-|---|---|---|
-| `tsc` | Just `typescript` | Type checking, sometimes builds |
-| `tsup` | `tsup` in deps | Library bundler (esbuild-based) |
-| `unbuild` | `unbuild` in deps | Library bundler (rollup-based) |
-| `tsx` | `tsx` in deps | Run TS files directly (replaces ts-node) |
-| `ts-node` | `ts-node` in deps | Run TS files (legacy) |
-| `swc` / `@swc/core` | In deps | Fast TS compilation |
-| `esbuild` | In deps | Fast TS compilation/bundling |
-| `vite` | In deps | Dev server + bundler |
-| `rollup` | In deps | Bundler (often for libraries) |
-| `tsc-alias` | In deps | Resolves path aliases in tsc output |
+
+| Tool                | Detection         | Purpose                                  |
+| ------------------- | ----------------- | ---------------------------------------- |
+| `tsc`               | Just `typescript` | Type checking, sometimes builds          |
+| `tsup`              | `tsup` in deps    | Library bundler (esbuild-based)          |
+| `unbuild`           | `unbuild` in deps | Library bundler (rollup-based)           |
+| `tsx`               | `tsx` in deps     | Run TS files directly (replaces ts-node) |
+| `ts-node`           | `ts-node` in deps | Run TS files (legacy)                    |
+| `swc` / `@swc/core` | In deps           | Fast TS compilation                      |
+| `esbuild`           | In deps           | Fast TS compilation/bundling             |
+| `vite`              | In deps           | Dev server + bundler                     |
+| `rollup`            | In deps           | Bundler (often for libraries)            |
+| `tsc-alias`         | In deps           | Resolves path aliases in tsc output      |
 
 Document which tool does what — it's common to have `tsc` for type checking + `tsup` for building + `tsx` for scripts.
 
 ### Monorepo Project References
+
 For monorepos using TypeScript project references:
 
 ```bash
@@ -109,7 +120,9 @@ find . -name 'tsconfig.json' -not -path '*/node_modules/*' -exec sh -c '
 Document the build order implied by references, and whether builds use `tsc -b` (build mode) or per-package builds.
 
 ### Runtime Validation
+
 TypeScript only enforces types at compile time. Detect runtime validation libraries:
+
 - **Zod** (`zod`) — most common
 - **Valibot** (`valibot`) — newer, smaller
 - **ArkType** (`arktype`) — newer, very fast
@@ -121,30 +134,34 @@ TypeScript only enforces types at compile time. Detect runtime validation librar
 Document which is used and where the trust boundaries are (API request parsing, env var parsing, config file parsing, third-party data).
 
 ### Linting and Formatting
-| Tool | Detection |
-|---|---|
-| ESLint (legacy config) | `.eslintrc*` |
-| ESLint (flat config) | `eslint.config.js`/`.ts`/`.mjs` |
-| typescript-eslint | `@typescript-eslint/*` |
-| Biome | `biome.json` |
-| oxlint | `.oxlintrc.json` |
-| Prettier | `.prettierrc*`, `prettier` in deps |
-| dprint | `dprint.json` |
+
+| Tool                   | Detection                          |
+| ---------------------- | ---------------------------------- |
+| ESLint (legacy config) | `.eslintrc*`                       |
+| ESLint (flat config)   | `eslint.config.js`/`.ts`/`.mjs`    |
+| typescript-eslint      | `@typescript-eslint/*`             |
+| Biome                  | `biome.json`                       |
+| oxlint                 | `.oxlintrc.json`                   |
+| Prettier               | `.prettierrc*`, `prettier` in deps |
+| dprint                 | `dprint.json`                      |
 
 Note: ESLint flat config is the modern default; legacy `.eslintrc` is deprecated.
 
 ### Test Framework
-| Tool | Detection |
-|---|---|
-| Vitest | `vitest` in deps, `vitest.config.*` |
-| Jest | `jest` in deps |
+
+| Tool             | Detection                                    |
+| ---------------- | -------------------------------------------- |
+| Vitest           | `vitest` in deps, `vitest.config.*`          |
+| Jest             | `jest` in deps                               |
 | Node test runner | `node:test` imports, no other test framework |
-| Bun test | `bun` runtime + `bun:test` imports |
-| uvu | `uvu` in deps |
-| ava | `ava` in deps |
+| Bun test         | `bun` runtime + `bun:test` imports           |
+| uvu              | `uvu` in deps                                |
+| ava              | `ava` in deps                                |
 
 ### Type Generation Sources
+
 Document any code that generates types (these are documentation maintenance hazards):
+
 - Prisma (`prisma generate` → `@prisma/client`)
 - Drizzle (`drizzle-kit` introspection)
 - GraphQL (`graphql-codegen`)
@@ -169,15 +186,15 @@ For non-trivial TypeScript projects, document:
 
 For each external boundary, document the validation strategy:
 
-| Boundary | Validation | Schema Location |
-|---|---|---|
-| HTTP request body | Zod | `lib/schemas/api.ts` |
-| Environment variables | Zod | `lib/env.ts` |
-| Config files | Zod | `lib/config.ts` |
-| Third-party API responses | Zod | `lib/integrations/*.ts` |
-| Database results | Inferred from ORM | (none — trusted) |
+| Boundary                  | Validation        | Schema Location         |
+| ------------------------- | ----------------- | ----------------------- |
+| HTTP request body         | Zod               | `lib/schemas/api.ts`    |
+| Environment variables     | Zod               | `lib/env.ts`            |
+| Config files              | Zod               | `lib/config.ts`         |
+| Third-party API responses | Zod               | `lib/integrations/*.ts` |
+| Database results          | Inferred from ORM | (none — trusted)        |
 
-The pattern to surface: where TypeScript types are *trusted* vs. *enforced*.
+The pattern to surface: where TypeScript types are _trusted_ vs. _enforced_.
 
 ### Public API Surface (libraries)
 
@@ -196,6 +213,7 @@ Anything reachable from these entry points is part of the public contract and is
 ### Path Aliases
 
 If `compilerOptions.paths` is configured, document:
+
 - The aliases (`@/*`, `~/*`, `@app/*`, etc.)
 - Whether the bundler/runtime also resolves them (TypeScript paths alone do nothing at runtime; you need `tsc-alias`, a bundler, or runtime resolution)
 - Any aliases that point to internal-only modules
@@ -205,12 +223,14 @@ If `compilerOptions.paths` is configured, document:
 ### README Additions
 
 For TypeScript projects, the README should mention:
+
 - TypeScript version requirement (especially for libraries)
 - Whether the package ships types (`"types"` field) and whether they're handwritten or generated
 - Module format (ESM-only, CJS, dual)
 - Node.js version requirement
 
 For libraries:
+
 ```markdown
 ## Requirements
 
@@ -220,7 +240,7 @@ For libraries:
 
 ### Module Format Statement (libraries)
 
-```markdown
+````markdown
 ## Module Format
 
 This package is published as ESM only. It does not provide a CommonJS build.
@@ -229,9 +249,10 @@ If you need to use it from CommonJS, use a dynamic import:
 \```js
 const { thing } = await import('the-package')
 \```
-```
+````
 
 Or:
+
 ```markdown
 ## Module Format
 
@@ -247,11 +268,13 @@ In `DEVELOPMENT.md`, include a section explaining the project's tsconfig setup:
 ## TypeScript Configuration
 
 This project uses strict TypeScript with the following non-default options:
+
 - `noUncheckedIndexedAccess: true` — array and object access returns `T | undefined`
 - `exactOptionalPropertyTypes: true` — `?` and `| undefined` are not equivalent
 - `verbatimModuleSyntax: true` — `import type` is required for type-only imports
 
 The base config is in `tsconfig.json`. Additional configs:
+
 - `tsconfig.build.json` — production build (excludes tests)
 - `tsconfig.test.json` — test compilation
 ```
@@ -265,11 +288,11 @@ In `DEVELOPMENT.md`, document every code generation step:
 
 The following code is generated and must be regenerated after changes:
 
-| Source | Generator | Output | When to Run |
-|---|---|---|---|
-| `prisma/schema.prisma` | `pnpm db:generate` | `node_modules/.prisma/client` | After schema changes |
-| `openapi.yaml` | `pnpm openapi:generate` | `src/generated/api.ts` | After spec changes |
-| `src/server/router.ts` | (none — inferred) | (tRPC types inferred at use site) | Never |
+| Source                 | Generator               | Output                            | When to Run          |
+| ---------------------- | ----------------------- | --------------------------------- | -------------------- |
+| `prisma/schema.prisma` | `pnpm db:generate`      | `node_modules/.prisma/client`     | After schema changes |
+| `openapi.yaml`         | `pnpm openapi:generate` | `src/generated/api.ts`            | After spec changes   |
+| `src/server/router.ts` | (none — inferred)       | (tRPC types inferred at use site) | Never                |
 ```
 
 ## Phase 4 Additions: Verification

@@ -9,6 +9,7 @@ cargo build --release
 ```
 
 The output library will be at:
+
 - macOS: `target/release/libmarkdown_exporter.dylib`
 - Linux: `target/release/libmarkdown_exporter.so`
 - Windows: `target/release/markdown_exporter.dll`

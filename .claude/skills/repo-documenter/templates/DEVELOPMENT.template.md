@@ -7,14 +7,15 @@ For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| Node.js | 20.x | See `.nvmrc` |
-| pnpm | 9.x | Install via `npm install -g pnpm` or corepack |
-| Postgres | 16.x | Local install or Docker |
-| Docker | 24+ | Required for local services |
+| Tool     | Version | Notes                                         |
+| -------- | ------- | --------------------------------------------- |
+| Node.js  | 20.x    | See `.nvmrc`                                  |
+| pnpm     | 9.x     | Install via `npm install -g pnpm` or corepack |
+| Postgres | 16.x    | Local install or Docker                       |
+| Docker   | 24+     | Required for local services                   |
 
 Optional tooling:
+
 - `direnv` for automatic env loading
 - `mkcert` for local HTTPS
 
@@ -54,26 +55,26 @@ The app should now be running at <http://localhost:3000>.
 
 ### Required
 
-| Variable | Description | Example |
-|---|---|---|
-| `DATABASE_URL` | Postgres connection string | `postgresql://user:pass@localhost:5432/dbname` |
-| `NEXTAUTH_SECRET` | Session signing secret | Generate with `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Canonical app URL | `http://localhost:3000` |
+| Variable          | Description                | Example                                        |
+| ----------------- | -------------------------- | ---------------------------------------------- |
+| `DATABASE_URL`    | Postgres connection string | `postgresql://user:pass@localhost:5432/dbname` |
+| `NEXTAUTH_SECRET` | Session signing secret     | Generate with `openssl rand -base64 32`        |
+| `NEXTAUTH_URL`    | Canonical app URL          | `http://localhost:3000`                        |
 
 ### Optional
 
-| Variable | Default | Description |
-|---|---|---|
-| `LOG_LEVEL` | `info` | Logger verbosity (`debug`, `info`, `warn`, `error`) |
-| `RATE_LIMIT_ENABLED` | `true` | Toggle rate limiting in development |
+| Variable             | Default | Description                                         |
+| -------------------- | ------- | --------------------------------------------------- |
+| `LOG_LEVEL`          | `info`  | Logger verbosity (`debug`, `info`, `warn`, `error`) |
+| `RATE_LIMIT_ENABLED` | `true`  | Toggle rate limiting in development                 |
 
 ### Service Credentials
 
-| Variable | Required In | Description |
-|---|---|---|
-| `STRIPE_SECRET_KEY` | Production | Stripe API secret |
-| `STRIPE_WEBHOOK_SECRET` | Production | For verifying Stripe webhooks |
-| `OPENAI_API_KEY` | Production | LLM features |
+| Variable                | Required In | Description                   |
+| ----------------------- | ----------- | ----------------------------- |
+| `STRIPE_SECRET_KEY`     | Production  | Stripe API secret             |
+| `STRIPE_WEBHOOK_SECRET` | Production  | For verifying Stripe webhooks |
+| `OPENAI_API_KEY`        | Production  | LLM features                  |
 
 ## Common Workflows
 
@@ -196,6 +197,7 @@ pnpm db:generate
 ### Database connection refused
 
 Check that Postgres is running:
+
 ```bash
 docker compose ps
 docker compose logs postgres

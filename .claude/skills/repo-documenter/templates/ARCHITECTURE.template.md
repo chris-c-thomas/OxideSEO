@@ -31,12 +31,12 @@ graph LR
     App --> External2[External Service B]
 ```
 
-| Component | Runtime | Hosted On | Purpose |
-|---|---|---|---|
-| Web app | Node 20 | Vercel | Serves HTTP requests |
-| Worker | Node 20 | Fly.io | Processes background jobs |
-| Database | Postgres 16 | Supabase | Primary data store |
-| Cache | Redis 7 | Upstash | Session and rate-limit storage |
+| Component | Runtime     | Hosted On | Purpose                        |
+| --------- | ----------- | --------- | ------------------------------ |
+| Web app   | Node 20     | Vercel    | Serves HTTP requests           |
+| Worker    | Node 20     | Fly.io    | Processes background jobs      |
+| Database  | Postgres 16 | Supabase  | Primary data store             |
+| Cache     | Redis 7     | Upstash   | Session and rate-limit storage |
 
 ## Request Lifecycle
 
@@ -53,13 +53,14 @@ A walkthrough of what happens when a typical request hits the system. Be specifi
 
 The full schema lives in [`prisma/schema.prisma`](../prisma/schema.prisma) (or equivalent). Below is a summary of the core entities and their relationships.
 
-| Entity | Purpose | Key Relations |
-|---|---|---|
-| `User` | Account holder | hasMany `Session`, hasMany `Project` |
-| `Project` | Top-level workspace | belongsTo `User`, hasMany `Item` |
-| `Item` | Domain entity | belongsTo `Project` |
+| Entity    | Purpose             | Key Relations                        |
+| --------- | ------------------- | ------------------------------------ |
+| `User`    | Account holder      | hasMany `Session`, hasMany `Project` |
+| `Project` | Top-level workspace | belongsTo `User`, hasMany `Item`     |
+| `Item`    | Domain entity       | belongsTo `Project`                  |
 
 Notable patterns:
+
 - Soft deletes via `deletedAt` column on entities X, Y
 - Multi-tenancy via `organizationId` on every tenant-scoped table
 - Audit trail in `audit_log` table populated by database triggers
@@ -71,9 +72,10 @@ Notable patterns:
 - Library: <name>
 - Session storage: <mechanism>
 - Supported providers: <list>
-- Configuration: [`<path>`](<path>)
+- Configuration: [`<path>`](path)
 
 Login flow:
+
 1. User submits credentials to `/api/auth/...`
 2. Server validates against database
 3. Session cookie set, redirected to dashboard
@@ -86,11 +88,11 @@ Login flow:
 
 ## External Integrations
 
-| Service | Purpose | Code Location | Failure Mode |
-|---|---|---|---|
-| Stripe | Billing | `lib/integrations/stripe.ts` | Hard fail — billing endpoints return 503 |
-| SendGrid | Email | `lib/integrations/email.ts` | Soft fail — emails queued for retry |
-| OpenAI | LLM features | `lib/integrations/openai.ts` | Soft fail — feature degraded |
+| Service  | Purpose      | Code Location                | Failure Mode                             |
+| -------- | ------------ | ---------------------------- | ---------------------------------------- |
+| Stripe   | Billing      | `lib/integrations/stripe.ts` | Hard fail — billing endpoints return 503 |
+| SendGrid | Email        | `lib/integrations/email.ts`  | Soft fail — emails queued for retry      |
+| OpenAI   | LLM features | `lib/integrations/openai.ts` | Soft fail — feature degraded             |
 
 For each integration, credentials are configured via environment variables documented in [DEVELOPMENT.md](DEVELOPMENT.md#environment-variables).
 
@@ -102,7 +104,7 @@ For each integration, credentials are configured via environment variables docum
 - Retry policy: <description>
 - Dead letter handling: <description>
 
-Job definitions live in [`<path>`](<path>).
+Job definitions live in [`<path>`](path).
 
 ## Client/Server Boundary
 
@@ -117,13 +119,13 @@ For full-stack frameworks (Next.js, Remix, etc.):
 
 The codebase is organized around the following module boundaries. New code should fit into one of these layers.
 
-| Directory | Purpose | Allowed Imports |
-|---|---|---|
-| `app/` | Routes and pages, thin | `lib/*`, `components/*` |
-| `components/` | Presentational components | `lib/utils`, no business logic |
-| `lib/services/` | Business logic | `lib/db`, `lib/integrations` |
-| `lib/db/` | Database access | `lib/db` only |
-| `lib/integrations/` | External service clients | Service SDKs |
+| Directory           | Purpose                   | Allowed Imports                |
+| ------------------- | ------------------------- | ------------------------------ |
+| `app/`              | Routes and pages, thin    | `lib/*`, `components/*`        |
+| `components/`       | Presentational components | `lib/utils`, no business logic |
+| `lib/services/`     | Business logic            | `lib/db`, `lib/integrations`   |
+| `lib/db/`           | Database access           | `lib/db` only                  |
+| `lib/integrations/` | External service clients  | Service SDKs                   |
 
 ## Build and Bundle
 
@@ -154,6 +156,7 @@ Things a new contributor will trip over. Document these explicitly.
 For full deployment details, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Summary:
+
 - Hosting: <provider>
 - Trigger: <push to main | manual | tag>
 - Environments: <list>

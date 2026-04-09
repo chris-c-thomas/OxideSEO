@@ -34,6 +34,7 @@ Generate in this order — later files reference earlier ones:
 Source: `architecture-notes.md` plus inventory sections 4, 8, 10, 11, 12.
 
 This is the deepest doc. It should let a senior engineer understand the system in 30 minutes of reading. Include:
+
 - The mechanical system overview (no marketing)
 - A Mermaid diagram of runtime topology (5-10 nodes)
 - Request lifecycle walkthrough
@@ -49,6 +50,7 @@ Length: 400-1000 lines is reasonable for a non-trivial app. Don't pad.
 Source: inventory sections 2, 6, 7, 13, 15, 16.
 
 This is the doc a new developer reads on day one. Include:
+
 - Prerequisites (exact versions: Node, package manager, system deps)
 - Clone + install steps (verbatim runnable commands)
 - Environment setup (every required env var with description)
@@ -67,6 +69,7 @@ Every command must work copy-paste against the actual repo.
 Source: inventory section 14, 18 + project conventions inferred from existing code.
 
 Include:
+
 - How to propose a change (issue first? PR directly?)
 - Branch naming convention (infer from `git branch -a`)
 - Commit message convention (infer from `git log`)
@@ -83,6 +86,7 @@ Be honest. If the project has no formal contribution process, say so and propose
 **Only generate this file if there is real deployment infrastructure** (CI workflow, Dockerfile, vercel.json, fly.toml, k8s manifests, etc.). Otherwise, skip it and link to a `TODO` from the README.
 
 Include:
+
 - Where it deploys (which provider, which environments)
 - How a deploy is triggered
 - Environment promotion flow
@@ -121,6 +125,7 @@ Use `templates/README.template.md` as the base. The structure is:
 16. License
 
 Critical README rules:
+
 - The Quickstart must work copy-paste. Every single line.
 - The env var table must contain every required var. Optional vars can be omitted from the README and listed in DEVELOPMENT.md.
 - The script table must list every npm script (or workspace equivalent), not a curated subset.

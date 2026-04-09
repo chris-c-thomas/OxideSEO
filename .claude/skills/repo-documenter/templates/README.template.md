@@ -9,6 +9,7 @@
 ## Overview
 
 Two to four paragraphs describing what the project does in mechanical terms. Cover:
+
 - What problem it solves
 - The high-level approach
 - What's notable or different about the implementation
@@ -71,11 +72,11 @@ For deeper usage, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 Required environment variables:
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | — | Postgres connection string |
-| `NEXTAUTH_SECRET` | Yes | — | Secret used to sign session tokens |
-| `STRIPE_SECRET_KEY` | Yes | — | Stripe API key for billing |
+| Variable            | Required | Default | Description                        |
+| ------------------- | -------- | ------- | ---------------------------------- |
+| `DATABASE_URL`      | Yes      | —       | Postgres connection string         |
+| `NEXTAUTH_SECRET`   | Yes      | —       | Secret used to sign session tokens |
+| `STRIPE_SECRET_KEY` | Yes      | —       | Stripe API key for billing         |
 
 Optional environment variables are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#environment-variables).
 
@@ -103,16 +104,16 @@ For full architecture documentation including request lifecycle, data model, and
 
 ## Scripts
 
-| Script | Purpose |
-|---|---|
-| `pnpm dev` | Start the dev server with HMR |
-| `pnpm build` | Build the production bundle |
-| `pnpm start` | Start the production server (requires `build` first) |
-| `pnpm test` | Run the test suite |
-| `pnpm lint` | Run ESLint |
-| `pnpm typecheck` | Run TypeScript in --noEmit mode |
-| `pnpm db:migrate` | Apply pending Prisma migrations |
-| `pnpm db:generate` | Regenerate the Prisma client |
+| Script             | Purpose                                              |
+| ------------------ | ---------------------------------------------------- |
+| `pnpm dev`         | Start the dev server with HMR                        |
+| `pnpm build`       | Build the production bundle                          |
+| `pnpm start`       | Start the production server (requires `build` first) |
+| `pnpm test`        | Run the test suite                                   |
+| `pnpm lint`        | Run ESLint                                           |
+| `pnpm typecheck`   | Run TypeScript in --noEmit mode                      |
+| `pnpm db:migrate`  | Apply pending Prisma migrations                      |
+| `pnpm db:generate` | Regenerate the Prisma client                         |
 
 ## Testing
 
