@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import type { AppView } from "@/App";
-import { getRecentCrawls, openCrawlFile, saveCrawlFile } from "@/lib/commands";
+import { getRecentCrawls, openCrawlFile, saveCrawlFile, stopCrawl } from "@/lib/commands";
 import { formatNumber } from "@/lib/utils";
 import type { CrawlSummary } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
   PlusCircle,
   GitCompare,
   Save,
+  Square,
   Search,
 } from "lucide-react";
 
@@ -84,6 +85,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       setError(String(err));
     }
   };
+
+  const handleStopCrawl = async (crawlId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await stopCrawl(crawlId);
+      loadCrawls();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const isRunning = (crawl: CrawlSummary) =>
+    crawl.status === "running" || crawl.status === "paused";
 
   const toggleCompareMode = () => {
     setCompareMode((prev) => !prev);
@@ -259,15 +273,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       {crawl.status}
                     </Badge>
                     {!compareMode && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="size-7 p-0"
-                        onClick={(e) => handleSaveCrawl(crawl.crawlId, e)}
-                        title="Save as .seocrawl"
-                      >
-                        <Save className="size-3.5" strokeWidth={1.75} />
-                      </Button>
+                      <div className="flex gap-1">
+                        {isRunning(crawl) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger hover:text-danger size-7 p-0"
+                            onClick={(e) => handleStopCrawl(crawl.crawlId, e)}
+                            title="Stop crawl"
+                          >
+                            <Square className="size-3.5" strokeWidth={1.75} />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="size-7 p-0"
+                          onClick={(e) => handleSaveCrawl(crawl.crawlId, e)}
+                          title="Save as .seocrawl"
+                        >
+                          <Save className="size-3.5" strokeWidth={1.75} />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </button>
