@@ -1,6 +1,6 @@
-@import "tailwindcss";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
+@import "tailwindcss";
 @import "./tokens.css";
 
 /* ------------------------------------------------------------------ */

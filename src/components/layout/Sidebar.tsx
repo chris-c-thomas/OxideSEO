@@ -1,12 +1,13 @@
 /**
- * Sidebar navigation with collapsible width, Lucide icons, and
- * active state highlighting. Theme toggle removed (moved to Settings).
+ * Sidebar navigation with collapsible width, Lucide icons,
+ * active state highlighting, and theme toggle.
  */
 
 import type { AppView } from "@/App";
 import { cn } from "@/lib/utils";
 import { useCrawlStore } from "@/stores/crawlStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useTheme } from "@/hooks/useTheme";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -17,6 +18,8 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -46,6 +49,11 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
   const crawlState = useCrawlStore((s) => s.state);
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const { resolved, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(resolved === "dark" ? "light" : "dark");
+  };
 
   return (
     <aside
@@ -96,25 +104,70 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
         })}
       </nav>
 
-      {/* Collapse toggle */}
-      <div className="border-border-subtle border-t p-2">
-        <button
-          onClick={toggleSidebar}
-          className={cn(
-            "text-fg-muted hover:bg-bg-hover hover:text-fg-default flex w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm transition-colors",
-            collapsed && "justify-center px-0",
-          )}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <PanelLeft className="size-4" strokeWidth={1.75} />
-          ) : (
-            <>
-              <PanelLeftClose className="size-4" strokeWidth={1.75} />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
+      {/* Bottom: theme toggle + collapse */}
+      <div className="border-border-subtle flex flex-col gap-1 border-t p-2">
+        {/* Theme toggle */}
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={toggleTheme}
+                className="text-fg-muted hover:bg-bg-hover hover:text-fg-default flex w-full items-center justify-center rounded-[var(--radius-sm)] px-3 py-1.5 text-sm transition-colors"
+                aria-label={
+                  resolved === "dark" ? "Switch to light mode" : "Switch to dark mode"
+                }
+              >
+                {resolved === "dark" ? (
+                  <Sun className="size-4" strokeWidth={1.75} />
+                ) : (
+                  <Moon className="size-4" strokeWidth={1.75} />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              {resolved === "dark" ? "Light mode" : "Dark mode"}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={toggleTheme}
+            className="text-fg-muted hover:bg-bg-hover hover:text-fg-default flex w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm transition-colors"
+          >
+            {resolved === "dark" ? (
+              <Sun className="size-4" strokeWidth={1.75} />
+            ) : (
+              <Moon className="size-4" strokeWidth={1.75} />
+            )}
+            <span>{resolved === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </button>
+        )}
+
+        {/* Collapse toggle */}
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={toggleSidebar}
+                className="text-fg-muted hover:bg-bg-hover hover:text-fg-default flex w-full items-center justify-center rounded-[var(--radius-sm)] px-3 py-1.5 text-sm transition-colors"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeft className="size-4" strokeWidth={1.75} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              Expand sidebar
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={toggleSidebar}
+            className="text-fg-muted hover:bg-bg-hover hover:text-fg-default flex w-full items-center gap-3 rounded-[var(--radius-sm)] px-3 py-1.5 text-sm transition-colors"
+            aria-label="Collapse sidebar"
+          >
+            <PanelLeftClose className="size-4" strokeWidth={1.75} />
+            <span>Collapse</span>
+          </button>
+        )}
       </div>
     </aside>
   );

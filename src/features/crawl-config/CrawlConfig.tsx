@@ -368,7 +368,7 @@ export function CrawlConfig({ onCrawlStarted }: CrawlConfigProps) {
       </Card>
 
       {/* Sticky footer */}
-      <div className="border-border-subtle bg-bg-app sticky bottom-0 mt-4 flex items-center justify-end gap-3 border-t py-4">
+      <div className="mt-6 flex items-center justify-end gap-3 pb-6">
         <Button variant="ghost" size="sm">
           Cancel
         </Button>

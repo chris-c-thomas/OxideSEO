@@ -5,7 +5,7 @@
  * Used by both the palette component and the global hotkey handler.
  */
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { commandRegistry, type PaletteCommand } from "@/lib/commandRegistry";
 
 // Global palette state (singleton -- only one palette in the app).
@@ -45,10 +45,17 @@ export function toggleCommandPalette() {
 export function useCommandPalette() {
   const open = useSyncExternalStore(subscribe, getSnapshot);
 
-  const commands = useSyncExternalStore(
-    (cb) => commandRegistry.subscribe(cb),
-    () => commandRegistry.getAll(),
+  // Use useState for commands to avoid the infinite loop from useSyncExternalStore
+  // returning a new array reference on every call.
+  const [commands, setCommands] = useState<PaletteCommand[]>(() =>
+    commandRegistry.getAll(),
   );
+
+  useEffect(() => {
+    return commandRegistry.subscribe(() => {
+      setCommands(commandRegistry.getAll());
+    });
+  }, []);
 
   const setOpen = useCallback((value: boolean) => {
     isOpen = value;
@@ -60,17 +67,19 @@ export function useCommandPalette() {
 
 /** Hook for views to register their commands on mount. */
 export function useRegisterCommands(commands: PaletteCommand[]) {
-  // Register on first render, unregister on unmount.
-  // Using useSyncExternalStore pattern to avoid stale closures.
-  const ids = commands.map((c) => c.id);
+  const registered = useRef(false);
+  const ids = useRef(commands.map((c) => c.id));
 
-  // We register in a layout-effect-like pattern but use a ref approach
-  // to avoid re-registering on every render.
-  useSyncExternalStore(
-    () => {
+  useEffect(() => {
+    const currentIds = ids.current;
+    if (!registered.current) {
       commandRegistry.registerMany(commands);
-      return () => commandRegistry.unregisterMany(ids);
-    },
-    () => null,
-  );
+      registered.current = true;
+    }
+    return () => {
+      commandRegistry.unregisterMany(currentIds);
+      registered.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

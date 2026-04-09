@@ -38,7 +38,7 @@ function applyTheme(resolved: ResolvedTheme) {
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return getStoredTheme() ?? "system";
+    return getStoredTheme() ?? "light";
   });
 
   const resolved = resolveTheme(theme);
