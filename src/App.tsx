@@ -53,7 +53,6 @@ export function App() {
   // Initialize theme system (applies data-theme attribute).
   const { setTheme, resolved } = useTheme();
   const crawlState = useCrawlStore((s) => s.state);
-  const setCrawlState = useCrawlStore((s) => s.setCrawlState);
 
   // App-level crawl event listeners — active regardless of current view.
   useCrawlProgress(activeCrawlId);
@@ -152,7 +151,6 @@ export function App() {
         run: async () => {
           try {
             await pauseCrawl(activeCrawlId);
-            setCrawlState("paused");
           } catch (err) {
             toast.error(`Failed to pause crawl: ${String(err)}`);
           }
@@ -168,7 +166,6 @@ export function App() {
         run: async () => {
           try {
             await resumeCrawl(activeCrawlId);
-            setCrawlState("running");
           } catch (err) {
             toast.error(`Failed to resume crawl: ${String(err)}`);
           }
@@ -233,7 +230,6 @@ export function App() {
     if (!activeCrawlId) return;
     try {
       await stopCrawl(activeCrawlId);
-      setCrawlState("stopped");
     } catch (err) {
       toast.error(`Failed to stop crawl: ${String(err)}`);
     }

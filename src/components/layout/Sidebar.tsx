@@ -45,6 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
+const STATUS_DOT_COLORS: Record<string, string> = {
+  running: "bg-status-running",
+  paused: "bg-status-paused",
+  error: "bg-status-error",
+};
+
 export function Sidebar({ activeView, onNavigate }: SidebarProps) {
   const crawlState = useCrawlStore((s) => s.state);
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -67,14 +73,8 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
           const dotColor =
-            item.id === "crawl-monitor"
-              ? crawlState === "running"
-                ? "bg-status-running"
-                : crawlState === "paused"
-                  ? "bg-status-paused"
-                  : crawlState === "error"
-                    ? "bg-status-error"
-                    : null
+            item.id === "crawl-monitor" && crawlState
+              ? (STATUS_DOT_COLORS[crawlState] ?? null)
               : null;
           const showDot = dotColor !== null;
           const Icon = item.icon;

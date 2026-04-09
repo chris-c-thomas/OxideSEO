@@ -15,6 +15,7 @@ import {
   stopCrawl,
 } from "@/lib/commands";
 import { cn, formatNumber } from "@/lib/utils";
+import { useCrawlStore } from "@/stores/crawlStore";
 import { toast } from "sonner";
 import type { CrawlSummary } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       try {
         await deleteCrawl(crawlId);
         setRecentCrawls((prev) => prev.filter((c) => c.crawlId !== crawlId));
+        // Clear the global crawl store if this was the active crawl.
+        const { activeCrawlId, clearCrawl } = useCrawlStore.getState();
+        if (crawlId === activeCrawlId) {
+          clearCrawl();
+        }
         toast.success("Crawl deleted.");
       } catch (err) {
         toast.error(`Failed to delete crawl: ${String(err)}`);

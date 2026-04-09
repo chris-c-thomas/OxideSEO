@@ -1,4 +1,4 @@
-//! Crawl lifecycle commands: start, pause, resume, stop, status.
+//! Crawl lifecycle commands: start, pause, resume, stop, delete, re-run, and status.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +14,14 @@ use crate::plugin::manager::PluginManager;
 use crate::storage::db::Database;
 use crate::storage::models::CrawlRow;
 use crate::storage::queries;
+
+/// State change event payload emitted to the frontend via `crawl://state`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlStateChange {
+    pub crawl_id: String,
+    pub state: CrawlState,
+}
 
 /// Managed state type for the plugin manager.
 pub type PluginManagerState = Arc<Mutex<PluginManager>>;
@@ -258,7 +266,7 @@ pub async fn pause_crawl(
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.pause();
-    emit_state_change(&app, &crawl_id, "paused");
+    emit_state_change(&app, &crawl_id, CrawlState::Paused);
     Ok(())
 }
 
@@ -273,7 +281,7 @@ pub async fn resume_crawl(
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.resume();
-    emit_state_change(&app, &crawl_id, "running");
+    emit_state_change(&app, &crawl_id, CrawlState::Running);
     Ok(())
 }
 
@@ -288,7 +296,7 @@ pub async fn stop_crawl(
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.stop();
-    emit_state_change(&app, &crawl_id, "stopped");
+    emit_state_change(&app, &crawl_id, CrawlState::Stopped);
     Ok(())
 }
 
@@ -369,10 +377,14 @@ pub async fn delete_crawl(
     tracing::info!(%crawl_id, "Deleting crawl");
 
     // Stop and remove from active handles if running.
+    // Wait for the orchestrator and storage writer to fully shut down
+    // before deleting data, to avoid racing with in-flight writes.
     {
         let mut map = handles.lock().await;
         if let Some(handle) = map.remove(&crawl_id) {
             handle.stop();
+            drop(map);
+            handle.wait_for_shutdown().await;
         }
     }
 
@@ -412,10 +424,15 @@ pub async fn rerun_crawl(
 // ---------------------------------------------------------------------------
 
 /// Emit a `crawl://state` event so the frontend can detect state changes.
-fn emit_state_change(app: &tauri::AppHandle, crawl_id: &str, state: &str) {
+fn emit_state_change(app: &tauri::AppHandle, crawl_id: &str, state: CrawlState) {
     use tauri::Emitter;
-    let _ = app.emit(
+    if let Err(e) = app.emit(
         "crawl://state",
-        serde_json::json!({ "crawlId": crawl_id, "state": state }),
-    );
+        CrawlStateChange {
+            crawl_id: crawl_id.to_owned(),
+            state,
+        },
+    ) {
+        tracing::warn!(%crawl_id, error = %e, "Failed to emit crawl state change event");
+    }
 }

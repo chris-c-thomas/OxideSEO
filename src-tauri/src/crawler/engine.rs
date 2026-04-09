@@ -40,6 +40,8 @@ pub struct CrawlHandle {
     pub frontier: Arc<Mutex<UrlFrontier>>,
     /// When the crawl started.
     started_at: Instant,
+    /// Signaled when the orchestrator task (including storage flush) completes.
+    completion_rx: Option<tokio::sync::oneshot::Receiver<()>>,
 }
 
 /// Shared atomic crawl statistics.
@@ -68,14 +70,25 @@ impl CrawlHandle {
     pub fn elapsed_ms(&self) -> u64 {
         self.started_at.elapsed().as_millis() as u64
     }
+
+    /// Wait for the orchestrator task and storage writer to fully shut down.
+    /// Times out after 5 seconds to avoid blocking indefinitely.
+    pub async fn wait_for_shutdown(mut self) {
+        if let Some(rx) = self.completion_rx.take() {
+            let _ = tokio::time::timeout(Duration::from_secs(5), rx).await;
+        }
+    }
 }
 
 /// Trait for progress event emission — allows test mocking.
 pub trait ProgressEmitter: Send + Sync + 'static {
     fn emit_progress(&self, progress: &CrawlProgress);
 
-    /// Emit a crawl state change event. Default no-op for test emitters.
-    fn emit_state_change(&self, _crawl_id: &str, _state: &str) {}
+    /// Emit a crawl state change event.
+    ///
+    /// Default implementation is a no-op. Implementors that surface state
+    /// transitions to a UI (e.g., `TauriEmitter`) must override this.
+    fn emit_state_change(&self, _crawl_id: &str, _state: CrawlState) {}
 }
 
 /// Real emitter using Tauri's AppHandle.
@@ -95,12 +108,18 @@ impl ProgressEmitter for TauriEmitter {
         let _ = self.app_handle.emit("crawl://progress", progress);
     }
 
-    fn emit_state_change(&self, crawl_id: &str, state: &str) {
+    fn emit_state_change(&self, crawl_id: &str, state: CrawlState) {
+        use crate::commands::crawl::CrawlStateChange;
         use tauri::Emitter;
-        let _ = self.app_handle.emit(
+        if let Err(e) = self.app_handle.emit(
             "crawl://state",
-            serde_json::json!({ "crawlId": crawl_id, "state": state }),
-        );
+            CrawlStateChange {
+                crawl_id: crawl_id.to_owned(),
+                state,
+            },
+        ) {
+            tracing::warn!(%crawl_id, error = %e, "Failed to emit crawl state change event");
+        }
     }
 }
 
@@ -240,6 +259,7 @@ pub async fn spawn_crawl(
     let in_flight = Arc::new(AtomicU64::new(0));
 
     let state_tx = Arc::new(state_tx);
+    let (completion_tx, completion_rx) = tokio::sync::oneshot::channel::<()>();
     let handle = CrawlHandle {
         crawl_id: crawl_id.clone(),
         config: config.clone(),
@@ -248,6 +268,7 @@ pub async fn spawn_crawl(
         stats: stats.clone(),
         frontier: frontier.clone(),
         started_at: Instant::now(),
+        completion_rx: Some(completion_rx),
     };
 
     // Spawn the orchestrator loop.
@@ -895,7 +916,7 @@ pub async fn spawn_crawl(
         });
 
         // Emit state change so the frontend can auto-detect completion.
-        emitter.emit_state_change(&crawl_id, final_status);
+        emitter.emit_state_change(&crawl_id, final_state);
 
         tracing::info!(
             %crawl_id,
@@ -904,6 +925,9 @@ pub async fn spawn_crawl(
             status = final_status,
             "Crawl orchestrator finished"
         );
+
+        // Signal that the orchestrator and storage writer are fully done.
+        let _ = completion_tx.send(());
     });
 
     Ok(handle)

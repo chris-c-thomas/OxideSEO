@@ -3,7 +3,6 @@
  */
 
 import { useState } from "react";
-import { useCrawlProgress } from "@/hooks/useCrawlProgress";
 import { pauseCrawl, resumeCrawl, stopCrawl } from "@/lib/commands";
 import { formatDuration, formatNumber, formatRps, formatBytes } from "@/lib/utils";
 import { useCrawlStore } from "@/stores/crawlStore";
@@ -25,11 +24,9 @@ interface CrawlMonitorProps {
 
 export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
   const [showStopConfirm, setShowStopConfirm] = useState(false);
-  useCrawlProgress(crawlId);
 
   const progress = useCrawlStore((s) => s.progress);
   const state = useCrawlStore((s) => s.state);
-  const setCrawlState = useCrawlStore((s) => s.setCrawlState);
   const maxMemoryMb = useCrawlStore((s) => s.config?.maxMemoryMb ?? 512);
 
   if (!crawlId) {
@@ -48,7 +45,6 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
   const handlePause = async () => {
     try {
       await pauseCrawl(crawlId);
-      setCrawlState("paused");
     } catch (err) {
       toast.error(`Failed to pause crawl: ${String(err)}`);
     }
@@ -57,7 +53,6 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
   const handleResume = async () => {
     try {
       await resumeCrawl(crawlId);
-      setCrawlState("running");
     } catch (err) {
       toast.error(`Failed to resume crawl: ${String(err)}`);
     }
@@ -66,7 +61,6 @@ export function CrawlMonitor({ crawlId, onCompleted }: CrawlMonitorProps) {
   const handleStop = async () => {
     try {
       await stopCrawl(crawlId);
-      setCrawlState("stopped");
     } catch (err) {
       toast.error(`Failed to stop crawl: ${String(err)}`);
     }
