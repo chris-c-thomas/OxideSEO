@@ -46,8 +46,8 @@ npx tauri icon app-icon.png
 
 Beyond the 52 plan deliverables, these features were added:
 
-- **D-1: Crawl deletion** — Delete crawl + cascade pages/issues/links
-- **D-2: Crawl re-run** — Clone config from a completed crawl into a new crawl
+- **D-1: Crawl deletion** — `delete_crawl` command with 9-table cascading delete, Dashboard dropdown with confirmation dialog
+- **D-2: Crawl re-run** — `rerun_crawl` command clones config from DB, Dashboard dropdown action
 - **D-3: Keyboard shortcuts** — Global hotkeys for navigation and actions
 - **D-4: ResourceMeter** — Real-time memory RSS gauge + throughput stats in CrawlMonitor (raw FFI on macOS, `/proc/self/status` on Linux)
 - **D-5: PDF export** — A4 summary report via `printpdf` crate
@@ -162,6 +162,8 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `features/crawl-monitor/CrawlMonitor.tsx`       | Live crawl monitor with ProgressRing                                      |
 | `features/results-explorer/ResultsExplorer.tsx` | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
 | `features/issues/IssuesView.tsx`                | Issues grouped by rule with collapsible sections                          |
+| `hooks/useCrawlStateEvents.ts`                  | Global `crawl://state` event listener, auto-updates store + toasts        |
+| `components/ConfirmDialog.tsx`                   | Reusable AlertDialog wrapper for destructive action confirmation          |
 | `features/settings/SettingsView.tsx`            | Settings with left sub-nav (General, Appearance, AI, About)               |
 | `components/comparison/*.tsx`                   | Crawl comparison: overview, page/issue/metadata diff tabs                 |
 | `components/export/ExportDialog.tsx`            | Export dialog with format/type/column selection                           |
@@ -283,4 +285,5 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **`useSyncExternalStore` snapshots must be stable** — Never return a new array/object from `getSnapshot`. Use `useState` + `useEffect` subscription for collection data, reserve `useSyncExternalStore` for primitives (booleans, strings, numbers).
 - **Theme defaults to light, uses `data-theme` attribute** — `useTheme` hook defaults to `"light"` when no stored preference exists. Theme toggle is in the sidebar bottom section. Applied via `data-theme` attribute on `<html>`, not the `.dark` class.
 - **Screen components live in `src/features/`** — Dashboard, CrawlConfig, CrawlMonitor, ResultsExplorer, IssuesView, and SettingsView are in `src/features/<name>/`. Shared components remain in `src/components/`. Old screen stubs still exist in `src/components/` but are no longer imported by `App.tsx`.
-- **No `deleteCrawl` IPC command exists** — Despite D-1 being listed as implemented, `src/lib/commands.ts` has no `deleteCrawl` wrapper and `commands/crawl.rs` lacks a delete command. Only `stopCrawl` is available for running crawls.
+- **`crawl://state` events for lifecycle tracking** — The backend emits `crawl://state` Tauri events (with `crawlId` and `state` fields) on pause/resume/stop and at crawl completion. `useCrawlStateEvents` hook in `App.tsx` listens globally. Do not duplicate this listener in child components.
+- **Crawl delete cascades 9 tables** — `queries::delete_crawl()` deletes in FK-reverse order: ai_analyses, ai_usage, ai_crawl_summaries, external_links, links, issues, sitemap_urls, pages, crawls. If a new child table is added to the schema, it must be added to this function.
