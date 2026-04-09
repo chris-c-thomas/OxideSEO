@@ -57,6 +57,7 @@ cat package.json | jq -r '.scripts | keys[]'
 ### 3. Environment Variable Claims
 
 Every env var mentioned in the docs must:
+
 - Exist in the actual code (grep for `process.env.X` or equivalent)
 - Match the description (does the description match how it's actually used?)
 
@@ -98,6 +99,7 @@ Every config file referenced (`tsconfig.json`, `next.config.js`, etc.) must exis
 These are the hardest to verify mechanically. For each non-trivial architectural claim, identify the file(s) that substantiate it. If you can't, mark the claim as unverified and either remove it or replace it with `TODO(verify)`.
 
 Examples:
+
 - "The system uses Prisma for data access" → verify `prisma` is a dependency and `schema.prisma` exists
 - "Authentication is handled by NextAuth" → verify `next-auth` is a dependency and there's an auth config file
 - "Background jobs run on Inngest" → verify `inngest` is a dependency and there are job definitions
@@ -120,6 +122,7 @@ If you have any uncertainty about any step, flag it.
 Generated: <date>
 
 ## Summary
+
 - Total claims checked: N
 - Verified: N
 - Fixed (was wrong, now corrected): N
@@ -128,19 +131,22 @@ Generated: <date>
 ## File-by-File Results
 
 ### README.md
-| Claim | Type | Status | Source/Note |
-|---|---|---|---|
-| `pnpm dev` starts the dev server | command | OK | package.json scripts.dev |
-| `DATABASE_URL` is required | env | OK | src/db.ts:3 |
-| Uses Prisma 6.x | dependency | FIXED | Was 5.x in docs, actual is 6.1.0 |
-| Has a /admin dashboard | route | TODO | No app/admin route found, asked user |
-| ... | ... | ... | ... |
+
+| Claim                            | Type       | Status | Source/Note                          |
+| -------------------------------- | ---------- | ------ | ------------------------------------ |
+| `pnpm dev` starts the dev server | command    | OK     | package.json scripts.dev             |
+| `DATABASE_URL` is required       | env        | OK     | src/db.ts:3                          |
+| Uses Prisma 6.x                  | dependency | FIXED  | Was 5.x in docs, actual is 6.1.0     |
+| Has a /admin dashboard           | route      | TODO   | No app/admin route found, asked user |
+| ...                              | ...        | ...    | ...                                  |
 
 ### docs/ARCHITECTURE.md
+
 | Claim | Type | Status | Source/Note |
 | ... | ... | ... | ... |
 
 ### docs/DEVELOPMENT.md
+
 ...
 
 ## Unresolved Issues
@@ -204,6 +210,7 @@ After verification, present the final result:
 > Documentation pass complete. Here's what was generated:
 >
 > **Files created/modified:**
+>
 > - README.md (rewritten)
 > - docs/ARCHITECTURE.md (new)
 > - docs/DEVELOPMENT.md (new)
@@ -213,6 +220,7 @@ After verification, present the final result:
 > - CHANGELOG.md (scaffolded) [if applicable]
 >
 > **Verification summary:**
+>
 > - N total claims checked
 > - N verified, N fixed, N marked TODO
 >
@@ -220,6 +228,7 @@ After verification, present the final result:
 > [List from verification-report.md]
 >
 > **Recommended next steps:**
+>
 > 1. Review the docs in your editor
 > 2. Resolve the TODO items
 > 3. Run the Quickstart end-to-end on a clean checkout to confirm it works

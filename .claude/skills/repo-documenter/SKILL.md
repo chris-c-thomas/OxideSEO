@@ -19,13 +19,13 @@ Generate a comprehensive, accurate, and professional documentation set for an ex
 
 The skill is organized into four phases, each with its own detailed instructions in `phases/`. Read the relevant phase file at the start of that phase rather than trying to hold the entire workflow in context at once.
 
-| Phase | File | Purpose | Stops for user? |
-|---|---|---|---|
-| 1 | `phases/01-discovery.md` | Build a factual inventory of the repo | Yes — show inventory before proceeding |
-| 2 | `phases/02-architecture.md` | Map system structure and surface Open Questions | Yes — get answers before proceeding |
-| 3 | `phases/03-synthesis.md` | Generate the actual user-facing docs | No — proceed to verification |
-| 4 | `phases/04-verification.md` | Cross-check every claim against the codebase | Yes — present report and final docs |
-| 5 | `phases/05-maintenance.md` | Detect and fix doc drift on subsequent runs | Yes — present drift report |
+| Phase | File                        | Purpose                                         | Stops for user?                        |
+| ----- | --------------------------- | ----------------------------------------------- | -------------------------------------- |
+| 1     | `phases/01-discovery.md`    | Build a factual inventory of the repo           | Yes — show inventory before proceeding |
+| 2     | `phases/02-architecture.md` | Map system structure and surface Open Questions | Yes — get answers before proceeding    |
+| 3     | `phases/03-synthesis.md`    | Generate the actual user-facing docs            | No — proceed to verification           |
+| 4     | `phases/04-verification.md` | Cross-check every claim against the codebase    | Yes — present report and final docs    |
+| 5     | `phases/05-maintenance.md`  | Detect and fix doc drift on subsequent runs     | Yes — present drift report             |
 
 Phase 5 is **not** part of the initial pipeline. It is run separately on subsequent invocations against an already-documented repo to catch drift. The first four phases are the initial pass; Phase 5 is the recurring sweep.
 
@@ -84,14 +84,14 @@ The final deliverable should look like this:
 
 All output documents are based on templates in `templates/`. Read the relevant template at the start of Phase 3 and adapt it to the specific project — do not blindly copy. Templates are starting points, not rigid forms.
 
-| Template | Used for |
-|---|---|
-| `templates/README.template.md` | The root README |
+| Template                             | Used for                      |
+| ------------------------------------ | ----------------------------- |
+| `templates/README.template.md`       | The root README               |
 | `templates/ARCHITECTURE.template.md` | System overview and data flow |
-| `templates/DEVELOPMENT.template.md` | Local setup and dev workflows |
-| `templates/CONTRIBUTING.template.md` | Contribution process |
-| `templates/DEPLOYMENT.template.md` | Build, release, environments |
-| `templates/adr-template.md` | Individual ADR entries |
+| `templates/DEVELOPMENT.template.md`  | Local setup and dev workflows |
+| `templates/CONTRIBUTING.template.md` | Contribution process          |
+| `templates/DEPLOYMENT.template.md`   | Build, release, environments  |
+| `templates/adr-template.md`          | Individual ADR entries        |
 
 ## Quality Checklist
 
@@ -110,12 +110,12 @@ This skill is designed to be re-runnable after major refactors. When re-running:
 
 When the target repo uses a known stack, read the corresponding reference file in `references/` at the start of Phase 1. Reference files contain stack-specific detection signals, additional inventory items, common footguns, and documentation conventions to honor.
 
-| Stack | Reference File | When to Read |
-|---|---|---|
-| TypeScript | `references/typescript.md` | Any project with `tsconfig.json` |
-| React | `references/react.md` | Any project with `react` in dependencies |
-| Rust | `references/rust.md` | Any project with `Cargo.toml` |
-| Tauri v2 | `references/tauri-v2.md` | Projects with `src-tauri/` and Tauri v2 |
+| Stack      | Reference File             | When to Read                             |
+| ---------- | -------------------------- | ---------------------------------------- |
+| TypeScript | `references/typescript.md` | Any project with `tsconfig.json`         |
+| React      | `references/react.md`      | Any project with `react` in dependencies |
+| Rust       | `references/rust.md`       | Any project with `Cargo.toml`            |
+| Tauri v2   | `references/tauri-v2.md`   | Projects with `src-tauri/` and Tauri v2  |
 
 Reference files are **additive**, not exclusive. A Tauri app written in React + TypeScript should load all four references. Read them once at the start of Phase 1 and apply their guidance throughout subsequent phases.
 

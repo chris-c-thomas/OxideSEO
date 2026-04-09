@@ -33,15 +33,15 @@
 
 ### 2.3 Naming Conventions
 
-| Item | Convention | Example |
-|---|---|---|
-| Crate / module | `snake_case` | `crawler::frontier` |
-| Struct / Enum / Trait | `PascalCase` | `ParsedPage`, `SeoRule`, `RuleCategory` |
-| Function / method | `snake_case` | `normalize_url`, `evaluate_page` |
-| Constant | `SCREAMING_SNAKE_CASE` | `MAX_REDIRECT_HOPS`, `DEFAULT_CRAWL_DELAY_MS` |
-| Type parameter | Single uppercase letter or descriptive `PascalCase` | `T`, `F`, `PageData` |
-| Boolean variables/fields | Prefix with `is_`, `has_`, `should_`, `can_` | `is_noindex`, `has_canonical` |
-| Builder methods | Use `with_` prefix | `with_timeout`, `with_concurrency` |
+| Item                     | Convention                                          | Example                                       |
+| ------------------------ | --------------------------------------------------- | --------------------------------------------- |
+| Crate / module           | `snake_case`                                        | `crawler::frontier`                           |
+| Struct / Enum / Trait    | `PascalCase`                                        | `ParsedPage`, `SeoRule`, `RuleCategory`       |
+| Function / method        | `snake_case`                                        | `normalize_url`, `evaluate_page`              |
+| Constant                 | `SCREAMING_SNAKE_CASE`                              | `MAX_REDIRECT_HOPS`, `DEFAULT_CRAWL_DELAY_MS` |
+| Type parameter           | Single uppercase letter or descriptive `PascalCase` | `T`, `F`, `PageData`                          |
+| Boolean variables/fields | Prefix with `is_`, `has_`, `should_`, `can_`        | `is_noindex`, `has_canonical`                 |
+| Builder methods          | Use `with_` prefix                                  | `with_timeout`, `with_concurrency`            |
 
 ### 2.4 Module and File Organization
 
@@ -149,17 +149,17 @@ src/
 
 ### 3.3 Naming Conventions
 
-| Item | Convention | Example |
-|---|---|---|
-| Component | `PascalCase` file and export | `CrawlMonitor.tsx` → `export function CrawlMonitor` |
-| Hook | `camelCase` with `use` prefix | `useCrawlProgress`, `useTheme` |
-| Store | `camelCase` with `use` prefix | `useCrawlStore`, `useSettingsStore` |
-| Utility function | `camelCase` | `formatDuration`, `extractDomain` |
-| Type / Interface | `PascalCase` | `PageRow`, `CrawlConfig`, `PaginatedResponse` |
-| Constant | `SCREAMING_SNAKE_CASE` or `PascalCase` for arrays/objects | `MAX_RESULTS`, `NAV_ITEMS` |
-| CSS class (Tailwind) | utility-first, no custom class names | `className="flex items-center gap-2"` |
-| Event handler props | `on` + event name | `onCrawlStart`, `onFilterChange` |
-| Boolean props/vars | `is`, `has`, `should`, `can` prefix | `isLoading`, `hasResults` |
+| Item                 | Convention                                                | Example                                             |
+| -------------------- | --------------------------------------------------------- | --------------------------------------------------- |
+| Component            | `PascalCase` file and export                              | `CrawlMonitor.tsx` → `export function CrawlMonitor` |
+| Hook                 | `camelCase` with `use` prefix                             | `useCrawlProgress`, `useTheme`                      |
+| Store                | `camelCase` with `use` prefix                             | `useCrawlStore`, `useSettingsStore`                 |
+| Utility function     | `camelCase`                                               | `formatDuration`, `extractDomain`                   |
+| Type / Interface     | `PascalCase`                                              | `PageRow`, `CrawlConfig`, `PaginatedResponse`       |
+| Constant             | `SCREAMING_SNAKE_CASE` or `PascalCase` for arrays/objects | `MAX_RESULTS`, `NAV_ITEMS`                          |
+| CSS class (Tailwind) | utility-first, no custom class names                      | `className="flex items-center gap-2"`               |
+| Event handler props  | `on` + event name                                         | `onCrawlStart`, `onFilterChange`                    |
+| Boolean props/vars   | `is`, `has`, `should`, `can` prefix                       | `isLoading`, `hasResults`                           |
 
 ### 3.4 Component Patterns
 
@@ -285,17 +285,17 @@ The IPC boundary between Rust and TypeScript is the most critical integration su
 
 ## 8. Anti-Patterns to Avoid
 
-| Do Not | Do Instead |
-|---|---|
-| `unwrap()` / `expect()` in non-test code | `.context("message")?` or `if let` / `match` |
-| `any` type in TypeScript | `unknown` + type narrowing, or define a proper type |
-| Inline SQL in command handlers | Call functions from `storage/queries.rs` |
-| `console.log` for error handling | Structured error state in UI, `tracing::error!` in Rust |
-| CSS-in-JS or custom CSS classes | Tailwind utilities + CSS custom properties |
-| `useEffect` for derived state | `useMemo` or compute inline |
-| Passing entire store to components | Select specific fields with `useStore((s) => s.field)` |
-| Nested ternaries in JSX | Extract to variables or early-return patterns |
-| `clone()` in Rust without necessity | Use references, `&str`, `Cow<'_, str>`, or `Arc<T>` |
-| Magic numbers / strings | Named constants with doc comments |
-| Catching and silently swallowing errors | Log, surface to user, or propagate with context |
-| Mutating function arguments | Return new values; use builder patterns for complex construction |
+| Do Not                                   | Do Instead                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `unwrap()` / `expect()` in non-test code | `.context("message")?` or `if let` / `match`                     |
+| `any` type in TypeScript                 | `unknown` + type narrowing, or define a proper type              |
+| Inline SQL in command handlers           | Call functions from `storage/queries.rs`                         |
+| `console.log` for error handling         | Structured error state in UI, `tracing::error!` in Rust          |
+| CSS-in-JS or custom CSS classes          | Tailwind utilities + CSS custom properties                       |
+| `useEffect` for derived state            | `useMemo` or compute inline                                      |
+| Passing entire store to components       | Select specific fields with `useStore((s) => s.field)`           |
+| Nested ternaries in JSX                  | Extract to variables or early-return patterns                    |
+| `clone()` in Rust without necessity      | Use references, `&str`, `Cow<'_, str>`, or `Arc<T>`              |
+| Magic numbers / strings                  | Named constants with doc comments                                |
+| Catching and silently swallowing errors  | Log, surface to user, or propagate with context                  |
+| Mutating function arguments              | Return new values; use builder patterns for complex construction |

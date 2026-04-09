@@ -71,7 +71,7 @@ jobs:
       - name: Integration tests
         working-directory: src-tauri
         run: cargo test --test '*' --all-features
-        continue-on-error: true  # No integration tests yet (Phase 2)
+        continue-on-error: true # No integration tests yet (Phase 2)
 
   # -------------------------------------------------------------------------
   # Frontend checks

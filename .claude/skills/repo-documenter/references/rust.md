@@ -5,11 +5,13 @@ Stack-specific guidance for documenting Rust projects. Read this in addition to 
 ## Detection
 
 The repo is a Rust project if any of these are present:
+
 - `Cargo.toml` at the root
 - `rust-toolchain.toml` or `rust-toolchain` file
 - `.rs` files as the dominant source language
 
 Determine the project shape from `Cargo.toml`:
+
 - `[package]` only → single crate
 - `[workspace]` with `members` → workspace (multi-crate)
 - Both `[package]` and `[lib]`/`[[bin]]` → library and/or binary
@@ -19,11 +21,13 @@ Determine the project shape from `Cargo.toml`:
 Add these to the inventory:
 
 ### Crate Identity
+
 ```bash
 cargo metadata --format-version 1 --no-deps | jq '.packages[] | {name, version, edition, rust_version}'
 ```
 
 Capture:
+
 - Crate name(s) and version(s)
 - Rust edition (2018, 2021, 2024)
 - MSRV (`rust-version` field)
@@ -31,6 +35,7 @@ Capture:
 - Workspace member count and shape
 
 ### Toolchain
+
 - Pinned toolchain (`rust-toolchain.toml`)
 - Required components (rustfmt, clippy, miri, etc.)
 - Required targets (cross-compilation)
@@ -40,7 +45,9 @@ cat rust-toolchain.toml 2>/dev/null
 ```
 
 ### Cargo Features
+
 List all features and their dependencies:
+
 ```bash
 cargo metadata --format-version 1 --no-deps | jq '.packages[] | {name, features}'
 ```
@@ -48,11 +55,13 @@ cargo metadata --format-version 1 --no-deps | jq '.packages[] | {name, features}
 Document which features are default, which are mutually exclusive, and which gate platform-specific code.
 
 ### Dependencies (grouped)
+
 ```bash
 cargo tree --depth 1 --edges normal
 ```
 
 Group by purpose in the inventory:
+
 - **Async runtime**: tokio, async-std, smol
 - **Web framework**: axum, actix-web, rocket, warp, actix
 - **Serialization**: serde, serde_json, rmp-serde, bincode
@@ -64,17 +73,20 @@ Group by purpose in the inventory:
 - **Testing**: proptest, quickcheck, insta, mockall, rstest
 
 ### Build Configuration
+
 - `[profile.*]` overrides in Cargo.toml
 - `build.rs` presence and what it does
 - `.cargo/config.toml` settings (custom targets, linker config, registry overrides)
 
 ### Binaries and Examples
+
 ```bash
 find . -path ./target -prune -o -name 'main.rs' -print
 ls examples/ 2>/dev/null
 ```
 
 ### Tests
+
 ```bash
 find . -path ./target -prune -o -name 'tests' -type d -print
 find tests -name '*.rs' 2>/dev/null
@@ -85,7 +97,9 @@ Distinguish unit tests (in `src/`), integration tests (in `tests/`), doctests, a
 ## Phase 2 Additions: Architecture
 
 ### Module Boundaries
+
 Rust's module system is the architecture. Document:
+
 - Top-level modules (`src/lib.rs` or `src/main.rs` `mod` declarations)
 - Public API surface (`pub use` re-exports in `lib.rs`)
 - Internal vs. public modules
@@ -96,25 +110,30 @@ rg '^pub use ' src/lib.rs 2>/dev/null
 ```
 
 ### Error Handling Strategy
+
 Determine the project's error model:
+
 - `thiserror`-based custom error enums (typed, library-style)
 - `anyhow`/`eyre` (dynamic, application-style)
 - Mixed (libraries use thiserror, binaries use anyhow)
 - Custom Result type alias
 
 Find the canonical error type:
+
 ```bash
 rg 'pub (enum|struct) \w*Error' src/
 rg 'pub type Result' src/
 ```
 
 ### Async Model
+
 - Which runtime
 - Whether the library is runtime-agnostic or tokio-specific
 - Whether `Send`/`Sync` bounds are enforced
 - Spawn vs. block_on patterns
 
 ### Unsafe Surface
+
 ```bash
 rg -c 'unsafe' src/ | sort -t: -k2 -n -r
 ```
@@ -122,6 +141,7 @@ rg -c 'unsafe' src/ | sort -t: -k2 -n -r
 Document any unsafe blocks and their justification. This is high-leverage for new contributors.
 
 ### FFI Boundaries
+
 - `extern "C"` declarations
 - `#[no_mangle]` exports
 - C header generation (cbindgen, cxx)
@@ -151,17 +171,18 @@ your-crate = "1.0"
 ### README for a Binary Crate
 
 Closer to the standard application README, but add:
+
 - Installation via `cargo install`
 - Pre-built binaries (if released)
 - Shell completion setup
 
 ### Cargo Features Table
 
-| Feature | Default | Pulls In | Purpose |
-|---|---|---|---|
-| `tokio` | yes | `tokio`, `tokio-util` | Async runtime support |
-| `serde` | no | `serde` | Serialization derives |
-| `tls` | no | `rustls` | HTTPS support |
+| Feature | Default | Pulls In              | Purpose               |
+| ------- | ------- | --------------------- | --------------------- |
+| `tokio` | yes     | `tokio`, `tokio-util` | Async runtime support |
+| `serde` | no      | `serde`               | Serialization derives |
+| `tls`   | no      | `rustls`              | HTTPS support         |
 
 ### Workspace Structure (for workspace projects)
 
@@ -176,6 +197,7 @@ crates/
 ### Architecture Notes Specific to Rust
 
 In `ARCHITECTURE.md`, include:
+
 - **Lifetimes**: Any non-trivial lifetime relationships at API boundaries
 - **Type-state pattern**: If used, document the state transitions
 - **Trait hierarchy**: For libraries with significant generic code
@@ -205,7 +227,9 @@ cargo doc --no-deps --document-private-items -- -D rustdoc::broken-intra-doc-lin
 ```
 
 ### Doc Comment Coverage
+
 For libraries, check that every public item has a doc comment:
+
 ```bash
 cargo +nightly rustdoc --lib -- -D missing-docs
 ```

@@ -1,13 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Dashboard } from "@/components/layout/Dashboard";
-import { CrawlConfig } from "@/components/crawl/CrawlConfig";
-import { CrawlMonitor } from "@/components/crawl/CrawlMonitor";
-import { ResultsExplorer } from "@/components/results/ResultsExplorer";
-import { SettingsView } from "@/components/settings/SettingsView";
+import { useHotkeys } from "@/hooks/useHotkeys";
+import { toggleCommandPalette } from "@/hooks/useCommandPalette";
+import { commandRegistry } from "@/lib/commandRegistry";
+import { SHORTCUTS, shortcutToKeys } from "@/lib/shortcuts";
+import { AppShell } from "@/components/AppShell";
+import { CommandPalette } from "@/components/CommandPalette";
+import { Dashboard } from "@/features/dashboard/Dashboard";
+import { CrawlConfig } from "@/features/crawl-config/CrawlConfig";
+import { CrawlMonitor } from "@/features/crawl-monitor/CrawlMonitor";
+import { ResultsExplorer } from "@/features/results-explorer/ResultsExplorer";
+import { SettingsView } from "@/features/settings/SettingsView";
+import { IssuesView } from "@/features/issues/IssuesView";
 import { PluginManagerView } from "@/components/plugins/PluginManagerView";
 import { CrawlComparison } from "@/components/comparison/CrawlComparison";
+import {
+  LayoutDashboard,
+  PlusCircle,
+  Activity,
+  Table2,
+  Settings,
+  Palette,
+} from "lucide-react";
 
 /** Application views mapped to sidebar navigation items. */
 export type AppView =
@@ -15,6 +29,7 @@ export type AppView =
   | "crawl-config"
   | "crawl-monitor"
   | "results"
+  | "issues"
   | "plugins"
   | "settings"
   | "crawl-comparison";
@@ -23,7 +38,9 @@ export function App() {
   const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [activeCrawlId, setActiveCrawlId] = useState<string | null>(null);
   const [compareCrawlId, setCompareCrawlId] = useState<string | null>(null);
-  const { theme, setTheme } = useTheme();
+
+  // Initialize theme system (applies data-theme attribute).
+  const { setTheme, resolved } = useTheme();
 
   /** Navigate to a view. Optionally set crawl context (1 or 2 IDs for comparison). */
   const navigate = (view: AppView, crawlId?: string, secondCrawlId?: string) => {
@@ -35,6 +52,83 @@ export function App() {
       setCompareCrawlId(secondCrawlId);
     }
   };
+
+  // Register global shortcuts.
+  useHotkeys({
+    commandPalette: { shortcut: SHORTCUTS.commandPalette, handler: toggleCommandPalette },
+    settings: { shortcut: SHORTCUTS.settings, handler: () => navigate("settings") },
+    newCrawl: { shortcut: SHORTCUTS.newCrawl, handler: () => navigate("crawl-config") },
+    switchView1: {
+      shortcut: SHORTCUTS.switchView1,
+      handler: () => navigate("dashboard"),
+    },
+    switchView2: {
+      shortcut: SHORTCUTS.switchView2,
+      handler: () => navigate("crawl-config"),
+    },
+    switchView3: {
+      shortcut: SHORTCUTS.switchView3,
+      handler: () => navigate("crawl-monitor"),
+    },
+    switchView4: { shortcut: SHORTCUTS.switchView4, handler: () => navigate("results") },
+    switchView5: { shortcut: SHORTCUTS.switchView5, handler: () => navigate("settings") },
+  });
+
+  // Register core commands in the palette.
+  useEffect(() => {
+    const commands = [
+      {
+        id: "nav:dashboard",
+        label: "Go to Dashboard",
+        icon: LayoutDashboard,
+        group: "Navigation",
+        shortcut: shortcutToKeys(SHORTCUTS.switchView1),
+        run: () => navigate("dashboard"),
+      },
+      {
+        id: "nav:new-crawl",
+        label: "Start New Crawl",
+        icon: PlusCircle,
+        group: "Navigation",
+        shortcut: shortcutToKeys(SHORTCUTS.newCrawl),
+        run: () => navigate("crawl-config"),
+      },
+      {
+        id: "nav:monitor",
+        label: "Go to Monitor",
+        icon: Activity,
+        group: "Navigation",
+        run: () => navigate("crawl-monitor"),
+      },
+      {
+        id: "nav:results",
+        label: "Go to Results",
+        icon: Table2,
+        group: "Navigation",
+        run: () => navigate("results"),
+      },
+      {
+        id: "nav:settings",
+        label: "Go to Settings",
+        icon: Settings,
+        group: "Navigation",
+        shortcut: shortcutToKeys(SHORTCUTS.settings),
+        run: () => navigate("settings"),
+      },
+      {
+        id: "theme:toggle",
+        label: "Toggle Theme",
+        icon: Palette,
+        group: "Appearance",
+        keywords: ["dark", "light", "mode"],
+        run: () => setTheme(resolved === "dark" ? "light" : "dark"),
+      },
+    ];
+
+    commandRegistry.registerMany(commands);
+    return () => commandRegistry.unregisterMany(commands.map((c) => c.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolved]);
 
   const renderView = () => {
     switch (activeView) {
@@ -58,6 +152,8 @@ export function App() {
         );
       case "results":
         return <ResultsExplorer crawlId={activeCrawlId} />;
+      case "issues":
+        return <IssuesView crawlId={activeCrawlId} />;
       case "plugins":
         return <PluginManagerView />;
       case "settings":
@@ -72,14 +168,9 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
-      <Sidebar
-        activeView={activeView}
-        onNavigate={navigate}
-        theme={theme}
-        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
-      />
-      <main className="flex-1 overflow-auto">{renderView()}</main>
-    </div>
+    <AppShell activeView={activeView} onNavigate={navigate}>
+      {renderView()}
+      <CommandPalette />
+    </AppShell>
   );
 }

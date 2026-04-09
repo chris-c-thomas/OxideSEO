@@ -1,96 +1,204 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SEO Audit Report &mdash; {{START_URL}}</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; padding: 2rem; max-width: 960px; margin: 0 auto; }
-  h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
-  h2 { font-size: 1.25rem; margin: 2rem 0 0.75rem; padding-bottom: 0.25rem; border-bottom: 2px solid #e2e8f0; }
-  h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
-  p, li { font-size: 0.9rem; }
-  .meta { color: #64748b; font-size: 0.85rem; margin-bottom: 1.5rem; }
-  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
-  .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; text-align: center; }
-  .stat-card .value { font-size: 1.5rem; font-weight: 700; }
-  .stat-card .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-  .stat-card.error .value { color: #dc2626; }
-  .stat-card.warning .value { color: #d97706; }
-  .stat-card.info .value { color: #2563eb; }
-  .stat-card.success .value { color: #16a34a; }
-  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.85rem; }
-  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
-  th { background: #f8fafc; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
-  tr:hover { background: #f8fafc; }
-  .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-  .badge-error { background: #fef2f2; color: #dc2626; }
-  .badge-warning { background: #fffbeb; color: #d97706; }
-  .badge-info { background: #eff6ff; color: #2563eb; }
-  .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 0.75rem; text-align: center; }
-  @media print { body { padding: 0; } .stat-card { break-inside: avoid; } }
-</style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SEO Audit Report &mdash; {{START_URL}}</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+          sans-serif;
+        color: #1a1a2e;
+        background: #fff;
+        line-height: 1.6;
+        padding: 2rem;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 0.25rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin: 2rem 0 0.75rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      h3 {
+        font-size: 1rem;
+        margin: 1.25rem 0 0.5rem;
+      }
+      p,
+      li {
+        font-size: 0.9rem;
+      }
+      .meta {
+        color: #64748b;
+        font-size: 0.85rem;
+        margin-bottom: 1.5rem;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      .stat-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+      }
+      .stat-card .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .stat-card .label {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .stat-card.error .value {
+        color: #dc2626;
+      }
+      .stat-card.warning .value {
+        color: #d97706;
+      }
+      .stat-card.info .value {
+        color: #2563eb;
+      }
+      .stat-card.success .value {
+        color: #16a34a;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.75rem 0;
+        font-size: 0.85rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      th {
+        background: #f8fafc;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+      }
+      tr:hover {
+        background: #f8fafc;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .badge-error {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+      .badge-warning {
+        background: #fffbeb;
+        color: #d97706;
+      }
+      .badge-info {
+        background: #eff6ff;
+        color: #2563eb;
+      }
+      .footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        color: #94a3b8;
+        font-size: 0.75rem;
+        text-align: center;
+      }
+      @media print {
+        body {
+          padding: 0;
+        }
+        .stat-card {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SEO Audit Report</h1>
+    <p class="meta">
+      <strong>{{START_URL}}</strong><br />
+      Crawled: {{STARTED_AT}} &mdash; Status: {{STATUS}}<br />
+      Generated by OxideSEO
+    </p>
 
-<h1>SEO Audit Report</h1>
-<p class="meta">
-  <strong>{{START_URL}}</strong><br>
-  Crawled: {{STARTED_AT}} &mdash; Status: {{STATUS}}<br>
-  Generated by OxideSEO
-</p>
+    <h2>Summary</h2>
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="value">{{TOTAL_PAGES}}</div>
+        <div class="label">Pages Crawled</div>
+      </div>
+      <div class="stat-card error">
+        <div class="value">{{ERRORS}}</div>
+        <div class="label">Errors</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="value">{{WARNINGS}}</div>
+        <div class="label">Warnings</div>
+      </div>
+      <div class="stat-card info">
+        <div class="value">{{INFO_COUNT}}</div>
+        <div class="label">Info</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">{{AVG_RESPONSE_MS}}</div>
+        <div class="label">Avg Response (ms)</div>
+      </div>
+    </div>
 
-<h2>Summary</h2>
-<div class="summary-grid">
-  <div class="stat-card">
-    <div class="value">{{TOTAL_PAGES}}</div>
-    <div class="label">Pages Crawled</div>
-  </div>
-  <div class="stat-card error">
-    <div class="value">{{ERRORS}}</div>
-    <div class="label">Errors</div>
-  </div>
-  <div class="stat-card warning">
-    <div class="value">{{WARNINGS}}</div>
-    <div class="label">Warnings</div>
-  </div>
-  <div class="stat-card info">
-    <div class="value">{{INFO_COUNT}}</div>
-    <div class="label">Info</div>
-  </div>
-  <div class="stat-card">
-    <div class="value">{{AVG_RESPONSE_MS}}</div>
-    <div class="label">Avg Response (ms)</div>
-  </div>
-</div>
+    <h2>Status Code Distribution</h2>
+    <div class="summary-grid">
+      <div class="stat-card success">
+        <div class="value">{{STATUS_2XX}}</div>
+        <div class="label">2xx Success</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">{{STATUS_3XX}}</div>
+        <div class="label">3xx Redirect</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="value">{{STATUS_4XX}}</div>
+        <div class="label">4xx Client Error</div>
+      </div>
+      <div class="stat-card error">
+        <div class="value">{{STATUS_5XX}}</div>
+        <div class="label">5xx Server Error</div>
+      </div>
+    </div>
 
-<h2>Status Code Distribution</h2>
-<div class="summary-grid">
-  <div class="stat-card success">
-    <div class="value">{{STATUS_2XX}}</div>
-    <div class="label">2xx Success</div>
-  </div>
-  <div class="stat-card">
-    <div class="value">{{STATUS_3XX}}</div>
-    <div class="label">3xx Redirect</div>
-  </div>
-  <div class="stat-card warning">
-    <div class="value">{{STATUS_4XX}}</div>
-    <div class="label">4xx Client Error</div>
-  </div>
-  <div class="stat-card error">
-    <div class="value">{{STATUS_5XX}}</div>
-    <div class="label">5xx Server Error</div>
-  </div>
-</div>
+    <h2>Top Issues</h2>
+    {{TOP_ISSUES_TABLE}}
 
-<h2>Top Issues</h2>
-{{TOP_ISSUES_TABLE}}
-
-<div class="footer">
-  Generated by <strong>OxideSEO</strong> &mdash; Open-source SEO Crawler &amp; Audit Platform
-</div>
-
-</body>
+    <div class="footer">
+      Generated by <strong>OxideSEO</strong> &mdash; Open-source SEO Crawler &amp; Audit
+      Platform
+    </div>
+  </body>
 </html>

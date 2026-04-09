@@ -5,6 +5,7 @@
 **Output:** `docs/_working/drift-report.md` and a set of targeted fixes.
 
 **When to run:**
+
 - After a major refactor or feature merge
 - On a schedule (monthly or quarterly)
 - As part of CI on PRs that touch high-signal files
@@ -27,6 +28,7 @@ Run the drift detection checks below. Write findings to `docs/_working/drift-rep
 ### Step 2: Assess Severity
 
 Categorize each finding:
+
 - **Critical** — README Quickstart is broken, a documented command no longer exists, a required env var is missing from docs
 - **Important** — A documented feature has changed shape, a script's behavior has changed, an integration was added or removed
 - **Minor** — Cosmetic, version bumps, dependency list staleness
@@ -143,6 +145,7 @@ Check for new required checks, removed steps, or changed deployment targets.
 ### Check 8: Quickstart Smoke Test
 
 The most important check. Mentally walk through the README Quickstart one more time:
+
 1. Are the prerequisites still accurate?
 2. Does the install command still work?
 3. Does the env file template match what the code expects?
@@ -175,6 +178,7 @@ Last documentation pass: <date>
 Commits since last pass: <N>
 
 ## Summary
+
 - Critical issues: N
 - Important issues: N
 - Minor issues: N
@@ -183,6 +187,7 @@ Commits since last pass: <N>
 ## Critical Issues
 
 ### 1. README Quickstart broken
+
 - File: README.md, Quickstart section
 - Issue: `pnpm db:setup` no longer exists; renamed to `pnpm db:init` in commit abc123
 - Fix: Update line 47 of README.md
@@ -192,31 +197,35 @@ Commits since last pass: <N>
 ## Important Issues
 
 ### 1. New environment variable not documented
+
 - Variable: `INNGEST_SIGNING_KEY`
 - Added in: commit def456
 - Fix: Add to README env table and DEVELOPMENT.md env section
 
 ## Minor Issues
+
 - 3 stale dependency versions in ARCHITECTURE.md table
 - ...
 
 ## Informational
+
 - 2 new contributors since last pass
 - ...
 
 ## Recommendation
+
 <patch | full re-run | no action needed>
 ```
 
 ## When to Patch vs. Re-Run
 
-| Situation | Action |
-|---|---|
-| 0-5 drift items, all minor | Skip — note in report |
-| 5-15 drift items | Patch in place |
-| 15+ drift items, or any structural changes | Recommend full Phase 1-4 re-run |
-| Major refactor with new architecture | Recommend full Phase 1-4 re-run |
-| New top-level subsystem added | Patch ARCHITECTURE.md, recommend ADR |
+| Situation                                  | Action                               |
+| ------------------------------------------ | ------------------------------------ |
+| 0-5 drift items, all minor                 | Skip — note in report                |
+| 5-15 drift items                           | Patch in place                       |
+| 15+ drift items, or any structural changes | Recommend full Phase 1-4 re-run      |
+| Major refactor with new architecture       | Recommend full Phase 1-4 re-run      |
+| New top-level subsystem added              | Patch ARCHITECTURE.md, recommend ADR |
 
 ## CI Integration
 
@@ -261,6 +270,7 @@ Phase 5 is complete when:
 > Phase 5 (Maintenance) complete. The full drift report is at `docs/_working/drift-report.md`.
 >
 > **Drift summary since last pass (<date>):**
+>
 > - Critical: N (fixed)
 > - Important: N (fixed)
 > - Minor: N (batched)
@@ -269,6 +279,7 @@ Phase 5 is complete when:
 > **Recommendation:** [patch applied | full re-run recommended | no action needed]
 >
 > **Files modified in this pass:**
+>
 > - [list]
 >
 > Please review the changes and the drift report before committing.

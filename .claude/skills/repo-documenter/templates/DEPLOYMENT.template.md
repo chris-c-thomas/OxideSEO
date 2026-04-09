@@ -7,30 +7,32 @@ For architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Environments
 
-| Environment | URL | Branch | Auto-Deploy |
-|---|---|---|---|
-| Production | <https://example.com> | `main` | Yes |
-| Staging | <https://staging.example.com> | `staging` | Yes |
-| Preview | per-PR URLs | PR branches | Yes |
+| Environment | URL                           | Branch      | Auto-Deploy |
+| ----------- | ----------------------------- | ----------- | ----------- |
+| Production  | <https://example.com>         | `main`      | Yes         |
+| Staging     | <https://staging.example.com> | `staging`   | Yes         |
+| Preview     | per-PR URLs                   | PR branches | Yes         |
 
 ## Hosting
 
-| Component | Provider | Notes |
-|---|---|---|
-| Web app | Vercel | Auto-deploys on push |
-| Database | Supabase (Postgres) | Managed, daily backups |
-| Cache | Upstash (Redis) | Serverless |
-| File storage | Cloudflare R2 | S3-compatible |
-| Queue | Inngest | Hosted |
+| Component    | Provider            | Notes                  |
+| ------------ | ------------------- | ---------------------- |
+| Web app      | Vercel              | Auto-deploys on push   |
+| Database     | Supabase (Postgres) | Managed, daily backups |
+| Cache        | Upstash (Redis)     | Serverless             |
+| File storage | Cloudflare R2       | S3-compatible          |
+| Queue        | Inngest             | Hosted                 |
 
 ## Build Process
 
 The build is triggered by:
+
 - Push to `main` → production deploy
 - Push to `staging` → staging deploy
 - Pull request → preview deploy
 
 Build steps (defined in `<ci-config-path>`):
+
 1. Install dependencies
 2. Run linter and type checker
 3. Run test suite
@@ -44,14 +46,14 @@ If any step fails, the deploy is aborted.
 
 The following secrets must be configured in the deployment platform for each environment:
 
-| Secret | Where | Purpose |
-|---|---|---|
-| `DATABASE_URL` | Vercel env vars | Database connection |
-| `NEXTAUTH_SECRET` | Vercel env vars | Session signing |
-| `STRIPE_SECRET_KEY` | Vercel env vars | Stripe API |
+| Secret                  | Where           | Purpose                        |
+| ----------------------- | --------------- | ------------------------------ |
+| `DATABASE_URL`          | Vercel env vars | Database connection            |
+| `NEXTAUTH_SECRET`       | Vercel env vars | Session signing                |
+| `STRIPE_SECRET_KEY`     | Vercel env vars | Stripe API                     |
 | `STRIPE_WEBHOOK_SECRET` | Vercel env vars | Webhook signature verification |
-| `OPENAI_API_KEY` | Vercel env vars | LLM features |
-| `SENTRY_DSN` | Vercel env vars | Error tracking |
+| `OPENAI_API_KEY`        | Vercel env vars | LLM features                   |
+| `SENTRY_DSN`            | Vercel env vars | Error tracking                 |
 
 Secrets are managed via `<tooling>` and rotated `<frequency>`.
 
@@ -70,6 +72,7 @@ pnpm db:migrate:deploy
 ### Rolling Back a Migration
 
 Prisma does not support automatic rollback. To revert a schema change:
+
 1. Create a new migration that reverses the previous change
 2. Deploy as normal
 
@@ -111,22 +114,24 @@ vercel --prod
 ### Database Rollback
 
 If a deploy includes a destructive migration that needs reverting:
+
 1. Roll back the application first (see above)
 2. Apply a corrective migration as a hotfix
 3. Do not manually edit production data unless absolutely necessary
 
 ## Monitoring
 
-| Concern | Tool | Where |
-|---|---|---|
-| Errors | Sentry | <https://sentry.io/...> |
-| Logs | Vercel logs | Vercel dashboard |
-| Uptime | <service> | <link> |
-| Performance | Vercel Analytics | Vercel dashboard |
+| Concern     | Tool             | Where                   |
+| ----------- | ---------------- | ----------------------- |
+| Errors      | Sentry           | <https://sentry.io/...> |
+| Logs        | Vercel logs      | Vercel dashboard        |
+| Uptime      | <service>        | <link>                  |
+| Performance | Vercel Analytics | Vercel dashboard        |
 
 ### Health Checks
 
 The app exposes a health check at `/api/health` which:
+
 - Verifies database connectivity
 - Verifies cache connectivity
 - Returns 200 OK if all checks pass
@@ -136,6 +141,7 @@ This endpoint is hit by `<monitoring tool>` every <interval>.
 ### Alerts
 
 Alerts are configured for:
+
 - Error rate spike
 - 5xx response rate above threshold
 - Database connection failures
@@ -174,19 +180,19 @@ For incidents, see the runbook at `<location>` (or note that no formal runbook e
 
 ### Quick Reference
 
-| Symptom | First Steps |
-|---|---|
-| Site is down | Check Vercel dashboard, check Sentry, check `/api/health` |
-| Database errors | Check Supabase status, check connection pool metrics |
-| Slow responses | Check Vercel Analytics, check Sentry transactions |
+| Symptom          | First Steps                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| Site is down     | Check Vercel dashboard, check Sentry, check `/api/health`    |
+| Database errors  | Check Supabase status, check connection pool metrics         |
+| Slow responses   | Check Vercel Analytics, check Sentry transactions            |
 | Webhook failures | Check Stripe webhook logs, check `/api/webhooks/stripe` logs |
 
 ## Cost Monitoring
 
-| Service | Monthly Cost | Notes |
-|---|---|---|
-| Vercel | $X | Pro plan |
-| Supabase | $X | Pro plan |
-| Upstash | $X | Pay-per-request |
+| Service  | Monthly Cost | Notes           |
+| -------- | ------------ | --------------- |
+| Vercel   | $X           | Pro plan        |
+| Supabase | $X           | Pro plan        |
+| Upstash  | $X           | Pay-per-request |
 
 Review monthly. Set billing alerts on each provider.

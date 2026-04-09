@@ -46,11 +46,11 @@ The app window opens automatically with the dashboard view.
 
 ## Requirements
 
-| Tool | Version | Notes |
-|---|---|---|
-| Rust | 1.85+ (stable) | Install via [rustup](https://rustup.rs/) |
-| Node.js | 22 LTS | Install via [nodejs.org](https://nodejs.org/) |
-| npm | Included with Node.js | |
+| Tool    | Version               | Notes                                         |
+| ------- | --------------------- | --------------------------------------------- |
+| Rust    | 1.85+ (stable)        | Install via [rustup](https://rustup.rs/)      |
+| Node.js | 22 LTS                | Install via [nodejs.org](https://nodejs.org/) |
+| npm     | Included with Node.js |                                               |
 
 Platform-specific dependencies:
 
@@ -66,11 +66,11 @@ For other Linux distributions, see the [Tauri v2 prerequisites](https://v2.tauri
 
 Download the installer for your platform from [GitHub Releases](https://github.com/chris-c-thomas/OxideSEO/releases).
 
-| Platform | Formats |
-|---|---|
-| macOS | `.dmg` |
-| Windows | `.msi`, `.exe` |
-| Linux | `.deb`, `.AppImage` |
+| Platform | Formats             |
+| -------- | ------------------- |
+| macOS    | `.dmg`              |
+| Windows  | `.msi`, `.exe`      |
+| Linux    | `.deb`, `.AppImage` |
 
 ### Build from Source
 
@@ -135,21 +135,21 @@ OxideSEO/
 
 ## Scripts
 
-| Script | Purpose |
-|---|---|
-| `npx tauri dev` | Start dev mode (frontend + Rust backend with hot reload) |
-| `npx tauri build` | Production build for current platform |
-| `npm run dev` | Frontend dev server only (port 1420) |
-| `npm run build` | TypeScript check + Vite production bundle |
-| `npm run lint` | ESLint (zero-warning policy) |
-| `npm run format` | Prettier auto-format |
-| `npm run format:check` | Check Prettier formatting |
-| `npm run test` | Frontend tests (Vitest) |
-| `npm run test:watch` | Frontend tests in watch mode |
-| `npm run typecheck` | TypeScript type checking |
-| `cd src-tauri && cargo test` | Rust unit and integration tests |
-| `cd src-tauri && cargo clippy --all-targets -- -D warnings` | Rust lint |
-| `cd src-tauri && cargo fmt --all` | Rust auto-format |
+| Script                                                      | Purpose                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| `npx tauri dev`                                             | Start dev mode (frontend + Rust backend with hot reload) |
+| `npx tauri build`                                           | Production build for current platform                    |
+| `npm run dev`                                               | Frontend dev server only (port 1420)                     |
+| `npm run build`                                             | TypeScript check + Vite production bundle                |
+| `npm run lint`                                              | ESLint (zero-warning policy)                             |
+| `npm run format`                                            | Prettier auto-format                                     |
+| `npm run format:check`                                      | Check Prettier formatting                                |
+| `npm run test`                                              | Frontend tests (Vitest)                                  |
+| `npm run test:watch`                                        | Frontend tests in watch mode                             |
+| `npm run typecheck`                                         | TypeScript type checking                                 |
+| `cd src-tauri && cargo test`                                | Rust unit and integration tests                          |
+| `cd src-tauri && cargo clippy --all-targets -- -D warnings` | Rust lint                                                |
+| `cd src-tauri && cargo fmt --all`                           | Rust auto-format                                         |
 
 ## Testing
 

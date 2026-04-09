@@ -45,6 +45,7 @@ npx tauri icon app-icon.png
 ### Deferred Features (post-plan)
 
 Beyond the 52 plan deliverables, these features were added:
+
 - **D-1: Crawl deletion** — Delete crawl + cascade pages/issues/links
 - **D-2: Crawl re-run** — Clone config from a completed crawl into a new crawl
 - **D-3: Keyboard shortcuts** — Global hotkeys for navigation and actions
@@ -79,21 +80,21 @@ These design decisions are intentional and should not be changed:
 
 These types cross the IPC boundary. Changes must be synchronized between Rust and TypeScript:
 
-| Rust (serde) | TypeScript | File |
-|---|---|---|
-| `CrawlConfig` | `CrawlConfig` | `commands/crawl.rs` ↔ `types/index.ts` |
-| `CrawlStatus` | `CrawlStatus` | `commands/crawl.rs` ↔ `types/index.ts` |
-| `CrawlProgress` | `CrawlProgress` | `commands/crawl.rs` ↔ `types/index.ts` |
-| `PageRow` | `PageRow` | `storage/models.rs` ↔ `types/index.ts` |
-| `IssueRow` | `IssueRow` | `storage/models.rs` ↔ `types/index.ts` |
-| `LinkRow` | `LinkRow` | `storage/models.rs` ↔ `types/index.ts` |
-| `PaginatedResponse<T>` | `PaginatedResponse<T>` | `commands/results.rs` ↔ `types/index.ts` |
-| `PluginInfo` | `PluginInfo` | `plugin/manager.rs` ↔ `types/index.ts` |
-| `PluginDetail` | `PluginDetail` | `plugin/manager.rs` ↔ `types/index.ts` |
+| Rust (serde)             | TypeScript               | File                                     |
+| ------------------------ | ------------------------ | ---------------------------------------- |
+| `CrawlConfig`            | `CrawlConfig`            | `commands/crawl.rs` ↔ `types/index.ts`   |
+| `CrawlStatus`            | `CrawlStatus`            | `commands/crawl.rs` ↔ `types/index.ts`   |
+| `CrawlProgress`          | `CrawlProgress`          | `commands/crawl.rs` ↔ `types/index.ts`   |
+| `PageRow`                | `PageRow`                | `storage/models.rs` ↔ `types/index.ts`   |
+| `IssueRow`               | `IssueRow`               | `storage/models.rs` ↔ `types/index.ts`   |
+| `LinkRow`                | `LinkRow`                | `storage/models.rs` ↔ `types/index.ts`   |
+| `PaginatedResponse<T>`   | `PaginatedResponse<T>`   | `commands/results.rs` ↔ `types/index.ts` |
+| `PluginInfo`             | `PluginInfo`             | `plugin/manager.rs` ↔ `types/index.ts`   |
+| `PluginDetail`           | `PluginDetail`           | `plugin/manager.rs` ↔ `types/index.ts`   |
 | `CrawlComparisonSummary` | `CrawlComparisonSummary` | `commands/results.rs` ↔ `types/index.ts` |
-| `PageDiffRow` | `PageDiffRow` | `storage/models.rs` ↔ `types/index.ts` |
-| `IssueDiffRow` | `IssueDiffRow` | `storage/models.rs` ↔ `types/index.ts` |
-| `SiteTreeNode` | `SiteTreeNode` | `commands/results.rs` ↔ `types/index.ts` |
+| `PageDiffRow`            | `PageDiffRow`            | `storage/models.rs` ↔ `types/index.ts`   |
+| `IssueDiffRow`           | `IssueDiffRow`           | `storage/models.rs` ↔ `types/index.ts`   |
+| `SiteTreeNode`           | `SiteTreeNode`           | `commands/results.rs` ↔ `types/index.ts` |
 
 All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use camelCase natively. These must match exactly.
 
@@ -101,61 +102,62 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 
 ### Rust Backend (`src-tauri/src/`)
 
-| File | Purpose |
-|---|---|
-| `main.rs` | Tauri entry point, logging init, command registration |
-| `commands/crawl.rs` | Crawl lifecycle IPC: start, pause, resume, stop, delete, re-run |
-| `commands/results.rs` | Data query IPC: pages, issues, links, site tree, crawl comparison (10+ commands) |
-| `commands/export.rs` | Export: CSV, NDJSON, HTML, PDF, XLSX reports + .seocrawl save/open |
-| `commands/settings.rs` | Settings persistence IPC |
-| `commands/ai.rs` | 12 AI IPC commands (config, keys, analysis, batch, summary) |
-| `commands/plugin.rs` | 7 plugin management IPC commands |
-| `crawler/engine.rs` | Crawl orchestrator (channel-based actor model) |
-| `crawler/frontier.rs` | URL priority queue + blake3 dedup + SQLite overflow |
-| `crawler/fetcher.rs` | HTTP client with redirect tracking |
-| `crawler/parser.rs` | HTML parser (lol_html + scraper fallback) |
-| `crawler/politeness.rs` | Per-domain rate limiting |
-| `crawler/robots.rs` | robots.txt cache (texting_robots) |
-| `crawler/sitemap.rs` | Sitemap XML parser + discovery |
-| `crawler/external_checker.rs` | External link HEAD checker |
-| `crawler/js_renderer.rs` | JS rendering via hidden Tauri webviews (experimental) |
-| `rules/rule.rs` | SeoRule trait + Issue struct |
-| `rules/engine.rs` | Rule registry + executor |
-| `rules/builtin/*.rs` | 21 built-in rules: meta (7), content (4), links (3), images (2), performance (3), security (2) |
-| `rules/post_crawl.rs` | PostCrawlAnalyzer for cross-page rules (duplicates, orphans, broken links) |
-| `storage/db.rs` | SQLite connection + migrations |
-| `storage/models.rs` | Data structs (PageRow, IssueRow, LinkRow, diff types, StorageCommand) |
-| `storage/queries.rs` | All SQL: paginated reads, comparison diffs, report aggregates |
-| `storage/writer.rs` | Batched storage writer thread |
-| `ai/engine.rs` | AiAnalysisEngine with caching, rate limiting, budget enforcement |
-| `ai/provider.rs` | LlmProvider trait + CompletionRequest/Response |
-| `ai/adapters/*.rs` | OpenAI, Anthropic, Ollama adapters |
-| `ai/keystore.rs` | OS-native API key storage (keyring crate) |
-| `ai/prompts.rs` | Prompt templates for all AI analysis types |
-| `plugin/manager.rs` | Plugin discovery, enable/disable, install/uninstall |
-| `plugin/wasm_host.rs` | WASM Component Model runtime (wasmtime) |
-| `plugin/native_host.rs` | Native plugin loading (libloading) |
+| File                          | Purpose                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `main.rs`                     | Tauri entry point, logging init, command registration                                          |
+| `commands/crawl.rs`           | Crawl lifecycle IPC: start, pause, resume, stop, delete, re-run                                |
+| `commands/results.rs`         | Data query IPC: pages, issues, links, site tree, crawl comparison (10+ commands)               |
+| `commands/export.rs`          | Export: CSV, NDJSON, HTML, PDF, XLSX reports + .seocrawl save/open                             |
+| `commands/settings.rs`        | Settings persistence IPC                                                                       |
+| `commands/ai.rs`              | 12 AI IPC commands (config, keys, analysis, batch, summary)                                    |
+| `commands/plugin.rs`          | 7 plugin management IPC commands                                                               |
+| `crawler/engine.rs`           | Crawl orchestrator (channel-based actor model)                                                 |
+| `crawler/frontier.rs`         | URL priority queue + blake3 dedup + SQLite overflow                                            |
+| `crawler/fetcher.rs`          | HTTP client with redirect tracking                                                             |
+| `crawler/parser.rs`           | HTML parser (lol_html + scraper fallback)                                                      |
+| `crawler/politeness.rs`       | Per-domain rate limiting                                                                       |
+| `crawler/robots.rs`           | robots.txt cache (texting_robots)                                                              |
+| `crawler/sitemap.rs`          | Sitemap XML parser + discovery                                                                 |
+| `crawler/external_checker.rs` | External link HEAD checker                                                                     |
+| `crawler/js_renderer.rs`      | JS rendering via hidden Tauri webviews (experimental)                                          |
+| `rules/rule.rs`               | SeoRule trait + Issue struct                                                                   |
+| `rules/engine.rs`             | Rule registry + executor                                                                       |
+| `rules/builtin/*.rs`          | 21 built-in rules: meta (7), content (4), links (3), images (2), performance (3), security (2) |
+| `rules/post_crawl.rs`         | PostCrawlAnalyzer for cross-page rules (duplicates, orphans, broken links)                     |
+| `storage/db.rs`               | SQLite connection + migrations                                                                 |
+| `storage/models.rs`           | Data structs (PageRow, IssueRow, LinkRow, diff types, StorageCommand)                          |
+| `storage/queries.rs`          | All SQL: paginated reads, comparison diffs, report aggregates                                  |
+| `storage/writer.rs`           | Batched storage writer thread                                                                  |
+| `ai/engine.rs`                | AiAnalysisEngine with caching, rate limiting, budget enforcement                               |
+| `ai/provider.rs`              | LlmProvider trait + CompletionRequest/Response                                                 |
+| `ai/adapters/*.rs`            | OpenAI, Anthropic, Ollama adapters                                                             |
+| `ai/keystore.rs`              | OS-native API key storage (keyring crate)                                                      |
+| `ai/prompts.rs`               | Prompt templates for all AI analysis types                                                     |
+| `plugin/manager.rs`           | Plugin discovery, enable/disable, install/uninstall                                            |
+| `plugin/wasm_host.rs`         | WASM Component Model runtime (wasmtime)                                                        |
+| `plugin/native_host.rs`       | Native plugin loading (libloading)                                                             |
 
 ### Frontend (`src/`)
 
-| File | Purpose |
-|---|---|
-| `App.tsx` | Root component, view routing (`AppView` union type) |
-| `types/index.ts` | All TypeScript types matching Rust IPC |
-| `lib/commands.ts` | Typed Tauri invoke wrappers |
-| `hooks/useServerData.ts` | Infinite-scroll data fetching with sort/filter |
-| `components/layout/Dashboard.tsx` | Recent crawls, compare mode, quick-start |
-| `components/crawl/CrawlConfig.tsx` | Crawl config form with advanced sections |
-| `components/crawl/CrawlMonitor.tsx` | Live crawl monitor + ResourceMeter |
-| `components/results/ResultsExplorer.tsx` | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
-| `components/results/DataTable.tsx` | Virtualized table (TanStack Table + Virtual) |
-| `components/comparison/*.tsx` | Crawl comparison: overview, page/issue/metadata diff tabs |
-| `components/export/ExportDialog.tsx` | Export dialog with format/type/column selection |
-| `components/plugins/PluginManagerView.tsx` | Plugin manager grid with detail sheet |
+| File                                       | Purpose                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| `App.tsx`                                  | Root component, view routing (`AppView` union type)                       |
+| `types/index.ts`                           | All TypeScript types matching Rust IPC                                    |
+| `lib/commands.ts`                          | Typed Tauri invoke wrappers                                               |
+| `hooks/useServerData.ts`                   | Infinite-scroll data fetching with sort/filter                            |
+| `components/layout/Dashboard.tsx`          | Recent crawls, compare mode, quick-start                                  |
+| `components/crawl/CrawlConfig.tsx`         | Crawl config form with advanced sections                                  |
+| `components/crawl/CrawlMonitor.tsx`        | Live crawl monitor + ResourceMeter                                        |
+| `components/results/ResultsExplorer.tsx`   | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
+| `components/results/DataTable.tsx`         | Virtualized table (TanStack Table + Virtual)                              |
+| `components/comparison/*.tsx`              | Crawl comparison: overview, page/issue/metadata diff tabs                 |
+| `components/export/ExportDialog.tsx`       | Export dialog with format/type/column selection                           |
+| `components/plugins/PluginManagerView.tsx` | Plugin manager grid with detail sheet                                     |
 
 ## Testing Approach
 
 **Rust unit tests** — Run with `cargo test` from `src-tauri/`. Tests exist for:
+
 - URL normalization and hashing (`crawler/frontier.rs`)
 - Frontier dedup and priority ordering (`crawler/frontier.rs`)
 - URL resolution and internal classification (`crawler/parser.rs`)
@@ -171,15 +173,15 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 
 ## Performance Targets
 
-| Metric | Target |
-|---|---|
-| Crawl throughput | >500 pages/sec (8-core) |
-| HTML parse time | <1ms per 50KB page |
-| Results table | 60fps with 100k rows |
-| IPC latency | <1ms per invoke |
-| Memory (10k pages) | <200MB RSS |
-| Binary size | <20MB |
-| Cold start | <2s to interactive |
+| Metric             | Target                  |
+| ------------------ | ----------------------- |
+| Crawl throughput   | >500 pages/sec (8-core) |
+| HTML parse time    | <1ms per 50KB page      |
+| Results table      | 60fps with 100k rows    |
+| IPC latency        | <1ms per invoke         |
+| Memory (10k pages) | <200MB RSS              |
+| Binary size        | <20MB                   |
+| Cold start         | <2s to interactive      |
 
 ## Common Tasks
 

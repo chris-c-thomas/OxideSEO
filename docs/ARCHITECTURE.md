@@ -47,15 +47,15 @@ graph TD
     FETCH -->|HTTPS| WEB[Target Websites]
 ```
 
-| Component | Runtime | Concurrency | Purpose |
-|---|---|---|---|
-| Main thread | Tauri | 1 | Webview host, IPC dispatch |
-| Crawl orchestrator | tokio task | 1 per crawl | URL scheduling, state machine |
-| Fetch workers | tokio async | Configurable (default 8) | HTTP requests, redirect tracking |
-| Parse + Rules | rayon pool | CPU count - 2 | HTML parsing, rule evaluation |
-| Storage writer | OS thread | 1 (serialized writes) | Batched SQLite transactions |
-| External link checker | tokio task | 1 | HEAD requests for outbound links |
-| AI engine | tokio | Sequential per batch | LLM API calls with rate limiting |
+| Component             | Runtime     | Concurrency              | Purpose                          |
+| --------------------- | ----------- | ------------------------ | -------------------------------- |
+| Main thread           | Tauri       | 1                        | Webview host, IPC dispatch       |
+| Crawl orchestrator    | tokio task  | 1 per crawl              | URL scheduling, state machine    |
+| Fetch workers         | tokio async | Configurable (default 8) | HTTP requests, redirect tracking |
+| Parse + Rules         | rayon pool  | CPU count - 2            | HTML parsing, rule evaluation    |
+| Storage writer        | OS thread   | 1 (serialized writes)    | Batched SQLite transactions      |
+| External link checker | tokio task  | 1                        | HEAD requests for outbound links |
+| AI engine             | tokio       | Sequential per batch     | LLM API calls with rate limiting |
 
 No background daemons, cron jobs, or mandatory external service dependencies exist. AI providers are opt-in.
 
@@ -68,6 +68,7 @@ The crawl is the core operation. This section traces the complete data flow from
 The user configures a crawl in the CrawlConfig form and clicks Start. The frontend calls `startCrawl(config)` via Tauri IPC.
 
 In Rust (`commands/crawl.rs`):
+
 1. Validate the `CrawlConfig` (URL format, regex pattern compilation)
 2. Insert a new crawl record into SQLite with status `"running"`
 3. Call `spawn_crawl()` to set up the engine and return a `CrawlHandle`
@@ -78,17 +79,17 @@ In Rust (`commands/crawl.rs`):
 
 `spawn_crawl()` in `crawler/engine.rs` creates all supporting infrastructure:
 
-| Component | Type | Purpose |
-|---|---|---|
-| Fetcher | `Arc<Fetcher>` | HTTP client (reqwest, manual redirect tracking, rustls-tls) |
-| URL Frontier | `Arc<Mutex<UrlFrontier>>` | Priority queue: in-memory max-heap (10K cap) + SQLite overflow, blake3 dedup |
-| Politeness Controller | `Arc<PolitenessController>` | Per-domain crawl delay (default 500ms) + per-host concurrency (default 2) |
-| Robots Cache | `Arc<Mutex<RobotsCache>>` | robots.txt fetch, cache (3600s TTL), Crawl-Delay extraction |
-| Rule Registry | `Arc<RuleRegistry>` | Built-in + plugin rules with user config overrides |
-| Compiled Patterns | `Arc<CompiledPatterns>` | URL include/exclude regex, rewrite rules |
-| JS Renderer | Optional `Arc<JsRenderer>` | Headless webview for SPA rendering |
-| Storage channel | `mpsc::channel(5000)` | Bounded channel to the storage writer thread |
-| State channel | `watch::Sender<CrawlState>` | Broadcast for pause/resume/stop signals |
+| Component             | Type                        | Purpose                                                                      |
+| --------------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| Fetcher               | `Arc<Fetcher>`              | HTTP client (reqwest, manual redirect tracking, rustls-tls)                  |
+| URL Frontier          | `Arc<Mutex<UrlFrontier>>`   | Priority queue: in-memory max-heap (10K cap) + SQLite overflow, blake3 dedup |
+| Politeness Controller | `Arc<PolitenessController>` | Per-domain crawl delay (default 500ms) + per-host concurrency (default 2)    |
+| Robots Cache          | `Arc<Mutex<RobotsCache>>`   | robots.txt fetch, cache (3600s TTL), Crawl-Delay extraction                  |
+| Rule Registry         | `Arc<RuleRegistry>`         | Built-in + plugin rules with user config overrides                           |
+| Compiled Patterns     | `Arc<CompiledPatterns>`     | URL include/exclude regex, rewrite rules                                     |
+| JS Renderer           | Optional `Arc<JsRenderer>`  | Headless webview for SPA rendering                                           |
+| Storage channel       | `mpsc::channel(5000)`       | Bounded channel to the storage writer thread                                 |
+| State channel         | `watch::Sender<CrawlState>` | Broadcast for pause/resume/stop signals                                      |
 
 The seed URL is enqueued into the frontier at depth 0, priority 100.
 
@@ -108,26 +109,32 @@ The main loop runs as a tokio task:
 ### 4. Worker Task (per URL)
 
 **Fetch** (tokio async):
+
 - HTTP request with manual redirect following (up to 10 hops, each recorded)
 - blake3 hash of response body (capped at 10MB)
 - On error: write errored page row, increment counter, return
 
 **Parse** (rayon thread pool):
+
 - `parse_html()` via lol_html (streaming) with scraper (DOM) fallback
 - Extracts: title, meta description, canonical, viewport, H1-H6, links, images, scripts, stylesheets, word count, body text
 
 **Rule evaluation** (rayon, same dispatch):
+
 - `rule_registry.evaluate_page()` runs all enabled rules
 - Returns `Vec<Issue>` with severity, category, message, detail
 
 **JS rendering** (optional):
+
 - Heuristic: few links + many scripts = likely SPA
 - If triggered: render via hidden webview, re-parse, re-evaluate rules
 
 **Link enqueuing:**
+
 - For each internal, non-nofollow link within max depth: normalize URL, apply rewrite rules, compute blake3 hash, push to frontier with dedup check
 
 **Storage:**
+
 - Build `PageRow`, `Vec<LinkRow>`, `Vec<IssueRow>`
 - Send as `StorageCommand::StorePage` through the bounded channel
 
@@ -197,22 +204,23 @@ Orchestrator (tokio)
 
 The full schema lives in [`src-tauri/migrations/`](../src-tauri/migrations/). Below is a summary of the core entities and their relationships.
 
-| Entity | Purpose | Key Relations |
-|---|---|---|
-| `crawls` | Crawl session metadata (URL, config, status, stats) | Has many pages, issues |
-| `pages` | Fetched page data (URL, title, meta, status, timing) | Belongs to crawl; has many links, issues |
-| `links` | Internal hyperlinks (source, target, anchor, type) | Belongs to source page |
-| `issues` | SEO rule violations (rule, severity, message) | Belongs to page |
-| `sitemap_urls` | Sitemap entries discovered during crawl | Belongs to crawl |
-| `external_links` | External link check results (HEAD/GET) | Belongs to crawl |
-| `settings` | App configuration (key-value) | Standalone |
-| `rule_config` | Per-profile rule overrides | References rule ID |
-| `ai_analyses` | Cached AI analysis results per page | Belongs to crawl + page |
-| `ai_usage` | Token/cost tracking per provider per crawl | Belongs to crawl |
-| `ai_crawl_summaries` | Crawl-level AI summaries | Belongs to crawl |
-| `plugins` | Plugin registry (enabled, config) | Standalone |
+| Entity               | Purpose                                              | Key Relations                            |
+| -------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| `crawls`             | Crawl session metadata (URL, config, status, stats)  | Has many pages, issues                   |
+| `pages`              | Fetched page data (URL, title, meta, status, timing) | Belongs to crawl; has many links, issues |
+| `links`              | Internal hyperlinks (source, target, anchor, type)   | Belongs to source page                   |
+| `issues`             | SEO rule violations (rule, severity, message)        | Belongs to page                          |
+| `sitemap_urls`       | Sitemap entries discovered during crawl              | Belongs to crawl                         |
+| `external_links`     | External link check results (HEAD/GET)               | Belongs to crawl                         |
+| `settings`           | App configuration (key-value)                        | Standalone                               |
+| `rule_config`        | Per-profile rule overrides                           | References rule ID                       |
+| `ai_analyses`        | Cached AI analysis results per page                  | Belongs to crawl + page                  |
+| `ai_usage`           | Token/cost tracking per provider per crawl           | Belongs to crawl                         |
+| `ai_crawl_summaries` | Crawl-level AI summaries                             | Belongs to crawl                         |
+| `plugins`            | Plugin registry (enabled, config)                    | Standalone                               |
 
 Notable patterns:
+
 - URL deduplication uses blake3 hash as a UNIQUE constraint on the `pages` table
 - AI analysis caching uses blake3 hash of page body text -- identical content across pages or crawls returns cached results
 - No soft deletes; crawl deletion cascades to pages, issues, and links
@@ -226,24 +234,24 @@ The Tauri IPC layer separates the React frontend from the Rust backend. This is 
 
 46 async Tauri commands organized into groups:
 
-| Group | Count | Examples |
-|---|---|---|
-| Crawl lifecycle | 5 | `start_crawl`, `pause_crawl`, `resume_crawl`, `stop_crawl`, `get_crawl_status` |
-| Result queries | 9 | `get_crawl_results`, `get_issues`, `get_links`, `get_site_tree` |
-| Comparison | 4 | `get_comparison_summary`, `get_page_diffs`, `get_issue_diffs`, `get_metadata_diffs` |
-| Settings | 4 | `get_settings`, `set_settings`, `get_rule_config`, `set_rule_config` |
-| Export | 3 | `export_data`, `save_crawl_file`, `open_crawl_file` |
-| AI | 14 | `analyze_page`, `batch_analyze_pages`, `generate_crawl_summary` |
-| Plugins | 7 | `list_plugins`, `enable_plugin`, `install_plugin_from_file` |
+| Group           | Count | Examples                                                                            |
+| --------------- | ----- | ----------------------------------------------------------------------------------- |
+| Crawl lifecycle | 5     | `start_crawl`, `pause_crawl`, `resume_crawl`, `stop_crawl`, `get_crawl_status`      |
+| Result queries  | 9     | `get_crawl_results`, `get_issues`, `get_links`, `get_site_tree`                     |
+| Comparison      | 4     | `get_comparison_summary`, `get_page_diffs`, `get_issue_diffs`, `get_metadata_diffs` |
+| Settings        | 4     | `get_settings`, `set_settings`, `get_rule_config`, `set_rule_config`                |
+| Export          | 3     | `export_data`, `save_crawl_file`, `open_crawl_file`                                 |
+| AI              | 14    | `analyze_page`, `batch_analyze_pages`, `generate_crawl_summary`                     |
+| Plugins         | 7     | `list_plugins`, `enable_plugin`, `install_plugin_from_file`                         |
 
 Every command has a typed wrapper in `src/lib/commands.ts`.
 
 ### Events (Backend -> Frontend)
 
-| Event | Payload | Frequency |
-|---|---|---|
-| `crawl://progress` | `CrawlProgress` | ~4Hz during active crawl |
-| `ai://progress` | `BatchProgress` | Per page during batch analysis |
+| Event              | Payload         | Frequency                      |
+| ------------------ | --------------- | ------------------------------ |
+| `crawl://progress` | `CrawlProgress` | ~4Hz during active crawl       |
+| `ai://progress`    | `BatchProgress` | Per page during batch analysis |
 
 ### Serialization Contract
 
@@ -256,12 +264,12 @@ Every command has a typed wrapper in `src/lib/commands.ts`.
 
 ## External Integrations
 
-| Service | Purpose | Code Location | Credentials | Failure Mode |
-|---|---|---|---|---|
-| OpenAI API | LLM-powered SEO analysis | `ai/adapters/openai.rs` | OS keyring | Graceful: analysis skipped, error shown |
-| Anthropic API | LLM-powered SEO analysis | `ai/adapters/anthropic.rs` | OS keyring | Graceful: analysis skipped, error shown |
-| Ollama (local) | Local LLM inference | `ai/adapters/ollama.rs` | None | Graceful: connection error shown |
-| Target websites | Sites being crawled | `crawler/fetcher.rs` | None | Per-URL: error recorded, crawl continues |
+| Service         | Purpose                  | Code Location              | Credentials | Failure Mode                             |
+| --------------- | ------------------------ | -------------------------- | ----------- | ---------------------------------------- |
+| OpenAI API      | LLM-powered SEO analysis | `ai/adapters/openai.rs`    | OS keyring  | Graceful: analysis skipped, error shown  |
+| Anthropic API   | LLM-powered SEO analysis | `ai/adapters/anthropic.rs` | OS keyring  | Graceful: analysis skipped, error shown  |
+| Ollama (local)  | Local LLM inference      | `ai/adapters/ollama.rs`    | None        | Graceful: connection error shown         |
+| Target websites | Sites being crawled      | `crawler/fetcher.rs`       | None        | Per-URL: error recorded, crawl continues |
 
 All AI integrations are opt-in, BYOK (Bring Your Own Key). The app functions fully without any external service. No telemetry, analytics, or phone-home behavior exists.
 
@@ -285,18 +293,19 @@ pub trait SeoRule: Send + Sync {
 
 ### Built-in Rules (21)
 
-| Category | Count | Rules |
-|---|---|---|
-| Meta | 7 | TitleMissing, TitleLength, DescMissing, DescLength, CanonicalMissing, CanonicalMismatch, ViewportMissing |
-| Content | 4 | H1Missing, H1Multiple, HeadingHierarchy, ThinContent |
-| Links | 3 | BrokenInternal, RedirectChain, NofollowInternal |
-| Images | 2 | AltMissing, AltEmpty |
-| Performance | 3 | LargePage, SlowResponse, RenderBlocking |
-| Security | 2 | MixedContent, HttpPage |
+| Category    | Count | Rules                                                                                                    |
+| ----------- | ----- | -------------------------------------------------------------------------------------------------------- |
+| Meta        | 7     | TitleMissing, TitleLength, DescMissing, DescLength, CanonicalMissing, CanonicalMismatch, ViewportMissing |
+| Content     | 4     | H1Missing, H1Multiple, HeadingHierarchy, ThinContent                                                     |
+| Links       | 3     | BrokenInternal, RedirectChain, NofollowInternal                                                          |
+| Images      | 2     | AltMissing, AltEmpty                                                                                     |
+| Performance | 3     | LargePage, SlowResponse, RenderBlocking                                                                  |
+| Security    | 2     | MixedContent, HttpPage                                                                                   |
 
 ### Post-Crawl Analysis
 
 After all pages are committed (synchronized via FlushAck), `PostCrawlAnalyzer` runs cross-page rules:
+
 - Duplicate titles, descriptions, and H1s (GROUP BY queries)
 - Broken internal links (links targeting 4xx/5xx pages)
 - Orphan pages (pages with no inbound internal links at depth > 0)
@@ -304,6 +313,7 @@ After all pages are committed (synchronized via FlushAck), `PostCrawlAnalyzer` r
 ### Rule Configuration
 
 Users override per-rule settings through the Settings view:
+
 - **Enabled/disabled** per rule
 - **Severity override** (Error, Warning, Info)
 - **Parameters** for configurable rules (e.g., TitleLength min/max)
@@ -314,19 +324,19 @@ Configuration is stored in the `rule_config` table and applied at crawl start vi
 
 ### Plugin Types
 
-| Runtime | Sandboxing | Use Case |
-|---|---|---|
-| WASM (wasmtime Component Model) | Fuel metering (10M instructions), memory limit (64MB), capability gating | Community plugins, untrusted code |
-| Native (libloading, C ABI) | None -- full trust required | First-party plugins, verified vendors |
+| Runtime                         | Sandboxing                                                               | Use Case                              |
+| ------------------------------- | ------------------------------------------------------------------------ | ------------------------------------- |
+| WASM (wasmtime Component Model) | Fuel metering (10M instructions), memory limit (64MB), capability gating | Community plugins, untrusted code     |
+| Native (libloading, C ABI)      | None -- full trust required                                              | First-party plugins, verified vendors |
 
 ### Plugin Kinds
 
-| Kind | Purpose |
-|---|---|
-| Rule | Custom SEO rule implementing the SeoRule trait |
-| Exporter | Custom export format (receives crawl data as JSON, writes to file) |
+| Kind          | Purpose                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| Rule          | Custom SEO rule implementing the SeoRule trait                                  |
+| Exporter      | Custom export format (receives crawl data as JSON, writes to file)              |
 | PostProcessor | Post-crawl analysis with read-only SQL access (WASM) or full DB access (native) |
-| UiExtension | Frontend UI slot contribution |
+| UiExtension   | Frontend UI slot contribution                                                   |
 
 ### Plugin Lifecycle
 
@@ -342,12 +352,12 @@ Configuration is stored in the `rule_config` table and applied at crawl start vi
 - **Memory limit:** 64MB per instance (configurable in manifest).
 - **Capabilities:** Plugins declare required capabilities in `plugin.toml`. Only declared capabilities are granted.
 
-| Capability | Description |
-|---|---|
-| `log` | Write log messages to the host tracing system |
-| `http_read` | Make outbound HTTP GET requests |
-| `db_read` | Execute read-only SQL queries (validated for safety) |
-| `fs_read_plugin_dir` | Read files within the plugin's own directory |
+| Capability           | Description                                          |
+| -------------------- | ---------------------------------------------------- |
+| `log`                | Write log messages to the host tracing system        |
+| `http_read`          | Make outbound HTTP GET requests                      |
+| `db_read`            | Execute read-only SQL queries (validated for safety) |
+| `fs_read_plugin_dir` | Read files within the plugin's own directory         |
 
 ### Native Plugin Trust Model
 
@@ -375,13 +385,13 @@ For plugin development details, see [DEVELOPMENT.md](DEVELOPMENT.md#plugin-devel
 
 ### Analysis Types
 
-| Type | Purpose |
-|---|---|
-| `content_score` | Content quality scoring (readability, relevance, depth) |
-| `meta_desc` | Meta description generation (150-160 characters) |
-| `title_tag` | Title tag suggestions (50-60 characters) |
-| `structured_data` | JSON-LD schema recommendations |
-| `accessibility` | WCAG 2.1 remediation guidance |
+| Type              | Purpose                                                 |
+| ----------------- | ------------------------------------------------------- |
+| `content_score`   | Content quality scoring (readability, relevance, depth) |
+| `meta_desc`       | Meta description generation (150-160 characters)        |
+| `title_tag`       | Title tag suggestions (50-60 characters)                |
+| `structured_data` | JSON-LD schema recommendations                          |
+| `accessibility`   | WCAG 2.1 remediation guidance                           |
 
 ### Cost Controls
 
@@ -396,6 +406,7 @@ For plugin development details, see [DEVELOPMENT.md](DEVELOPMENT.md#plugin-devel
 ### Navigation Model
 
 The app uses client-side view switching (not URL-based routing). `App.tsx` maintains:
+
 - `activeView`: `AppView` union type (dashboard, crawl-config, crawl-monitor, results, plugins, settings, crawl-comparison)
 - `activeCrawlId` and optional `compareCrawlId`
 
@@ -403,16 +414,17 @@ The `navigate(view, crawlId?, compareCrawlId?)` callback propagates to all compo
 
 ### State Layers
 
-| Layer | Tool | Scope | Used For |
-|---|---|---|---|
-| Global client state | Zustand | App lifetime | Active crawl ID, progress snapshot, settings |
-| Local component state | useState | Component lifetime | Form inputs, tab selection, UI toggles |
-| Server state | Rust/SQLite via IPC | Persistent | All crawl data, results, configuration |
-| Real-time events | Tauri listen | Subscription lifetime | Crawl progress, AI batch progress |
+| Layer                 | Tool                | Scope                 | Used For                                     |
+| --------------------- | ------------------- | --------------------- | -------------------------------------------- |
+| Global client state   | Zustand             | App lifetime          | Active crawl ID, progress snapshot, settings |
+| Local component state | useState            | Component lifetime    | Form inputs, tab selection, UI toggles       |
+| Server state          | Rust/SQLite via IPC | Persistent            | All crawl data, results, configuration       |
+| Real-time events      | Tauri listen        | Subscription lifetime | Crawl progress, AI batch progress            |
 
 ### Data Table Pattern
 
 Result tables use `useServerData<T, F>()` for server-driven pagination:
+
 1. Component provides a fetcher function, filters, and sort state
 2. Hook calls the Rust backend with `{ offset, limit, sortBy, sortDir, ...filters }`
 3. Backend executes parameterized SQL and returns `PaginatedResponse<T>`
@@ -423,31 +435,31 @@ Result tables use `useServerData<T, F>()` for server-driven pagination:
 
 ### Rust Backend (`src-tauri/src/`)
 
-| Module | Responsibility | Runtime |
-|---|---|---|
-| `commands/` | Tauri IPC handlers. Thin wrappers that validate input, call into other modules, and map errors to `Result<T, String>`. | tokio (main) |
-| `crawler/` | Crawl engine. Orchestrator, fetch workers, URL frontier, politeness, robots.txt, sitemap parsing, JS rendering. | tokio + rayon |
-| `rules/` | SEO rule evaluation. `SeoRule` trait, rule registry, built-in rules, post-crawl analysis. | rayon |
-| `storage/` | SQLite layer. Database init, migrations, all SQL queries, data models, batched writer thread. | Dedicated OS thread (writes), any thread (reads) |
-| `ai/` | LLM integration. Provider trait, adapters, prompt templates, keystore, caching, budget enforcement. | tokio |
-| `plugin/` | Plugin system. Discovery, manifest parsing, WASM host (wasmtime), native host (libloading). | tokio + wasmtime |
+| Module      | Responsibility                                                                                                         | Runtime                                          |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `commands/` | Tauri IPC handlers. Thin wrappers that validate input, call into other modules, and map errors to `Result<T, String>`. | tokio (main)                                     |
+| `crawler/`  | Crawl engine. Orchestrator, fetch workers, URL frontier, politeness, robots.txt, sitemap parsing, JS rendering.        | tokio + rayon                                    |
+| `rules/`    | SEO rule evaluation. `SeoRule` trait, rule registry, built-in rules, post-crawl analysis.                              | rayon                                            |
+| `storage/`  | SQLite layer. Database init, migrations, all SQL queries, data models, batched writer thread.                          | Dedicated OS thread (writes), any thread (reads) |
+| `ai/`       | LLM integration. Provider trait, adapters, prompt templates, keystore, caching, budget enforcement.                    | tokio                                            |
+| `plugin/`   | Plugin system. Discovery, manifest parsing, WASM host (wasmtime), native host (libloading).                            | tokio + wasmtime                                 |
 
 ### React Frontend (`src/`)
 
-| Directory | Responsibility |
-|---|---|
-| `components/layout/` | App shell: Dashboard, Sidebar |
-| `components/crawl/` | CrawlConfig form, CrawlMonitor, ResourceMeter |
-| `components/results/` | ResultsExplorer (tabbed), DataTable (virtualized), tab components, filter bars, PageDetail |
-| `components/comparison/` | Crawl comparison views |
-| `components/export/` | ExportDialog |
-| `components/plugins/` | Plugin manager |
-| `components/settings/` | Settings, AI provider configuration |
-| `components/ui/` | shadcn/ui primitives (12 components) |
-| `hooks/` | useServerData, useCrawlProgress, useAiProgress, useTheme, usePluginExtensions |
-| `lib/` | commands.ts (IPC wrappers), validation.ts (Zod schemas), utils.ts (formatting) |
-| `stores/` | Zustand: crawlStore, settingsStore |
-| `types/` | TypeScript interfaces matching Rust IPC types |
+| Directory                | Responsibility                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| `components/layout/`     | App shell: Dashboard, Sidebar                                                              |
+| `components/crawl/`      | CrawlConfig form, CrawlMonitor, ResourceMeter                                              |
+| `components/results/`    | ResultsExplorer (tabbed), DataTable (virtualized), tab components, filter bars, PageDetail |
+| `components/comparison/` | Crawl comparison views                                                                     |
+| `components/export/`     | ExportDialog                                                                               |
+| `components/plugins/`    | Plugin manager                                                                             |
+| `components/settings/`   | Settings, AI provider configuration                                                        |
+| `components/ui/`         | shadcn/ui primitives (12 components)                                                       |
+| `hooks/`                 | useServerData, useCrawlProgress, useAiProgress, useTheme, usePluginExtensions              |
+| `lib/`                   | commands.ts (IPC wrappers), validation.ts (Zod schemas), utils.ts (formatting)             |
+| `stores/`                | Zustand: crawlStore, settingsStore                                                         |
+| `types/`                 | TypeScript interfaces matching Rust IPC types                                              |
 
 ## Build and Bundle
 
@@ -459,11 +471,11 @@ Result tables use `useServerData<T, F>()` for server-driven pagination:
 
 `npx tauri build` runs `tsc -b && vite build` for the frontend, then `cargo build --release` for the backend, and bundles everything into platform-specific installers.
 
-| Platform | Formats |
-|---|---|
-| macOS | `.dmg`, `.app` |
-| Windows | `.msi`, `.exe` (NSIS) |
-| Linux | `.deb`, `.AppImage`, `.rpm` |
+| Platform | Formats                     |
+| -------- | --------------------------- |
+| macOS    | `.dmg`, `.app`              |
+| Windows  | `.msi`, `.exe` (NSIS)       |
+| Linux    | `.deb`, `.AppImage`, `.rpm` |
 
 The `plugin-wasm` feature (default) adds ~5-10MB to the binary for the wasmtime runtime. Build without it via `cargo build --no-default-features`.
 

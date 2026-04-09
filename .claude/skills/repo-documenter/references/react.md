@@ -5,11 +5,13 @@ Stack-specific guidance for documenting React applications and component librari
 ## Detection
 
 The repo is a React project if:
+
 - `react` is in `package.json` dependencies
 - `.tsx` or `.jsx` files are present in significant numbers
 - A React-based framework is in use (Next.js, Remix, Vite + React, Astro, etc.)
 
 Determine the **shape** of the React project — this drives documentation structure:
+
 - **Standalone app** (Vite, CRA, custom): SPA, document like a normal app
 - **Next.js app**: Has its own conventions (see below)
 - **Remix app**: Has its own conventions
@@ -19,30 +21,35 @@ Determine the **shape** of the React project — this drives documentation struc
 ## Phase 1 Additions: Discovery
 
 ### React Version and Mode
+
 ```bash
 jq '.dependencies.react, .dependencies["react-dom"]' package.json
 ```
 
 Capture:
+
 - React major version (17, 18, 19) — affects available features
 - Whether the app uses Server Components (Next.js 13+ App Router, or experimental setups)
 - Concurrent features in use (`useTransition`, `useDeferredValue`, Suspense for data)
 
 ### Framework Detection
-| Signal | Framework |
-|---|---|
-| `next` in deps + `app/` or `pages/` directory | Next.js |
-| `@remix-run/*` in deps | Remix |
-| `vite` + `@vitejs/plugin-react` | Vite |
-| `react-scripts` | Create React App (legacy) |
-| `astro` + React integration | Astro |
-| `gatsby` | Gatsby |
-| `@tanstack/react-start` or `@tanstack/start` | TanStack Start |
+
+| Signal                                        | Framework                 |
+| --------------------------------------------- | ------------------------- |
+| `next` in deps + `app/` or `pages/` directory | Next.js                   |
+| `@remix-run/*` in deps                        | Remix                     |
+| `vite` + `@vitejs/plugin-react`               | Vite                      |
+| `react-scripts`                               | Create React App (legacy) |
+| `astro` + React integration                   | Astro                     |
+| `gatsby`                                      | Gatsby                    |
+| `@tanstack/react-start` or `@tanstack/start`  | TanStack Start            |
 
 Note: Tauri apps use one of the above as the frontend.
 
 ### Routing
+
 Determine the routing mechanism:
+
 - File-system routing (Next.js App Router, Next.js Pages Router, Remix, TanStack Router file routes)
 - Code-based routing (`react-router-dom`, TanStack Router code routes)
 - No routing (single-page tools)
@@ -62,50 +69,54 @@ rg 'createBrowserRouter|<Routes>' src/
 ```
 
 ### State Management
+
 Detect the state strategy. Check `package.json` and grep for usage:
 
-| Library | Pattern to grep |
-|---|---|
-| Redux Toolkit | `@reduxjs/toolkit`, `createSlice` |
-| Zustand | `zustand`, `create<` |
-| Jotai | `jotai`, `atom(` |
-| Recoil | `recoil`, `atom(` |
+| Library        | Pattern to grep                     |
+| -------------- | ----------------------------------- |
+| Redux Toolkit  | `@reduxjs/toolkit`, `createSlice`   |
+| Zustand        | `zustand`, `create<`                |
+| Jotai          | `jotai`, `atom(`                    |
+| Recoil         | `recoil`, `atom(`                   |
 | TanStack Query | `@tanstack/react-query`, `useQuery` |
-| SWR | `swr`, `useSWR` |
-| MobX | `mobx`, `observer(` |
-| Apollo Client | `@apollo/client`, `useQuery` |
-| URQL | `urql`, `useQuery` |
-| Context only | `createContext`, no external store |
+| SWR            | `swr`, `useSWR`                     |
+| MobX           | `mobx`, `observer(`                 |
+| Apollo Client  | `@apollo/client`, `useQuery`        |
+| URQL           | `urql`, `useQuery`                  |
+| Context only   | `createContext`, no external store  |
 
 Most apps use a combination — e.g., TanStack Query for server state + Zustand for client state. Document both explicitly.
 
 ### Styling
-| Library | Detection |
-|---|---|
-| Tailwind | `tailwindcss` in deps, `tailwind.config.*` |
-| CSS Modules | `*.module.css` files |
-| Styled Components | `styled-components` in deps |
-| Emotion | `@emotion/react` in deps |
-| Vanilla Extract | `@vanilla-extract/css` |
-| Stitches | `@stitches/react` |
-| shadcn/ui | `components/ui/` directory + Tailwind + Radix |
-| Plain CSS | `*.css` imports without modules |
+
+| Library           | Detection                                     |
+| ----------------- | --------------------------------------------- |
+| Tailwind          | `tailwindcss` in deps, `tailwind.config.*`    |
+| CSS Modules       | `*.module.css` files                          |
+| Styled Components | `styled-components` in deps                   |
+| Emotion           | `@emotion/react` in deps                      |
+| Vanilla Extract   | `@vanilla-extract/css`                        |
+| Stitches          | `@stitches/react`                             |
+| shadcn/ui         | `components/ui/` directory + Tailwind + Radix |
+| Plain CSS         | `*.css` imports without modules               |
 
 ### Component Libraries
-| Library | Detection |
-|---|---|
-| shadcn/ui | `components/ui/` + Radix primitives |
-| Radix UI | `@radix-ui/*` |
-| Headless UI | `@headlessui/react` |
-| Material UI | `@mui/material` |
-| Chakra UI | `@chakra-ui/react` |
-| Mantine | `@mantine/core` |
-| Ant Design | `antd` |
-| Park UI | `@park-ui/*` |
+
+| Library     | Detection                           |
+| ----------- | ----------------------------------- |
+| shadcn/ui   | `components/ui/` + Radix primitives |
+| Radix UI    | `@radix-ui/*`                       |
+| Headless UI | `@headlessui/react`                 |
+| Material UI | `@mui/material`                     |
+| Chakra UI   | `@chakra-ui/react`                  |
+| Mantine     | `@mantine/core`                     |
+| Ant Design  | `antd`                              |
+| Park UI     | `@park-ui/*`                        |
 
 Note: shadcn/ui is special — components are vendored into the project, not installed. Look in `components/ui/` for evidence.
 
 ### Data Fetching
+
 - TanStack Query (configuration in `lib/query-client.ts` or similar)
 - SWR
 - Native `fetch` in components or hooks
@@ -113,6 +124,7 @@ Note: shadcn/ui is special — components are vendored into the project, not ins
 - tRPC (`@trpc/*`)
 
 ### Forms
+
 - React Hook Form (`react-hook-form`)
 - Formik (`formik`)
 - TanStack Form (`@tanstack/react-form`)
@@ -120,12 +132,14 @@ Note: shadcn/ui is special — components are vendored into the project, not ins
 - Native form elements only
 
 ### Validation
+
 - Zod (`zod`) — most common in modern React projects
 - Yup (`yup`)
 - Valibot (`valibot`)
 - Joi (`joi`)
 
 ### Testing
+
 - Vitest (`vitest`) — increasingly the default
 - Jest (`jest`)
 - React Testing Library (`@testing-library/react`)
@@ -136,9 +150,11 @@ Note: shadcn/ui is special — components are vendored into the project, not ins
 ## Phase 2 Additions: Architecture
 
 ### Component Architecture
+
 Document the project's component organization. Common patterns:
 
 **Atomic structure:**
+
 ```
 components/
 ├── atoms/
@@ -149,6 +165,7 @@ components/
 ```
 
 **Feature-based:**
+
 ```
 features/
 ├── auth/
@@ -160,6 +177,7 @@ features/
 ```
 
 **Flat with shadcn pattern:**
+
 ```
 components/
 ├── ui/             # shadcn primitives
@@ -170,6 +188,7 @@ components/
 Document which one is in use, with examples.
 
 ### Server vs. Client Components (Next.js App Router)
+
 For App Router projects, the boundary is critical:
 
 ```bash
@@ -181,27 +200,32 @@ find app -name 'page.tsx' -o -name 'layout.tsx' | xargs grep -L "use client"
 ```
 
 Document the project's default and exceptions:
+
 - Default: server components
 - Client components used for: forms, interactive UI, browser APIs, third-party libraries that need client context
 
 ### State Layers
+
 Most non-trivial React apps have multiple state layers. Document each:
 
-| Layer | Tool | Lifetime | Used For |
-|---|---|---|---|
-| Server cache | TanStack Query | Until invalidated | API data |
-| URL state | Next.js router / nuqs | Page lifetime | Filters, pagination, dialog open state |
-| Global client state | Zustand | App lifetime | User preferences, theme |
-| Local component state | useState | Component lifetime | Form inputs, UI toggles |
-| Form state | React Hook Form | Form lifetime | Form values and validation |
+| Layer                 | Tool                  | Lifetime           | Used For                               |
+| --------------------- | --------------------- | ------------------ | -------------------------------------- |
+| Server cache          | TanStack Query        | Until invalidated  | API data                               |
+| URL state             | Next.js router / nuqs | Page lifetime      | Filters, pagination, dialog open state |
+| Global client state   | Zustand               | App lifetime       | User preferences, theme                |
+| Local component state | useState              | Component lifetime | Form inputs, UI toggles                |
+| Form state            | React Hook Form       | Form lifetime      | Form values and validation             |
 
 ### Hooks Architecture
+
 Custom hooks are the React equivalent of services. Document:
+
 - Where shared hooks live (`hooks/`, `lib/hooks/`, etc.)
 - Naming convention (`use-*` vs `use*`)
 - The few "load-bearing" hooks that everything depends on (e.g., `useAuth`, `useUser`)
 
 ### Boundaries
+
 - **Server boundary**: Where server-only code lives (`server/`, `lib/server/`) and how it's enforced (`server-only` package)
 - **Client boundary**: Where client-only code lives and how client-only deps are kept out of server bundles
 - **Public API** (component libraries): What's exported from `src/index.ts`
@@ -211,6 +235,7 @@ Custom hooks are the React equivalent of services. Document:
 ### README for an Application
 
 Adapt the standard template. Add or emphasize:
+
 - A screenshot or GIF (note: don't generate one — flag for the user to add)
 - Browser support statement
 - Whether it's a SPA, SSR, or static
@@ -232,36 +257,37 @@ Different structure, closer to a Rust library:
 10. License
 
 ```tsx
-import { Button } from 'your-library'
+import { Button } from "your-library";
 
 export function App() {
-  return <Button variant="primary">Click me</Button>
+  return <Button variant="primary">Click me</Button>;
 }
 ```
 
 ### Component Inventory (for libraries)
 
-| Component | Purpose | Status |
-|---|---|---|
-| `Button` | Standard button with variants | Stable |
-| `Dialog` | Modal dialog | Stable |
-| `DataTable` | Sortable, filterable table | Beta |
+| Component   | Purpose                       | Status |
+| ----------- | ----------------------------- | ------ |
+| `Button`    | Standard button with variants | Stable |
+| `Dialog`    | Modal dialog                  | Stable |
+| `DataTable` | Sortable, filterable table    | Beta   |
 
 ### Routes Table (for apps with file-system routing)
 
 For Next.js App Router:
 
-| Route | File | Auth | Purpose |
-|---|---|---|---|
-| `/` | `app/page.tsx` | Public | Landing page |
-| `/dashboard` | `app/(app)/dashboard/page.tsx` | Required | User dashboard |
-| `/api/auth/[...nextauth]` | `app/api/auth/[...nextauth]/route.ts` | N/A | NextAuth handler |
+| Route                     | File                                  | Auth     | Purpose          |
+| ------------------------- | ------------------------------------- | -------- | ---------------- |
+| `/`                       | `app/page.tsx`                        | Public   | Landing page     |
+| `/dashboard`              | `app/(app)/dashboard/page.tsx`        | Required | User dashboard   |
+| `/api/auth/[...nextauth]` | `app/api/auth/[...nextauth]/route.ts` | N/A      | NextAuth handler |
 
 Document route groups (`(group)`), parallel routes (`@slot`), and intercepting routes (`(.)`) explicitly — they confuse new contributors.
 
 ### Performance Considerations Section
 
 For non-trivial apps, include in ARCHITECTURE.md:
+
 - Code splitting strategy (`dynamic`, route-level, component-level)
 - Image optimization (`next/image`, custom)
 - Font loading (`next/font`, system fonts)

@@ -16,7 +16,7 @@ Read code purposefully. Start at entry points and follow the most important requ
 
 ## Architecture Notes Structure
 
-```markdown
+````markdown
 # Architecture Notes
 
 Generated: <date>
@@ -33,6 +33,7 @@ A 3-5 sentence description of what the system does in mechanical terms (not mark
 ## Runtime Topology
 
 A description of the processes that run in production:
+
 - Web server(s)
 - Workers
 - Cron / scheduled jobs
@@ -49,12 +50,14 @@ graph LR
     App --> Redis[(Redis)]
     App --> Stripe[Stripe API]
 ```
+````
 
 ## Request Lifecycle
 
 Walk through what happens when a typical request hits the system. Be specific to the codebase, not generic.
 
 Example for a Next.js app:
+
 1. Request hits `middleware.ts` — auth check, locale routing
 2. Routed to `app/(app)/dashboard/page.tsx` — server component
 3. Server component calls `lib/queries/getDashboardData.ts` — Prisma queries
@@ -64,10 +67,10 @@ Example for a Next.js app:
 
 Summarize the core entities and their relationships. Reference the schema file directly. Don't reproduce the entire schema — just the key entities and how they relate.
 
-| Entity | Purpose | Key Relations |
-|---|---|---|
-| User | Account | hasMany Sessions, hasMany Projects |
-| ... | ... | ... |
+| Entity | Purpose | Key Relations                      |
+| ------ | ------- | ---------------------------------- |
+| User   | Account | hasMany Sessions, hasMany Projects |
+| ...    | ...     | ...                                |
 
 Note any non-obvious patterns (soft deletes, multi-tenancy via row-level security, event sourcing, etc.).
 
@@ -82,6 +85,7 @@ Note any non-obvious patterns (soft deletes, multi-tenancy via row-level securit
 ## External Integrations
 
 For each external service from the inventory, document:
+
 - What it's used for
 - Where the integration code lives
 - How credentials are configured
@@ -97,6 +101,7 @@ For each external service from the inventory, document:
 ## Client/Server Boundary
 
 For full-stack apps: what runs on the client vs. the server. For Next.js specifically:
+
 - Server components vs. client components — predominant pattern
 - Server actions used? Where?
 - API routes — what's exposed
@@ -107,6 +112,7 @@ For full-stack apps: what runs on the client vs. the server. For Next.js specifi
 How the codebase is internally organized. The mental model that lets a new developer know "this kind of code goes in this kind of place."
 
 Example:
+
 - `app/` — Next.js routes only, thin
 - `lib/services/` — business logic, framework-agnostic
 - `lib/db/` — Prisma client and query helpers
@@ -115,6 +121,7 @@ Example:
 ## Hidden Coupling and Footguns
 
 Things a new contributor would trip over:
+
 - Global state
 - Side-effectful imports
 - Magic environment variables
@@ -148,14 +155,17 @@ Things a new contributor would trip over:
 List every question that the agent could not answer from the code alone, grouped by severity. The user must answer the **Blocking** questions before Phase 3 can proceed.
 
 ### Blocking (must answer before Phase 3)
+
 1. Q: I see two auth providers configured (NextAuth and Clerk). Which one is actually in use?
 2. Q: The `legacy/` directory is referenced in tsconfig but appears unused. Should it be documented or excluded?
 3. ...
 
 ### Non-blocking (helpful but optional)
+
 1. Q: What's the intended audience for the `/admin` routes?
 2. ...
-```
+
+````
 
 ## Useful Commands
 
@@ -177,7 +187,7 @@ rg "from ['\"].*lib/auth['\"]" -t ts
 
 # Find all server actions
 rg "^['\"]use server['\"]" -t ts
-```
+````
 
 ## Completion Criteria
 
@@ -200,11 +210,13 @@ Present to the user in this form:
 > **System summary:** [one paragraph]
 >
 > **I have N blocking questions that I need you to answer before Phase 3:**
+>
 > 1. [Question 1]
 > 2. [Question 2]
-> ...
+>    ...
 >
 > **And M non-blocking questions if you have time:**
+>
 > 1. ...
 >
 > Please answer the blocking questions and I'll incorporate the answers into the architecture notes before proceeding to Phase 3 (Synthesis).

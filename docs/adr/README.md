@@ -4,11 +4,11 @@ This directory contains Architecture Decision Records (ADRs) for OxideSEO. ADRs 
 
 ## Index
 
-| ADR | Title | Status | Date |
-|---|---|---|---|
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted | 2026-04-07 |
-| [0002](0002-channel-based-crawl-engine.md) | Channel-based crawl engine with dedicated storage writer | Accepted | 2026-04-07 |
-| [0003](0003-wasm-plugin-sandboxing.md) | WASM Component Model for plugin sandboxing | Accepted | 2026-04-07 |
+| ADR                                           | Title                                                    | Status   | Date       |
+| --------------------------------------------- | -------------------------------------------------------- | -------- | ---------- |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions                            | Accepted | 2026-04-07 |
+| [0002](0002-channel-based-crawl-engine.md)    | Channel-based crawl engine with dedicated storage writer | Accepted | 2026-04-07 |
+| [0003](0003-wasm-plugin-sandboxing.md)        | WASM Component Model for plugin sandboxing               | Accepted | 2026-04-07 |
 
 ## Creating a New ADR
 

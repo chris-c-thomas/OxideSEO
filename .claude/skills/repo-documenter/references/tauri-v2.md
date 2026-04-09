@@ -5,6 +5,7 @@ Stack-specific guidance for documenting Tauri v2 desktop and mobile applications
 ## Detection
 
 The repo is a Tauri v2 project if:
+
 - A `src-tauri/` directory exists with `Cargo.toml`
 - `src-tauri/tauri.conf.json` exists
 - `@tauri-apps/api` v2.x is in the frontend `package.json`
@@ -32,7 +33,9 @@ The boundary between them is the IPC layer. Most of the unique documentation sur
 ## Phase 1 Additions: Discovery
 
 ### Project Layout
+
 Standard Tauri v2 layout:
+
 ```
 .
 ├── src/                    # Frontend (your web app)
@@ -51,6 +54,7 @@ Standard Tauri v2 layout:
 ```
 
 ### Tauri Configuration
+
 Read and summarize `src-tauri/tauri.conf.json`:
 
 ```bash
@@ -74,6 +78,7 @@ jq '{
 ```
 
 Capture:
+
 - Product name and bundle identifier
 - Build commands (`beforeDevCommand`, `beforeBuildCommand`, `devUrl`, `frontendDist`)
 - Window definitions (count, sizing, decorations, transparency)
@@ -82,7 +87,9 @@ Capture:
 - Plugin list
 
 ### Frontend Stack
+
 Detect the frontend framework as you would for any web project. Common Tauri pairings:
+
 - React + Vite
 - Svelte/SvelteKit
 - Solid
@@ -92,6 +99,7 @@ Detect the frontend framework as you would for any web project. Common Tauri pai
 Note: Next.js with Tauri requires static export (`output: 'export'`) and has its own caveats.
 
 ### Tauri Plugins
+
 List enabled plugins from both manifests:
 
 ```bash
@@ -103,6 +111,7 @@ jq '.dependencies | to_entries[] | select(.key | startswith("@tauri-apps/plugin-
 ```
 
 Common plugins to recognize:
+
 - `tauri-plugin-fs` — Filesystem access
 - `tauri-plugin-dialog` — Native dialogs
 - `tauri-plugin-shell` — Shell command execution
@@ -117,6 +126,7 @@ Common plugins to recognize:
 - `tauri-plugin-log` — Structured logging
 
 ### Capabilities (v2 Security Model)
+
 Tauri v2's defining feature is its capability-based permission system. List all capability files:
 
 ```bash
@@ -125,6 +135,7 @@ cat src-tauri/capabilities/*.json
 ```
 
 Each capability file declares:
+
 - `identifier` — capability name
 - `windows` — which windows it applies to
 - `permissions` — list of granular permissions granted
@@ -132,6 +143,7 @@ Each capability file declares:
 This is critical to document — it's the security boundary.
 
 ### Custom Commands
+
 Find every Tauri command exposed to the frontend:
 
 ```bash
@@ -141,6 +153,7 @@ rg '#\[tauri::command\]' src-tauri/src/ -A 2
 Each `#[tauri::command]` is an IPC endpoint. Inventory them all.
 
 ### Frontend → Backend Calls
+
 Find every `invoke` call:
 
 ```bash
@@ -150,6 +163,7 @@ rg "invoke\(['\"]" src/
 These should pair 1:1 with the commands above. Mismatches are bugs or dead code.
 
 ### Events
+
 Find event emitters and listeners:
 
 ```bash
@@ -161,7 +175,9 @@ rg "listen\(['\"]" src/
 ```
 
 ### Mobile Targets (v2)
+
 Tauri v2 supports iOS and Android. Check:
+
 ```bash
 ls src-tauri/gen/ 2>/dev/null
 ls src-tauri/gen/apple/ 2>/dev/null
@@ -173,6 +189,7 @@ If mobile is configured, document the additional targets and their build require
 ## Phase 2 Additions: Architecture
 
 ### IPC Architecture
+
 This is the most important section for any Tauri app. Document:
 
 1. **Command surface** — every `#[tauri::command]`, what it does, what permissions it requires
@@ -181,35 +198,41 @@ This is the most important section for any Tauri app. Document:
 4. **Async patterns** — which commands are async, which spawn background tasks
 
 ### Capability Model
+
 Document the capability files explicitly:
 
-| Capability File | Applies To | Key Permissions |
-|---|---|---|
-| `default.json` | main window | `core:default`, `fs:allow-read-text-file` |
-| `admin.json` | admin window | `shell:allow-execute`, `fs:allow-write-file` |
+| Capability File | Applies To   | Key Permissions                              |
+| --------------- | ------------ | -------------------------------------------- |
+| `default.json`  | main window  | `core:default`, `fs:allow-read-text-file`    |
+| `admin.json`    | admin window | `shell:allow-execute`, `fs:allow-write-file` |
 
-For each non-trivial permission, note *why* it's granted and what feature requires it.
+For each non-trivial permission, note _why_ it's granted and what feature requires it.
 
 ### Process Model
+
 - Main process (Rust) — what it owns
 - Webview process(es) — how many, what each renders
 - Worker threads — any `tauri::async_runtime::spawn` patterns
 - Sidecars — external binaries bundled with the app (`externalBin`)
 
 ### State and Persistence
+
 - Where app state lives in memory (`tauri::State`)
 - Where state persists to disk (tauri-plugin-store, custom files, SQLite via plugin-sql)
 - Where logs go (`tauri-plugin-log` or custom)
 - App data directory paths per platform (`app_data_dir`, `app_config_dir`, `app_log_dir`)
 
 ### Window Management
+
 - Window count and roles
 - Window-to-window communication (events, shared state)
 - Tray integration
 - Menu integration
 
 ### Update Strategy
+
 If `tauri-plugin-updater` is configured:
+
 - Update endpoint
 - Signing key location (public key in `tauri.conf.json`, private key in CI secrets)
 - Update channel strategy (stable, beta, etc.)
@@ -228,14 +251,14 @@ Adapt the README template to include:
 
 ### Platforms Table
 
-| Platform | Architecture | Bundle Format | Status |
-|---|---|---|---|
-| macOS | aarch64 | .dmg, .app | Supported |
-| macOS | x86_64 | .dmg, .app | Supported |
-| Windows | x86_64 | .msi, .exe | Supported |
-| Linux | x86_64 | .deb, .AppImage, .rpm | Supported |
-| iOS | aarch64 | .ipa | Beta |
-| Android | aarch64 | .apk, .aab | Beta |
+| Platform | Architecture | Bundle Format         | Status    |
+| -------- | ------------ | --------------------- | --------- |
+| macOS    | aarch64      | .dmg, .app            | Supported |
+| macOS    | x86_64       | .dmg, .app            | Supported |
+| Windows  | x86_64       | .msi, .exe            | Supported |
+| Linux    | x86_64       | .deb, .AppImage, .rpm | Supported |
+| iOS      | aarch64      | .ipa                  | Beta      |
+| Android  | aarch64      | .apk, .aab            | Beta      |
 
 ### Installation Section
 
@@ -266,11 +289,11 @@ A short paragraph explaining the two-process model, then link to ARCHITECTURE.md
 
 In `ARCHITECTURE.md`, include a table of every command:
 
-| Command | Permission Required | Purpose | Async |
-|---|---|---|---|
-| `read_config` | `fs:allow-read-text-file` | Loads user config from disk | Yes |
-| `save_image` | `dialog:allow-save`, `fs:allow-write-file` | Saves image via native dialog | Yes |
-| ... | ... | ... | ... |
+| Command       | Permission Required                        | Purpose                       | Async |
+| ------------- | ------------------------------------------ | ----------------------------- | ----- |
+| `read_config` | `fs:allow-read-text-file`                  | Loads user config from disk   | Yes   |
+| `save_image`  | `dialog:allow-save`, `fs:allow-write-file` | Saves image via native dialog | Yes   |
+| ...           | ...                                        | ...                           | ...   |
 
 ## Phase 4 Additions: Verification
 
@@ -300,6 +323,7 @@ jq '.build.devUrl' src-tauri/tauri.conf.json
 ### Build Verification (optional but high-value)
 
 If feasible, run a debug build to verify the documented build process actually works:
+
 ```bash
 pnpm tauri build --debug
 ```
