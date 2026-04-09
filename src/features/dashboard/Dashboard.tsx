@@ -152,9 +152,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         try {
           await deleteCrawl(crawlId);
           setRecentCrawls((prev) => prev.filter((c) => c.crawlId !== crawlId));
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(crawlId);
+            return next;
+          });
           const { activeCrawlId, clearCrawl } = useCrawlStore.getState();
           if (crawlId === activeCrawlId) {
             clearCrawl();
+            onNavigate("dashboard");
           }
           toast.success("Crawl deleted.");
         } catch (err) {

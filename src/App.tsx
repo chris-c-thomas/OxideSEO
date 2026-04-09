@@ -53,6 +53,14 @@ export function App() {
   // Initialize theme system (applies data-theme attribute).
   const { setTheme, resolved } = useTheme();
   const crawlState = useCrawlStore((s) => s.state);
+  const storeCrawlId = useCrawlStore((s) => s.activeCrawlId);
+
+  // Sync local activeCrawlId when the store is cleared (e.g., on crawl deletion).
+  useEffect(() => {
+    if (storeCrawlId === null && activeCrawlId !== null) {
+      setActiveCrawlId(null);
+    }
+  }, [storeCrawlId, activeCrawlId]);
 
   // App-level crawl event listeners — active regardless of current view.
   useCrawlProgress(activeCrawlId);
