@@ -4,7 +4,7 @@
 //! writer uses these for batched inserts; the command handlers use them
 //! for reads with LIMIT/OFFSET pagination.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rusqlite::{Connection, params, types::Value};
 
 use super::models::{
@@ -271,6 +271,58 @@ pub fn update_crawl_stats(
         UPDATE_CRAWL_STATS,
         params![crawl_id, urls_crawled, urls_errored],
     )?;
+    Ok(())
+}
+
+/// Retrieve the config_json for a crawl (used by re-run).
+pub fn select_crawl_config(conn: &Connection, crawl_id: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT config_json FROM crawls WHERE id = ?1")?;
+    let result = stmt.query_row(params![crawl_id], |row| row.get::<_, String>(0));
+    match result {
+        Ok(json) => Ok(Some(json)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Delete a crawl and all child records in a single transaction.
+///
+/// Must delete in reverse FK dependency order since no CASCADE is configured.
+pub fn delete_crawl(conn: &mut Connection, crawl_id: &str) -> Result<()> {
+    let tx = conn
+        .transaction()
+        .context("failed to begin delete transaction")?;
+
+    tx.execute(
+        "DELETE FROM ai_analyses WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute(
+        "DELETE FROM ai_usage WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute(
+        "DELETE FROM ai_crawl_summaries WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute(
+        "DELETE FROM external_links WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute("DELETE FROM links WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute("DELETE FROM issues WHERE crawl_id = ?1", params![crawl_id])?;
+    tx.execute(
+        "DELETE FROM sitemap_urls WHERE crawl_id = ?1",
+        params![crawl_id],
+    )?;
+    tx.execute("DELETE FROM pages WHERE crawl_id = ?1", params![crawl_id])?;
+    let changes = tx.execute("DELETE FROM crawls WHERE id = ?1", params![crawl_id])?;
+
+    if changes == 0 {
+        anyhow::bail!("crawl not found: {crawl_id}");
+    }
+
+    tx.commit().context("failed to commit delete transaction")?;
     Ok(())
 }
 
@@ -1922,5 +1974,152 @@ fn build_metadata_diff_sql(
         values.push(Value::Integer(limit));
         values.push(Value::Integer(offset));
         (format!("{sql} ORDER BY p1.url LIMIT ? OFFSET ?"), values)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::db::Database;
+    use crate::{RuleCategory, Severity};
+
+    fn test_db() -> Database {
+        Database::new_in_memory().unwrap()
+    }
+
+    fn insert_test_crawl(conn: &Connection, crawl_id: &str) {
+        insert_crawl(
+            conn,
+            &CrawlRow {
+                id: crawl_id.to_string(),
+                start_url: "https://example.com".into(),
+                config_json: r#"{"startUrl":"https://example.com"}"#.into(),
+                status: "completed".into(),
+                started_at: None,
+                completed_at: None,
+                urls_crawled: 0,
+                urls_errored: 0,
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_select_crawl_config_returns_json() {
+        let db = test_db();
+        db.with_conn(|conn| {
+            insert_test_crawl(conn, "c1");
+            let config = select_crawl_config(conn, "c1")?;
+            assert!(config.is_some());
+            assert!(config.unwrap().contains("example.com"));
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_select_crawl_config_not_found() {
+        let db = test_db();
+        db.with_conn(|conn| {
+            let config = select_crawl_config(conn, "nonexistent")?;
+            assert!(config.is_none());
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_delete_crawl_removes_all_child_records() {
+        let db = test_db();
+        db.with_conn_mut(|conn| {
+            insert_test_crawl(conn, "c1");
+
+            // Insert a page.
+            let url_hash = blake3::hash(b"https://example.com").as_bytes().to_vec();
+            upsert_page(
+                conn,
+                &PageRow {
+                    id: 0,
+                    crawl_id: "c1".into(),
+                    url: "https://example.com".into(),
+                    depth: 0,
+                    status_code: Some(200),
+                    content_type: Some("text/html".into()),
+                    response_time_ms: Some(100),
+                    body_size: Some(5000),
+                    title: Some("Example".into()),
+                    meta_desc: None,
+                    h1: None,
+                    canonical: None,
+                    robots_directives: None,
+                    state: "fetched".into(),
+                    fetched_at: None,
+                    error_message: None,
+                    custom_extractions: None,
+                    is_js_rendered: false,
+                    body_text: None,
+                },
+                &url_hash,
+            )?;
+
+            // Insert an issue referencing the page.
+            insert_issue(
+                conn,
+                &IssueRow {
+                    id: 0,
+                    crawl_id: "c1".into(),
+                    page_id: 1,
+                    rule_id: "test-rule".into(),
+                    severity: Severity::Warning,
+                    category: RuleCategory::Meta,
+                    message: "test issue".into(),
+                    detail_json: None,
+                },
+            )?;
+
+            // Insert a link.
+            insert_link(
+                conn,
+                &LinkRow {
+                    id: 0,
+                    crawl_id: "c1".into(),
+                    source_page: 1,
+                    target_url: "https://example.com/about".into(),
+                    anchor_text: Some("About".into()),
+                    link_type: "a".into(),
+                    is_internal: true,
+                    nofollow: false,
+                },
+            )?;
+
+            // Verify records exist.
+            assert_eq!(count_pages(conn, "c1")?, 1);
+            assert_eq!(count_issues(conn, "c1", None, None, None)?, 1);
+            assert_eq!(count_links(conn, "c1", None, None, None, None)?, 1);
+
+            // Delete the crawl.
+            delete_crawl(conn, "c1")?;
+
+            // Verify all records are gone.
+            assert_eq!(count_pages(conn, "c1")?, 0);
+            assert_eq!(count_issues(conn, "c1", None, None, None)?, 0);
+            assert_eq!(count_links(conn, "c1", None, None, None, None)?, 0);
+            assert!(select_crawl_by_id(conn, "c1")?.is_none());
+
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_delete_crawl_not_found_returns_error() {
+        let db = test_db();
+        db.with_conn_mut(|conn| {
+            let result = delete_crawl(conn, "nonexistent");
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("crawl not found"));
+            Ok(())
+        })
+        .unwrap();
     }
 }

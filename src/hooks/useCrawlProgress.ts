@@ -21,18 +21,28 @@ export function useCrawlProgress(crawlId: string | null) {
     if (!crawlId) return;
 
     let unlisten: UnlistenFn | null = null;
+    let cancelled = false;
 
     const subscribe = async () => {
-      unlisten = await listen<CrawlProgress>("crawl://progress", (event) => {
+      const fn = await listen<CrawlProgress>("crawl://progress", (event) => {
         if (event.payload.crawlId === crawlId) {
           updateProgress(event.payload);
         }
       });
+
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     };
 
-    subscribe();
+    subscribe().catch((err) => {
+      console.error("Failed to subscribe to crawl progress events:", err);
+    });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [crawlId, updateProgress]);

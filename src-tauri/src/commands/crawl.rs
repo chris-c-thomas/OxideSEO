@@ -1,4 +1,4 @@
-//! Crawl lifecycle commands: start, pause, resume, stop, status.
+//! Crawl lifecycle commands: start, pause, resume, stop, delete, re-run, and status.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +14,14 @@ use crate::plugin::manager::PluginManager;
 use crate::storage::db::Database;
 use crate::storage::models::CrawlRow;
 use crate::storage::queries;
+
+/// State change event payload emitted to the frontend via `crawl://state`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlStateChange {
+    pub crawl_id: String,
+    pub state: CrawlState,
+}
 
 /// Managed state type for the plugin manager.
 pub type PluginManagerState = Arc<Mutex<PluginManager>>;
@@ -249,11 +257,16 @@ pub async fn start_crawl(
 
 /// Pause an active crawl.
 #[tauri::command]
-pub async fn pause_crawl(crawl_id: String, handles: State<'_, CrawlHandles>) -> Result<(), String> {
+pub async fn pause_crawl(
+    crawl_id: String,
+    handles: State<'_, CrawlHandles>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     tracing::info!(%crawl_id, "Pausing crawl");
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.pause();
+    emit_state_change(&app, &crawl_id, CrawlState::Paused);
     Ok(())
 }
 
@@ -262,21 +275,28 @@ pub async fn pause_crawl(crawl_id: String, handles: State<'_, CrawlHandles>) -> 
 pub async fn resume_crawl(
     crawl_id: String,
     handles: State<'_, CrawlHandles>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     tracing::info!(%crawl_id, "Resuming crawl");
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.resume();
+    emit_state_change(&app, &crawl_id, CrawlState::Running);
     Ok(())
 }
 
 /// Stop a crawl entirely.
 #[tauri::command]
-pub async fn stop_crawl(crawl_id: String, handles: State<'_, CrawlHandles>) -> Result<(), String> {
+pub async fn stop_crawl(
+    crawl_id: String,
+    handles: State<'_, CrawlHandles>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     tracing::info!(%crawl_id, "Stopping crawl");
     let map = handles.lock().await;
     let handle = map.get(&crawl_id).ok_or("Crawl not found")?;
     handle.stop();
+    emit_state_change(&app, &crawl_id, CrawlState::Stopped);
     Ok(())
 }
 
@@ -343,4 +363,76 @@ pub async fn get_crawl_status(
         elapsed_ms: 0,
         current_rps: 0.0,
     })
+}
+
+/// Delete a crawl and all associated data.
+///
+/// If the crawl is currently active, it is stopped first.
+#[tauri::command]
+pub async fn delete_crawl(
+    crawl_id: String,
+    handles: State<'_, CrawlHandles>,
+    db: State<'_, Arc<Database>>,
+) -> Result<(), String> {
+    tracing::info!(%crawl_id, "Deleting crawl");
+
+    // Stop and remove from active handles if running.
+    // Wait for the orchestrator and storage writer to fully shut down
+    // before deleting data, to avoid racing with in-flight writes.
+    {
+        let mut map = handles.lock().await;
+        if let Some(handle) = map.remove(&crawl_id) {
+            handle.stop();
+            drop(map);
+            handle.wait_for_shutdown().await;
+        }
+    }
+
+    db.with_conn_mut(|conn| queries::delete_crawl(conn, &crawl_id))
+        .map_err(|e| format!("{e:#}"))?;
+
+    Ok(())
+}
+
+/// Re-run a crawl using the same configuration.
+///
+/// Reads the config from a previous crawl and starts a fresh crawl with it.
+#[tauri::command]
+pub async fn rerun_crawl(
+    crawl_id: String,
+    db: State<'_, Arc<Database>>,
+    handles: State<'_, CrawlHandles>,
+    plugin_manager: State<'_, PluginManagerState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    tracing::info!(%crawl_id, "Re-running crawl");
+
+    let config_json = db
+        .with_conn(|conn| queries::select_crawl_config(conn, &crawl_id))
+        .map_err(|e| format!("{e:#}"))?
+        .ok_or_else(|| format!("Crawl not found: {crawl_id}"))?;
+
+    let config: CrawlConfig =
+        serde_json::from_str(&config_json).map_err(|e| format!("Invalid config: {e}"))?;
+
+    // Reuse start_crawl logic.
+    start_crawl(config, db, handles, plugin_manager, app).await
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Emit a `crawl://state` event so the frontend can detect state changes.
+fn emit_state_change(app: &tauri::AppHandle, crawl_id: &str, state: CrawlState) {
+    use tauri::Emitter;
+    if let Err(e) = app.emit(
+        "crawl://state",
+        CrawlStateChange {
+            crawl_id: crawl_id.to_owned(),
+            state,
+        },
+    ) {
+        tracing::warn!(%crawl_id, error = %e, "Failed to emit crawl state change event");
+    }
 }

@@ -56,6 +56,11 @@ export interface CrawlStatus {
   currentRps: number;
 }
 
+export interface CrawlStateChange {
+  crawlId: string;
+  state: CrawlState;
+}
+
 export interface CrawlProgress {
   crawlId: string;
   urlsCrawled: number;

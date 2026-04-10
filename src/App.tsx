@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { useHotkeys } from "@/hooks/useHotkeys";
+import { useCrawlProgress } from "@/hooks/useCrawlProgress";
+import { useCrawlStateEvents } from "@/hooks/useCrawlStateEvents";
 import { toggleCommandPalette } from "@/hooks/useCommandPalette";
 import { commandRegistry } from "@/lib/commandRegistry";
+import { pauseCrawl, resumeCrawl, stopCrawl } from "@/lib/commands";
 import { SHORTCUTS, shortcutToKeys } from "@/lib/shortcuts";
+import { useCrawlStore } from "@/stores/crawlStore";
 import { AppShell } from "@/components/AppShell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Dashboard } from "@/features/dashboard/Dashboard";
 import { CrawlConfig } from "@/features/crawl-config/CrawlConfig";
 import { CrawlMonitor } from "@/features/crawl-monitor/CrawlMonitor";
@@ -15,6 +20,7 @@ import { SettingsView } from "@/features/settings/SettingsView";
 import { IssuesView } from "@/features/issues/IssuesView";
 import { PluginManagerView } from "@/components/plugins/PluginManagerView";
 import { CrawlComparison } from "@/components/comparison/CrawlComparison";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -22,6 +28,9 @@ import {
   Table2,
   Settings,
   Palette,
+  Pause,
+  Play,
+  Square,
 } from "lucide-react";
 
 /** Application views mapped to sidebar navigation items. */
@@ -39,9 +48,23 @@ export function App() {
   const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [activeCrawlId, setActiveCrawlId] = useState<string | null>(null);
   const [compareCrawlId, setCompareCrawlId] = useState<string | null>(null);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   // Initialize theme system (applies data-theme attribute).
   const { setTheme, resolved } = useTheme();
+  const crawlState = useCrawlStore((s) => s.state);
+  const storeCrawlId = useCrawlStore((s) => s.activeCrawlId);
+
+  // Sync local activeCrawlId when the store is cleared (e.g., on crawl deletion).
+  useEffect(() => {
+    if (storeCrawlId === null && activeCrawlId !== null) {
+      setActiveCrawlId(null);
+    }
+  }, [storeCrawlId, activeCrawlId]);
+
+  // App-level crawl event listeners — active regardless of current view.
+  useCrawlProgress(activeCrawlId);
+  useCrawlStateEvents();
 
   /** Navigate to a view. Optionally set crawl context (1 or 2 IDs for comparison). */
   const navigate = (view: AppView, crawlId?: string, secondCrawlId?: string) => {
@@ -126,10 +149,51 @@ export function App() {
       },
     ];
 
+    // Conditionally add crawl lifecycle commands based on active state.
+    if (crawlState === "running" && activeCrawlId) {
+      commands.push({
+        id: "crawl:pause",
+        label: "Pause Active Crawl",
+        icon: Pause,
+        group: "Crawl",
+        run: async () => {
+          try {
+            await pauseCrawl(activeCrawlId);
+          } catch (err) {
+            toast.error(`Failed to pause crawl: ${String(err)}`);
+          }
+        },
+      });
+    }
+    if (crawlState === "paused" && activeCrawlId) {
+      commands.push({
+        id: "crawl:resume",
+        label: "Resume Active Crawl",
+        icon: Play,
+        group: "Crawl",
+        run: async () => {
+          try {
+            await resumeCrawl(activeCrawlId);
+          } catch (err) {
+            toast.error(`Failed to resume crawl: ${String(err)}`);
+          }
+        },
+      });
+    }
+    if ((crawlState === "running" || crawlState === "paused") && activeCrawlId) {
+      commands.push({
+        id: "crawl:stop",
+        label: "Stop Active Crawl",
+        icon: Square,
+        group: "Crawl",
+        run: () => setShowStopConfirm(true),
+      });
+    }
+
     commandRegistry.registerMany(commands);
     return () => commandRegistry.unregisterMany(commands.map((c) => c.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolved]);
+  }, [resolved, crawlState, activeCrawlId]);
 
   const renderView = () => {
     switch (activeView) {
@@ -169,10 +233,29 @@ export function App() {
     }
   };
 
+  const handleConfirmStop = async () => {
+    setShowStopConfirm(false);
+    if (!activeCrawlId) return;
+    try {
+      await stopCrawl(activeCrawlId);
+    } catch (err) {
+      toast.error(`Failed to stop crawl: ${String(err)}`);
+    }
+  };
+
   return (
     <AppShell activeView={activeView} onNavigate={navigate}>
       <ErrorBoundary>{renderView()}</ErrorBoundary>
       <CommandPalette />
+      <ConfirmDialog
+        open={showStopConfirm}
+        title="Stop Crawl"
+        description="This will stop the crawl. In-flight requests will complete but no new URLs will be fetched."
+        confirmLabel="Stop"
+        variant="destructive"
+        onConfirm={handleConfirmStop}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </AppShell>
   );
 }

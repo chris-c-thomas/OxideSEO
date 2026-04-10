@@ -65,6 +65,8 @@ fn main() {
             commands::crawl::resume_crawl,
             commands::crawl::stop_crawl,
             commands::crawl::get_crawl_status,
+            commands::crawl::delete_crawl,
+            commands::crawl::rerun_crawl,
             // Results queries
             commands::results::get_recent_crawls,
             commands::results::get_crawl_results,

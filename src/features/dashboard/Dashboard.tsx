@@ -4,8 +4,18 @@
 
 import { useEffect, useState } from "react";
 import type { AppView } from "@/App";
-import { getRecentCrawls, openCrawlFile, saveCrawlFile, stopCrawl } from "@/lib/commands";
+import {
+  deleteCrawl,
+  getRecentCrawls,
+  openCrawlFile,
+  pauseCrawl,
+  resumeCrawl,
+  rerunCrawl,
+  saveCrawlFile,
+  stopCrawl,
+} from "@/lib/commands";
 import { cn, formatNumber } from "@/lib/utils";
+import { useCrawlStore } from "@/stores/crawlStore";
 import { toast } from "sonner";
 import type { CrawlSummary } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -17,7 +27,15 @@ import { Sparkline } from "@/components/Sparkline";
 import { Panel } from "@/components/Panel";
 import { EmptyState } from "@/components/EmptyState";
 import { SeverityBadge } from "@/components/badges/SeverityBadge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Globe,
   AlertTriangle,
@@ -26,9 +44,16 @@ import {
   FolderOpen,
   PlusCircle,
   GitCompare,
-  Save,
+  MoreHorizontal,
+  Pause,
+  Play,
   Square,
+  RotateCw,
+  Trash2,
+  Save,
   Search,
+  Activity,
+  Eye,
 } from "lucide-react";
 
 interface DashboardProps {
@@ -43,12 +68,18 @@ function stateVariant(
   return "secondary";
 }
 
+interface PendingAction {
+  type: "stop" | "delete";
+  crawlId: string;
+}
+
 export function Dashboard({ onNavigate }: DashboardProps) {
   const [recentCrawls, setRecentCrawls] = useState<CrawlSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const loadCrawls = () => {
     setIsLoading(true);
@@ -75,8 +106,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  const handleSaveCrawl = async (crawlId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleSaveCrawl = async (crawlId: string) => {
     try {
       await saveCrawlFile(crawlId);
       toast.success("Crawl saved to file.");
@@ -85,18 +115,76 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  const handleStopCrawl = async (crawlId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handlePause = async (crawlId: string) => {
     try {
-      await stopCrawl(crawlId);
-      toast.success("Crawl stopped.");
+      await pauseCrawl(crawlId);
       loadCrawls();
     } catch (err) {
-      toast.error(`Failed to stop crawl: ${String(err)}`);
+      toast.error(`Failed to pause crawl: ${String(err)}`);
     }
   };
 
-  const isRunning = (crawl: CrawlSummary) =>
+  const handleResume = async (crawlId: string) => {
+    try {
+      await resumeCrawl(crawlId);
+      loadCrawls();
+    } catch (err) {
+      toast.error(`Failed to resume crawl: ${String(err)}`);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!pendingAction) return;
+    const { type, crawlId } = pendingAction;
+    setPendingAction(null);
+
+    switch (type) {
+      case "stop":
+        try {
+          await stopCrawl(crawlId);
+          toast.success("Crawl stopped.");
+          loadCrawls();
+        } catch (err) {
+          toast.error(`Failed to stop crawl: ${String(err)}`);
+        }
+        break;
+      case "delete":
+        try {
+          await deleteCrawl(crawlId);
+          setRecentCrawls((prev) => prev.filter((c) => c.crawlId !== crawlId));
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(crawlId);
+            return next;
+          });
+          const { activeCrawlId, clearCrawl } = useCrawlStore.getState();
+          if (crawlId === activeCrawlId) {
+            clearCrawl();
+            onNavigate("dashboard");
+          }
+          toast.success("Crawl deleted.");
+        } catch (err) {
+          toast.error(`Failed to delete crawl: ${String(err)}`);
+        }
+        break;
+      default: {
+        const _exhaustive: never = type;
+        void _exhaustive;
+      }
+    }
+  };
+
+  const handleRerun = async (crawlId: string) => {
+    try {
+      const newCrawlId = await rerunCrawl(crawlId);
+      toast.success("Crawl re-started with same configuration.");
+      onNavigate("crawl-monitor", newCrawlId);
+    } catch (err) {
+      toast.error(`Failed to re-run crawl: ${String(err)}`);
+    }
+  };
+
+  const isActive = (crawl: CrawlSummary) =>
     crawl.status === "running" || crawl.status === "paused";
 
   const toggleCompareMode = () => {
@@ -252,9 +340,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-fg-default truncate text-sm font-medium">
-                      {crawl.startUrl}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      {crawl.status === "running" && (
+                        <span className="bg-status-running size-2 shrink-0 animate-pulse rounded-full" />
+                      )}
+                      <p className="text-fg-default truncate text-sm font-medium">
+                        {crawl.startUrl}
+                      </p>
+                    </div>
                     <p className="text-fg-muted text-[0.6875rem]">
                       {crawl.startedAt ?? "Not started"}
                     </p>
@@ -275,28 +368,90 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       {crawl.status}
                     </Badge>
                     {!compareMode && (
-                      <div className="flex gap-1">
-                        {isRunning(crawl) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-danger hover:text-danger size-7 p-0"
-                            onClick={(e) => handleStopCrawl(crawl.crawlId, e)}
-                            title="Stop crawl"
+                            className="size-7 p-0"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Square className="size-3.5" strokeWidth={1.75} />
+                            <MoreHorizontal className="size-4" strokeWidth={1.75} />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="size-7 p-0"
-                          onClick={(e) => handleSaveCrawl(crawl.crawlId, e)}
-                          title="Save as .seocrawl"
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Save className="size-3.5" strokeWidth={1.75} />
-                        </Button>
-                      </div>
+                          {/* Active crawl actions */}
+                          {crawl.status === "running" && (
+                            <DropdownMenuItem onClick={() => handlePause(crawl.crawlId)}>
+                              <Pause className="size-4" strokeWidth={1.75} />
+                              Pause
+                            </DropdownMenuItem>
+                          )}
+                          {crawl.status === "paused" && (
+                            <DropdownMenuItem onClick={() => handleResume(crawl.crawlId)}>
+                              <Play className="size-4" strokeWidth={1.75} />
+                              Resume
+                            </DropdownMenuItem>
+                          )}
+                          {isActive(crawl) && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setPendingAction({ type: "stop", crawlId: crawl.crawlId })
+                              }
+                            >
+                              <Square className="size-4" strokeWidth={1.75} />
+                              Stop
+                            </DropdownMenuItem>
+                          )}
+                          {isActive(crawl) && (
+                            <DropdownMenuItem
+                              onClick={() => onNavigate("crawl-monitor", crawl.crawlId)}
+                            >
+                              <Activity className="size-4" strokeWidth={1.75} />
+                              View Monitor
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Completed/stopped crawl actions */}
+                          {!isActive(crawl) && (
+                            <DropdownMenuItem onClick={() => handleRerun(crawl.crawlId)}>
+                              <RotateCw className="size-4" strokeWidth={1.75} />
+                              Re-run
+                            </DropdownMenuItem>
+                          )}
+                          {!isActive(crawl) && (
+                            <DropdownMenuItem
+                              onClick={() => onNavigate("results", crawl.crawlId)}
+                            >
+                              <Eye className="size-4" strokeWidth={1.75} />
+                              View Results
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Common actions */}
+                          <DropdownMenuItem
+                            onClick={() => handleSaveCrawl(crawl.crawlId)}
+                          >
+                            <Save className="size-4" strokeWidth={1.75} />
+                            Export
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            className="text-danger focus:text-danger"
+                            onClick={() =>
+                              setPendingAction({ type: "delete", crawlId: crawl.crawlId })
+                            }
+                          >
+                            <Trash2 className="size-4" strokeWidth={1.75} />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </button>
@@ -305,6 +460,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         )}
       </Panel>
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        title={pendingAction?.type === "delete" ? "Delete Crawl" : "Stop Crawl"}
+        description={
+          pendingAction?.type === "delete"
+            ? "This will permanently delete the crawl and all associated data. This action cannot be undone."
+            : "This will stop the crawl. In-flight requests will complete but no new URLs will be fetched."
+        }
+        confirmLabel={pendingAction?.type === "delete" ? "Delete" : "Stop"}
+        variant="destructive"
+        onConfirm={handleConfirmAction}
+        onCancel={() => setPendingAction(null)}
+      />
     </div>
   );
 }
