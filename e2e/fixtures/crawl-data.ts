@@ -14,9 +14,7 @@ export const CRAWL_ID_1 = "e2e-crawl-001";
 export const CRAWL_ID_2 = "e2e-crawl-002";
 export const CRAWL_ID_3 = "e2e-crawl-003";
 
-export function makeCrawlSummary(
-  overrides?: Partial<CrawlSummary>,
-): CrawlSummary {
+export function makeCrawlSummary(overrides?: Partial<CrawlSummary>): CrawlSummary {
   return {
     crawlId: CRAWL_ID_1,
     startUrl: "https://example.com",
@@ -30,9 +28,7 @@ export function makeCrawlSummary(
   };
 }
 
-export function makeCrawlStatus(
-  overrides?: Partial<CrawlStatus>,
-): CrawlStatus {
+export function makeCrawlStatus(overrides?: Partial<CrawlStatus>): CrawlStatus {
   return {
     crawlId: CRAWL_ID_1,
     state: "running",
@@ -45,9 +41,7 @@ export function makeCrawlStatus(
   };
 }
 
-export function makeCrawlProgress(
-  overrides?: Partial<CrawlProgress>,
-): CrawlProgress {
+export function makeCrawlProgress(overrides?: Partial<CrawlProgress>): CrawlProgress {
   return {
     crawlId: CRAWL_ID_1,
     urlsCrawled: 75,
@@ -61,9 +55,7 @@ export function makeCrawlProgress(
   };
 }
 
-export function makeCrawlConfig(
-  overrides?: Partial<CrawlConfig>,
-): CrawlConfig {
+export function makeCrawlConfig(overrides?: Partial<CrawlConfig>): CrawlConfig {
   return {
     startUrl: "https://example.com",
     maxDepth: 10,

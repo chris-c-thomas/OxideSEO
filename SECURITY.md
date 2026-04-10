@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.5.x   | Yes                |
-| < 0.5   | No                 |
+| Version | Supported |
+| ------- | --------- |
+| 0.5.x   | Yes       |
+| < 0.5   | No        |
 
 Only the latest release receives security updates. It's recommended to always be running the most recent version.
 
@@ -29,12 +29,12 @@ Instead, please send a detailed report to:
 
 ### Response Timeline
 
-| Stage                | Target          |
-| -------------------- | --------------- |
-| Acknowledgment       | Within 48 hours |
-| Initial assessment   | Within 7 days   |
-| Fix or mitigation    | Within 30 days  |
-| Public disclosure    | After fix ships  |
+| Stage              | Target          |
+| ------------------ | --------------- |
+| Acknowledgment     | Within 48 hours |
+| Initial assessment | Within 7 days   |
+| Fix or mitigation  | Within 30 days  |
+| Public disclosure  | After fix ships |
 
 Disclosure will be coordinated with you. If a fix requires more than 30 days, expect regular status updates and an agreed-upon disclosure timeline.
 

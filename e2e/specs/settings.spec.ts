@@ -35,17 +35,13 @@ test.describe("Settings Sub-Navigation", () => {
   test("clicking Appearance shows appearance settings", async ({ page }) => {
     const main = page.getByRole("main");
     await main.getByRole("button", { name: "Appearance" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Appearance" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
   });
 
   test("clicking AI Providers shows AI settings", async ({ page }) => {
     const main = page.getByRole("main");
     await main.getByRole("button", { name: "AI Providers" }).click();
-    await expect(
-      page.getByRole("heading", { name: "AI Providers" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "AI Providers" })).toBeVisible();
   });
 
   test("clicking About shows version info", async ({ page }) => {
@@ -70,9 +66,7 @@ test.describe("Settings Appearance", () => {
     await expect(page.getByText("Theme")).toBeVisible();
   });
 
-  test("changing to dark theme applies data-theme attribute", async ({
-    page,
-  }) => {
+  test("changing to dark theme applies data-theme attribute", async ({ page }) => {
     // Find and click the dark theme option
     const darkButton = page.getByRole("button", { name: /Dark/i }).first();
     await darkButton.click();
@@ -99,9 +93,7 @@ test.describe("Settings General", () => {
   });
 
   test("Save Settings button is visible", async ({ page }) => {
-    await expect(
-      page.getByRole("button", { name: /Save Settings/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Save Settings/i })).toBeVisible();
   });
 });
 
@@ -111,9 +103,7 @@ test.describe("Settings AI Providers", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withAiConfig(
-        makeAiConfig({ providerType: "open_ai", isConfigured: false }),
-      )
+      .withAiConfig(makeAiConfig({ providerType: "open_ai", isConfigured: false }))
       .build();
     await app.setup(mocks);
     await app.navigateTo("Settings");
@@ -129,8 +119,6 @@ test.describe("Settings AI Providers", () => {
   });
 
   test("Test Connection button is visible", async ({ page }) => {
-    await expect(
-      page.getByRole("button", { name: /Test Connection/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Test Connection/i })).toBeVisible();
   });
 });

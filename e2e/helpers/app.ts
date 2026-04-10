@@ -23,8 +23,7 @@ export class AppHelper {
     // Verify mock injection succeeded
     const hasMock = await this.page.evaluate(
       () =>
-        typeof (window as Record<string, unknown>).__TAURI_INTERNALS__ ===
-          "object" &&
+        typeof (window as Record<string, unknown>).__TAURI_INTERNALS__ === "object" &&
         typeof (
           (window as Record<string, unknown>).__TAURI_INTERNALS__ as Record<
             string,
@@ -41,17 +40,12 @@ export class AppHelper {
 
   /** Click a sidebar navigation item by its visible text. */
   async navigateTo(label: string): Promise<void> {
-    await this.page
-      .getByRole("navigation")
-      .getByRole("button", { name: label })
-      .click();
+    await this.page.getByRole("navigation").getByRole("button", { name: label }).click();
   }
 
   /** Assert that a heading with the given text is visible. */
   async expectHeading(text: string): Promise<void> {
-    await expect(
-      this.page.getByRole("heading", { name: text }).first(),
-    ).toBeVisible();
+    await expect(this.page.getByRole("heading", { name: text }).first()).toBeVisible();
   }
 
   /** Assert that specific text is visible on the page. */

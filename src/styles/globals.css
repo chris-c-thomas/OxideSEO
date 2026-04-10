@@ -1,6 +1,9 @@
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/manrope";
+@import "@fontsource/ibm-plex-mono";
 @import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
 @import "./tokens.css";
 
 /* ------------------------------------------------------------------ */
@@ -48,5 +51,15 @@ body {
   *::after {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Base layer (shadcn convention)                                      */
+/* ------------------------------------------------------------------ */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
 }

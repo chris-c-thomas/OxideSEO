@@ -39,15 +39,11 @@ test.describe("Dashboard Crawl List", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder()
-      .withRecentCrawls(SAMPLE_CRAWL_LIST)
-      .build();
+    const mocks = new TauriMockBuilder().withRecentCrawls(SAMPLE_CRAWL_LIST).build();
     await app.setup(mocks);
   });
 
-  test("displays crawl entries with URLs and status badges", async ({
-    page,
-  }) => {
+  test("displays crawl entries with URLs and status badges", async ({ page }) => {
     await expect(page.getByText("https://example.com")).toBeVisible();
     await expect(page.getByText("https://blog.example.com")).toBeVisible();
     await expect(page.getByText("https://shop.example.com")).toBeVisible();
@@ -74,9 +70,7 @@ test.describe("Dashboard Crawl List", () => {
     // Click the first crawl row (example.com - completed)
     await page.getByText("https://example.com", { exact: true }).click();
     // Should navigate away from dashboard — the heading "Dashboard" should no longer be visible
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" }),
-    ).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeHidden();
   });
 });
 
@@ -99,20 +93,14 @@ test.describe("Dashboard Actions", () => {
     await app.setup(mocks);
   });
 
-  test("completed crawl dropdown shows Re-run and View Results", async ({
-    page,
-  }) => {
+  test("completed crawl dropdown shows Re-run and View Results", async ({ page }) => {
     // Click the dropdown trigger for the first crawl row
     const dropdownTriggers = page.locator('[aria-label="Crawl actions"]');
     await dropdownTriggers.first().click();
 
     await expect(page.getByRole("menuitem", { name: "Re-run" })).toBeVisible();
-    await expect(
-      page.getByRole("menuitem", { name: "View Results" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("menuitem", { name: "Delete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "View Results" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Delete" })).toBeVisible();
   });
 
   test("delete shows confirmation dialog", async ({ page }) => {
@@ -123,9 +111,7 @@ test.describe("Dashboard Actions", () => {
     await page.getByRole("menuitem", { name: "Delete" }).click();
     // Confirm dialog
     await expect(page.getByText("Delete Crawl")).toBeVisible();
-    await expect(
-      page.getByText("permanently delete", { exact: false }),
-    ).toBeVisible();
+    await expect(page.getByText("permanently delete", { exact: false })).toBeVisible();
   });
 
   test("canceling delete keeps crawl in list", async ({ page }) => {
@@ -145,9 +131,7 @@ test.describe("Dashboard Compare Mode", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder()
-      .withRecentCrawls(SAMPLE_CRAWL_LIST)
-      .build();
+    const mocks = new TauriMockBuilder().withRecentCrawls(SAMPLE_CRAWL_LIST).build();
     await app.setup(mocks);
   });
 
@@ -158,9 +142,7 @@ test.describe("Dashboard Compare Mode", () => {
     await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   });
 
-  test("checkboxes appear in compare mode for selectable crawls", async ({
-    page,
-  }) => {
+  test("checkboxes appear in compare mode for selectable crawls", async ({ page }) => {
     await page.getByRole("button", { name: "Compare" }).click();
     // Checkboxes should appear in compare mode
     const checkboxes = page.getByRole("checkbox");

@@ -33,15 +33,11 @@ export async function setupTauriMocks(
       ({} as Record<string, unknown>);
     (window as Record<string, unknown>).__TAURI_INTERNALS__ = internals;
     (window as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ =
-      (window as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ ??
-      {};
+      (window as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ ?? {};
 
     // Callback registry (mirrors the official mocks.js, with events always
     // enabled since E2E tests require event simulation)
-    const callbacks = new Map<
-      number,
-      (data: unknown) => unknown | undefined
-    >();
+    const callbacks = new Map<number, (data: unknown) => unknown | undefined>();
 
     function registerCallback(
       callback: ((data: unknown) => void) | null,
@@ -69,10 +65,7 @@ export async function setupTauriMocks(
     // Event listener registry
     const eventListeners = new Map<string, number[]>();
 
-    function handleListen(args: {
-      event: string;
-      handler: number;
-    }): number {
+    function handleListen(args: { event: string; handler: number }): number {
       if (!eventListeners.has(args.event)) {
         eventListeners.set(args.event, []);
       }
@@ -140,7 +133,7 @@ export async function setupTauriMocks(
 
       throw new Error(
         `[E2E Mock] Unhandled Tauri command: "${cmd}". ` +
-        `Add it to TauriMockBuilder.withDefaults() or use .withCommand("${cmd}", ...) in your test.`,
+          `Add it to TauriMockBuilder.withDefaults() or use .withCommand("${cmd}", ...) in your test.`,
       );
     }
 
@@ -172,10 +165,7 @@ export async function setupTauriMocks(
     // Mock the unregisterListener for event plugin internals
     const eventInternals = (window as Record<string, unknown>)
       .__TAURI_EVENT_PLUGIN_INTERNALS__ as Record<string, unknown>;
-    eventInternals.unregisterListener = (
-      _event: string,
-      id: number,
-    ): void => {
+    eventInternals.unregisterListener = (_event: string, id: number): void => {
       unregisterCallback(id);
     };
   }, commands);

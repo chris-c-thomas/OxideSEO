@@ -2,13 +2,7 @@
  * Test fixture factories for page-related types.
  */
 
-import type {
-  PageRow,
-  PageDetail,
-  PaginatedResponse,
-  IssueRow,
-  LinkRow,
-} from "@/types";
+import type { PageRow, PageDetail, PaginatedResponse, IssueRow, LinkRow } from "@/types";
 import { CRAWL_ID_1 } from "./crawl-data";
 
 export function makePageRow(overrides?: Partial<PageRow>): PageRow {
@@ -36,9 +30,7 @@ export function makePageRow(overrides?: Partial<PageRow>): PageRow {
   };
 }
 
-export function makePageDetail(
-  overrides?: Partial<PageDetail>,
-): PageDetail {
+export function makePageDetail(overrides?: Partial<PageDetail>): PageDetail {
   const page = makePageRow(overrides?.page);
   return {
     page,
@@ -93,7 +85,8 @@ export const SAMPLE_PAGE_DETAIL: PageDetail = makePageDetail({
       ruleId: "meta-description-length",
       severity: "warning",
       category: "meta",
-      message: "Meta description is too short (32 characters). Recommended: 120-160 characters.",
+      message:
+        "Meta description is too short (32 characters). Recommended: 120-160 characters.",
       detailJson: null,
     },
   ] satisfies IssueRow[],

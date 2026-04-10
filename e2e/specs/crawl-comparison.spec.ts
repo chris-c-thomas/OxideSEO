@@ -5,17 +5,12 @@
 import { test, expect } from "@playwright/test";
 import { TauriMockBuilder } from "../helpers/mock-builder";
 import { AppHelper } from "../helpers/app";
-import {
-  CRAWL_ID_1,
-  CRAWL_ID_3,
-  makeCrawlSummary,
-} from "../fixtures/crawl-data";
+import { CRAWL_ID_1, CRAWL_ID_3, makeCrawlSummary } from "../fixtures/crawl-data";
 import {
   makeComparisonSummary,
   makePaginatedPageDiffs,
   makePaginatedIssueDiffs,
 } from "../fixtures/comparison-data";
-
 
 test.describe("Crawl Comparison via Dashboard", () => {
   let app: AppHelper;
@@ -40,9 +35,7 @@ test.describe("Crawl Comparison via Dashboard", () => {
     await app.setup(mocks);
   });
 
-  test("compare mode shows checkboxes and selection hint", async ({
-    page,
-  }) => {
+  test("compare mode shows checkboxes and selection hint", async ({ page }) => {
     await page.getByRole("button", { name: "Compare" }).click();
     await expect(page.getByText("Select 2 completed crawls")).toBeVisible();
     // Checkboxes should appear
@@ -50,22 +43,16 @@ test.describe("Crawl Comparison via Dashboard", () => {
     await expect(checkboxes.first()).toBeVisible();
   });
 
-  test("selecting 2 crawls enables Compare Selected button", async ({
-    page,
-  }) => {
+  test("selecting 2 crawls enables Compare Selected button", async ({ page }) => {
     await page.getByRole("button", { name: "Compare" }).click();
     // Click the crawl rows to select them (clicking the row toggles selection in compare mode)
     await page.getByText("https://example.com", { exact: true }).click();
     await page.getByText("https://shop.example.com").click();
     // Compare Selected button should appear
-    await expect(
-      page.getByRole("button", { name: "Compare Selected" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Compare Selected" })).toBeVisible();
   });
 
-  test("clicking Compare Selected navigates to comparison view", async ({
-    page,
-  }) => {
+  test("clicking Compare Selected navigates to comparison view", async ({ page }) => {
     await page.getByRole("button", { name: "Compare" }).click();
     await page.getByText("https://example.com", { exact: true }).click();
     await page.getByText("https://shop.example.com").click();
