@@ -90,8 +90,8 @@ keyring = "3"
 toml = "0.8"
 semver = "1"
 libloading = "0.8"
-wasmtime = { version = "34", optional = true }
-wasmtime-wasi = { version = "33", optional = true }
+wasmtime = { version = "36", optional = true }
+wasmtime-wasi = { version = "36", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
