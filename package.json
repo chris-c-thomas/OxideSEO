@@ -49,6 +49,9 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npx playwright test --config e2e/playwright.config.ts",
+    "test:e2e:ui": "npx playwright test --config e2e/playwright.config.ts --ui",
+    "test:e2e:debug": "npx playwright test --config e2e/playwright.config.ts --debug",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "changelog": "git cliff -o CHANGELOG.md",
@@ -88,6 +91,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/jest-dom": "^6.6.0",
