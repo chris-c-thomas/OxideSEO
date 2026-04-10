@@ -10,7 +10,6 @@ import { makePaginatedPages } from "../fixtures/page-data";
 
 async function openExportDialog(app: AppHelper) {
   const mocks = new TauriMockBuilder()
-    .withDefaults()
     .withStartCrawlId(CRAWL_ID_1)
     .withCrawlSummary(makeCrawlSummary({ crawlId: CRAWL_ID_1 }))
     .withCrawlResults(makePaginatedPages(5))

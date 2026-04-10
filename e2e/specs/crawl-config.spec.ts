@@ -11,7 +11,7 @@ test.describe("Crawl Config Form", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("New Crawl");
   });
@@ -74,7 +74,7 @@ test.describe("Crawl Config Advanced Sections", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("New Crawl");
   });

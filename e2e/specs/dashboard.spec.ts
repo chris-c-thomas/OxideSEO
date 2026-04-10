@@ -8,7 +8,6 @@ import { AppHelper } from "../helpers/app";
 import {
   SAMPLE_CRAWL_LIST,
   CRAWL_ID_1,
-  CRAWL_ID_2,
   CRAWL_ID_3,
   makeCrawlSummary,
 } from "../fixtures/crawl-data";
@@ -16,7 +15,7 @@ import {
 test.describe("Dashboard Empty State", () => {
   test("shows empty state when no crawls exist", async ({ page }) => {
     const app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
 
     await expect(page.getByText("No crawls yet")).toBeVisible();
@@ -25,7 +24,7 @@ test.describe("Dashboard Empty State", () => {
 
   test("Configure Crawl CTA navigates to crawl config", async ({ page }) => {
     const app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
 
     await page.getByRole("button", { name: "Configure Crawl" }).click();
@@ -41,7 +40,6 @@ test.describe("Dashboard Crawl List", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withRecentCrawls(SAMPLE_CRAWL_LIST)
       .build();
     await app.setup(mocks);
@@ -89,7 +87,6 @@ test.describe("Dashboard Actions", () => {
     app = new AppHelper(page);
     // Use only completed and stopped crawls for action tests (no running crawl to avoid ambiguity)
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withRecentCrawls([
         makeCrawlSummary({ crawlId: CRAWL_ID_1, status: "completed" }),
         makeCrawlSummary({
@@ -105,14 +102,8 @@ test.describe("Dashboard Actions", () => {
   test("completed crawl dropdown shows Re-run and View Results", async ({
     page,
   }) => {
-    // The dropdown trigger is inside each crawl row - find it near the crawl URL
-    const crawlRow = page
-      .getByText("https://example.com", { exact: true })
-      .locator("ancestor::button[contains(@class, 'flex')]")
-      .first();
-    // Click the dropdown trigger (the small button at the end of the row)
-    // Each row has a DropdownMenuTrigger button
-    const dropdownTriggers = page.getByRole("main").locator("button.size-7");
+    // Click the dropdown trigger for the first crawl row
+    const dropdownTriggers = page.locator('[aria-label="Crawl actions"]');
     await dropdownTriggers.first().click();
 
     await expect(page.getByRole("menuitem", { name: "Re-run" })).toBeVisible();
@@ -126,7 +117,7 @@ test.describe("Dashboard Actions", () => {
 
   test("delete shows confirmation dialog", async ({ page }) => {
     // Open dropdown for the second crawl (shop.example.com)
-    const dropdownTriggers = page.getByRole("main").locator("button.size-7");
+    const dropdownTriggers = page.locator('[aria-label="Crawl actions"]');
     await dropdownTriggers.last().click();
 
     await page.getByRole("menuitem", { name: "Delete" }).click();
@@ -138,7 +129,7 @@ test.describe("Dashboard Actions", () => {
   });
 
   test("canceling delete keeps crawl in list", async ({ page }) => {
-    const dropdownTriggers = page.getByRole("main").locator("button.size-7");
+    const dropdownTriggers = page.locator('[aria-label="Crawl actions"]');
     await dropdownTriggers.last().click();
 
     await page.getByRole("menuitem", { name: "Delete" }).click();
@@ -155,7 +146,6 @@ test.describe("Dashboard Compare Mode", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withRecentCrawls(SAMPLE_CRAWL_LIST)
       .build();
     await app.setup(mocks);

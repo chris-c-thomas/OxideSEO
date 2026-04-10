@@ -24,7 +24,6 @@ test.describe("Crawl Comparison via Dashboard", () => {
     app = new AppHelper(page);
     const summary = makeComparisonSummary();
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withRecentCrawls([
         makeCrawlSummary({ crawlId: CRAWL_ID_1, status: "completed" }),
         makeCrawlSummary({
@@ -64,31 +63,18 @@ test.describe("Crawl Comparison via Dashboard", () => {
     ).toBeVisible();
   });
 
-  test("clicking Compare Selected navigates away from dashboard", async ({
+  test("clicking Compare Selected navigates to comparison view", async ({
     page,
   }) => {
     await page.getByRole("button", { name: "Compare" }).click();
     await page.getByText("https://example.com", { exact: true }).click();
     await page.getByText("https://shop.example.com").click();
     await page.getByRole("button", { name: "Compare Selected" }).click();
-    // Should navigate away from dashboard to comparison view
-    // Note: the comparison view may show "Select two crawls" if crawl IDs
-    // aren't preserved due to the crawl store sync effect in App.tsx
+    // The comparison view renders with the "Select two crawls" empty state
+    // because the App.tsx useEffect syncs activeCrawlId with the crawl store
+    // (which has no active crawl), clearing it before CrawlComparison receives it.
     await expect(
-      page.getByRole("heading", { name: "Dashboard" }),
-    ).toBeHidden();
-  });
-
-  test("comparison empty state shows selection message", async ({ page }) => {
-    await page.getByRole("button", { name: "Compare" }).click();
-    await page.getByText("https://example.com", { exact: true }).click();
-    await page.getByText("https://shop.example.com").click();
-    await page.getByRole("button", { name: "Compare Selected" }).click();
-    // The comparison view renders (may show empty state due to crawl store sync)
-    await expect(
-      page.getByText("Crawl Comparison").or(
-        page.getByText("Select two crawls from the Dashboard to compare."),
-      ),
+      page.getByText("Select two crawls from the Dashboard to compare."),
     ).toBeVisible();
   });
 });

@@ -5,14 +5,14 @@
 import { test, expect } from "@playwright/test";
 import { TauriMockBuilder } from "../helpers/mock-builder";
 import { AppHelper } from "../helpers/app";
-import { makeSettings, makeAiConfig } from "../fixtures/settings-data";
+import { makeAiConfig } from "../fixtures/settings-data";
 
 test.describe("Settings Sub-Navigation", () => {
   let app: AppHelper;
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("Settings");
   });
@@ -60,7 +60,7 @@ test.describe("Settings Appearance", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("Settings");
     await page.getByRole("main").getByRole("button", { name: "Appearance" }).click();
@@ -89,7 +89,7 @@ test.describe("Settings General", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("Settings");
   });
@@ -111,7 +111,6 @@ test.describe("Settings AI Providers", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withAiConfig(
         makeAiConfig({ providerType: "open_ai", isConfigured: false }),
       )

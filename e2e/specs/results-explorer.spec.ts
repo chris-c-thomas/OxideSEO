@@ -31,7 +31,6 @@ test.describe("Results Explorer with Data", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withStartCrawlId(CRAWL_ID_1)
       .withCrawlSummary(
         makeCrawlSummary({
@@ -98,7 +97,7 @@ test.describe("Results Explorer with Data", () => {
 test.describe("Results Explorer Empty State", () => {
   test("shows empty state when no crawl is selected", async ({ page }) => {
     const app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("Results");
     await expect(page.getByText("No crawl selected")).toBeVisible();

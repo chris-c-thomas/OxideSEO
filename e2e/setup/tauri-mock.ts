@@ -126,9 +126,10 @@ export async function setupTauriMocks(
           : JSON.parse(JSON.stringify(response));
       }
 
-      // eslint-disable-next-line no-console
-      console.warn(`[E2E Mock] Unhandled command: ${cmd}`, args);
-      return undefined;
+      throw new Error(
+        `[E2E Mock] Unhandled Tauri command: "${cmd}". ` +
+        `Add it to TauriMockBuilder.withDefaults() or use .withCommand("${cmd}", ...) in your test.`,
+      );
     }
 
     // Wire everything up

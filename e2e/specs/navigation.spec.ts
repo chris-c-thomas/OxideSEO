@@ -11,7 +11,7 @@ test.describe("Sidebar Navigation", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
   });
 
@@ -94,7 +94,7 @@ test.describe("Keyboard Shortcuts", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
   });
 
@@ -140,7 +140,7 @@ test.describe("Command Palette", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
   });
 

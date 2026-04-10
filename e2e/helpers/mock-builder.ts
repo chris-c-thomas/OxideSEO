@@ -57,7 +57,12 @@ function emptyPaginated<T>(): PaginatedResponse<T> {
 }
 
 export class TauriMockBuilder {
-  private commands: MockCommandMap = {};
+  private commands: MockCommandMap;
+
+  constructor() {
+    this.commands = {};
+    this.withDefaults();
+  }
 
   /** Pre-populate all known commands with safe defaults. */
   withDefaults(): this {

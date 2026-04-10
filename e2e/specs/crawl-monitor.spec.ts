@@ -11,7 +11,7 @@ import { CRAWL_ID_1, makeCrawlProgress } from "../fixtures/crawl-data";
 test.describe("Crawl Monitor Empty State", () => {
   test("shows empty state when no crawlId is set", async ({ page }) => {
     const app = new AppHelper(page);
-    const mocks = new TauriMockBuilder().withDefaults().build();
+    const mocks = new TauriMockBuilder().build();
     await app.setup(mocks);
     await app.navigateTo("Monitor");
 
@@ -25,7 +25,6 @@ test.describe("Crawl Monitor Active Crawl", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withStartCrawlId(CRAWL_ID_1)
       .build();
     await app.setup(mocks);
@@ -87,7 +86,6 @@ test.describe("Crawl Monitor Live Updates", () => {
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
     const mocks = new TauriMockBuilder()
-      .withDefaults()
       .withStartCrawlId(CRAWL_ID_1)
       .build();
     await app.setup(mocks);

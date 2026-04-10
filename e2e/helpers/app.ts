@@ -18,8 +18,25 @@ export class AppHelper {
   async setup(commands: MockCommandMap): Promise<void> {
     await setupTauriMocks(this.page, commands);
     await this.page.goto("/");
-    // Wait for the app shell to render
+    // Wait for initial data fetches to complete
     await this.page.waitForLoadState("networkidle");
+    // Verify mock injection succeeded
+    const hasMock = await this.page.evaluate(
+      () =>
+        typeof (window as Record<string, unknown>).__TAURI_INTERNALS__ ===
+          "object" &&
+        typeof (
+          (window as Record<string, unknown>).__TAURI_INTERNALS__ as Record<
+            string,
+            unknown
+          >
+        ).invoke === "function",
+    );
+    if (!hasMock) {
+      throw new Error(
+        "[E2E] Tauri mock injection failed -- __TAURI_INTERNALS__.invoke is not a function",
+      );
+    }
   }
 
   /** Click a sidebar navigation item by its visible text. */
