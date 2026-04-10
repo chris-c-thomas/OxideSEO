@@ -87,15 +87,15 @@
   --sidebar-border: var(--border-subtle);
   --sidebar-ring: var(--accent);
 
-  /* Shadows (shared across light and dark themes) */
-  --shadow-2xs: 0 1px 8px 0 hsl(0 0% 0% / 0.07);
-  --shadow-xs: 0 1px 8px 0 hsl(0 0% 0% / 0.07);
-  --shadow-sm: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 1px 2px -1px hsl(0 0% 0% / 0.13);
-  --shadow-default: var(--shadow-sm);
-  --shadow-md: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 2px 4px -1px hsl(0 0% 0% / 0.13);
-  --shadow-lg: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 4px 6px -1px hsl(0 0% 0% / 0.13);
-  --shadow-xl: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 8px 10px -1px hsl(0 0% 0% / 0.13);
-  --shadow-2xl: 0 1px 8px 0 hsl(0 0% 0% / 0.33);
+  /* Shadows (prefixed to avoid name collision with @theme inline tokens) */
+  --_shadow-2xs: 0 1px 8px 0 hsl(0 0% 0% / 0.07);
+  --_shadow-xs: 0 1px 8px 0 hsl(0 0% 0% / 0.07);
+  --_shadow-sm: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 1px 2px -1px hsl(0 0% 0% / 0.13);
+  --_shadow-default: var(--_shadow-sm);
+  --_shadow-md: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 2px 4px -1px hsl(0 0% 0% / 0.13);
+  --_shadow-lg: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 4px 6px -1px hsl(0 0% 0% / 0.13);
+  --_shadow-xl: 0 1px 8px 0 hsl(0 0% 0% / 0.13), 0 8px 10px -1px hsl(0 0% 0% / 0.13);
+  --_shadow-2xl: 0 1px 8px 0 hsl(0 0% 0% / 0.33);
 }
 
 /* ------------------------------------------------------------------ */
@@ -155,14 +155,14 @@
   --sidebar-ring: oklch(0.5518 0.0972 214.4813);
 
   /* Shadows (higher opacity for visibility on dark backgrounds) */
-  --shadow-2xs: 0 1px 8px 0 hsl(0 0% 0% / 0.2);
-  --shadow-xs: 0 1px 8px 0 hsl(0 0% 0% / 0.2);
-  --shadow-sm: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
-  --shadow-default: var(--shadow-sm);
-  --shadow-md: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 2px 4px -1px hsl(0 0% 0% / 0.3);
-  --shadow-lg: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 4px 6px -1px hsl(0 0% 0% / 0.3);
-  --shadow-xl: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 8px 10px -1px hsl(0 0% 0% / 0.3);
-  --shadow-2xl: 0 1px 8px 0 hsl(0 0% 0% / 0.6);
+  --_shadow-2xs: 0 1px 8px 0 hsl(0 0% 0% / 0.2);
+  --_shadow-xs: 0 1px 8px 0 hsl(0 0% 0% / 0.2);
+  --_shadow-sm: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
+  --_shadow-default: var(--_shadow-sm);
+  --_shadow-md: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --_shadow-lg: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 4px 6px -1px hsl(0 0% 0% / 0.3);
+  --_shadow-xl: 0 1px 8px 0 hsl(0 0% 0% / 0.3), 0 8px 10px -1px hsl(0 0% 0% / 0.3);
+  --_shadow-2xl: 0 1px 8px 0 hsl(0 0% 0% / 0.6);
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,12 +259,12 @@
   --color-status-error: var(--danger);
 
   /* Shadows */
-  --shadow-2xs: var(--shadow-2xs);
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow: var(--shadow-default);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
-  --shadow-2xl: var(--shadow-2xl);
+  --shadow-2xs: var(--_shadow-2xs);
+  --shadow-xs: var(--_shadow-xs);
+  --shadow-sm: var(--_shadow-sm);
+  --shadow: var(--_shadow-default);
+  --shadow-md: var(--_shadow-md);
+  --shadow-lg: var(--_shadow-lg);
+  --shadow-xl: var(--_shadow-xl);
+  --shadow-2xl: var(--_shadow-2xl);
 }
