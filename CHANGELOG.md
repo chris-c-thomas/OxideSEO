@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **test:** Address Copilot PR review feedback on E2E mocks and shortcuts
+- **frontend:** Address E2E test PR review findings
+
+### Miscellaneous
+
+- Bump v0.6.0
+- Update CLAUDE.md
+- Update MIT and Apache-2.0 licenses
+- Update package.json information
+- Add SECURITY.md
+
+### Testing
+
+- **frontend:** Add IPC error simulation, IssuesView spec, and coverage gaps
+- **frontend:** Add Playwright E2E tests with Tauri IPC mocking
+
+## [0.5.0] - 2026-04-10
+
+### Bug Fixes
+
+- Address GitHub Copilot PR review findings
+- Cargo fmt fix
+- Address PR review findings for crawl lifecycle management
+- **frontend:** Address GitHub Copilot PR review findings
+- **frontend:** Address PR review suggestions
+- **frontend:** Resolve PR review findings for error handling and token collision
+- **ui:** Add delete crawl button
+- **frontend:** Resolve styling failures and UI issues
+- GitHub Copilot PR Review issues addressed
+
+### Dependencies
+
+- **deps:** Bump the cargo group across 1 directory with 2 updates
+
+### Documentation
+
+- Fix inaccuracies and reduce duplication in project documentation
+- Add comprehensive user facing documentation for OxideSEO
+
+### Features
+
+- **crawl:** Add delete, re-run, and full lifecycle management
+
+### Miscellaneous
+
+- Bump v.0.5.0
+- Update CLAUDE.md
+- Update CLAUDE.md
+- **skills:** Add ai agent skills
+- Update .gitignore
+- Update package-lock.json
+- **skill:** Repo-documenter skill
+- Refine CLAUDE.md
+
+### Refactoring
+
+- **frontend:** Improve Dashboard type safety and remove redundant comment
+
 ## [0.4.0] - 2026-04-08
 
 ### Bug Fixes
@@ -123,3 +185,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update CLAUDE.md
 - Fix initial scaffold; build app
 - Change README.md; add Cargo.lock
+
