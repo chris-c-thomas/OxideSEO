@@ -34,6 +34,15 @@ npm run typecheck
 # Frontend format
 npm run format:check
 
+# E2E tests (Playwright against Vite dev server)
+npm run test:e2e
+
+# E2E tests interactive UI mode
+npm run test:e2e:ui
+
+# E2E tests debug mode (with inspector)
+npm run test:e2e:debug
+
 # Generate app icons (requires a 1024x1024 source PNG)
 npx tauri icon app-icon.png
 ```
@@ -169,6 +178,25 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `components/export/ExportDialog.tsx`            | Export dialog with format/type/column selection                           |
 | `components/plugins/PluginManagerView.tsx`      | Plugin manager grid with detail sheet                                     |
 
+### E2E Tests (`e2e/`)
+
+| File                          | Purpose                                                     |
+| ----------------------------- | ----------------------------------------------------------- |
+| `playwright.config.ts`        | Playwright config, auto-starts Vite dev server on port 1420 |
+| `setup/tauri-mock.ts`         | Core `__TAURI_INTERNALS__` mock injection via addInitScript  |
+| `helpers/mock-builder.ts`     | Fluent builder with defaults for all registered IPC commands |
+| `helpers/event-emitter.ts`    | Simulate crawl://progress and crawl://state events           |
+| `helpers/app.ts`              | Page object for navigation and common assertions             |
+| `fixtures/*.ts`               | Factory functions for all IPC response types                 |
+| `specs/navigation.spec.ts`    | Sidebar, keyboard shortcuts, Command Palette                 |
+| `specs/dashboard.spec.ts`     | Empty state, crawl list, actions, compare mode               |
+| `specs/crawl-config.spec.ts`  | Form defaults, validation, advanced sections                 |
+| `specs/crawl-monitor.spec.ts` | Progress display, controls, live event updates               |
+| `specs/results-explorer.spec.ts` | Tabs, summary bar, export trigger, issues tab             |
+| `specs/export.spec.ts`        | Format/type/column selection                                 |
+| `specs/settings.spec.ts`      | Sub-nav, theme, density, AI providers                        |
+| `specs/crawl-comparison.spec.ts` | Compare mode flow, navigation                             |
+
 ## Testing Approach
 
 **Rust unit tests** — Run with `cargo test` from `src-tauri/`. Tests exist for:
@@ -185,6 +213,8 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 **Rust integration tests** — Place in `src-tauri/tests/`. Phase 2 needs a local `axum` HTTP server serving HTML fixtures from `tests/fixtures/`. Test full crawl cycles against it.
 
 **Frontend tests** — Run with `npm run test`. Vitest + Testing Library. The test setup in `tests/setup.ts` mocks `@tauri-apps/api/core` and `@tauri-apps/api/event`. Test components by mocking invoke responses.
+
+**E2E tests** — Run with `npm run test:e2e`. Playwright against the Vite dev server (port 1420). Tauri IPC is mocked at the `window.__TAURI_INTERNALS__` level via `page.addInitScript()` — see `e2e/setup/tauri-mock.ts`. Use `TauriMockBuilder` from `e2e/helpers/mock-builder.ts` for composing per-test command responses. Event simulation (crawl progress, state changes) uses helpers in `e2e/helpers/event-emitter.ts`. Tests live in `e2e/specs/`. Chromium only.
 
 ## Performance Targets
 
@@ -287,3 +317,7 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Screen components live in `src/features/`** — Dashboard, CrawlConfig, CrawlMonitor, ResultsExplorer, IssuesView, and SettingsView are in `src/features/<name>/`. Shared components remain in `src/components/`. Old screen stubs still exist in `src/components/` but are no longer imported by `App.tsx`.
 - **`crawl://state` events for lifecycle tracking** — The backend emits `crawl://state` Tauri events (with `crawlId` and `state` fields) on pause/resume/stop and at crawl completion. `useCrawlStateEvents` hook in `App.tsx` listens globally. Do not duplicate this listener in child components.
 - **Crawl delete cascades 9 tables** — `queries::delete_crawl()` deletes in FK-reverse order: ai_analyses, ai_usage, ai_crawl_summaries, external_links, links, issues, sitemap_urls, pages, crawls. If a new child table is added to the schema, it must be added to this function.
+- **Sidebar nav items are `<button>` not `<a>`** — In E2E tests, use `page.getByRole("navigation").getByRole("button", { name })` to scope clicks to the sidebar and avoid strict mode violations when the same label appears elsewhere (e.g., "New Crawl" button in Dashboard header).
+- **`cmdk` search filters on `value` prop, not visible text** — The Command Palette's `CommandItem` uses `value={cmd.id}` (e.g., `"theme:toggle"`). Search terms must fuzzy-match the ID or `keywords` array, not the display label.
+- **Most form `<Label>` elements lack `htmlFor`** — Only `<Switch>` components use `htmlFor`/`id` linking. For other fields, use `page.getByText("Label").locator("..").locator("input")` or `page.locator("#id")` instead of `page.getByLabel()`.
+- **`activeCrawlId` is cleared by App.tsx useEffect** — The useEffect in App.tsx that syncs local `activeCrawlId` with the crawl store will clear `activeCrawlId` if the store's value is null (no crawl started via `setCrawlStarted`). This means navigating to results/comparison with a crawlId will be immediately cleared. E2E tests that need a crawlId should start a crawl via the config form first.

@@ -45,6 +45,8 @@ GPUCache/
 # Test
 coverage/
 *.lcov
+e2e/playwright-report/
+e2e/test-results/
 
 # Crawl databases (user data)
 *.seocrawl

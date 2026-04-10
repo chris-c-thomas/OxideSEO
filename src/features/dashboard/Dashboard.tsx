@@ -374,6 +374,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             variant="ghost"
                             size="sm"
                             className="size-7 p-0"
+                            aria-label="Crawl actions"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="size-4" strokeWidth={1.75} />
