@@ -167,3 +167,15 @@ test.describe("Dashboard Compare Mode", () => {
     await expect(checkboxes.first()).toBeVisible();
   });
 });
+
+test.describe("Dashboard Error States", () => {
+  test("shows error when getRecentCrawls fails", async ({ page }) => {
+    const app = new AppHelper(page);
+    const mocks = new TauriMockBuilder()
+      .withCommandError("get_recent_crawls", "Database connection failed")
+      .build();
+    await app.setup(mocks);
+
+    await expect(page.getByText("Database connection failed")).toBeVisible();
+  });
+});

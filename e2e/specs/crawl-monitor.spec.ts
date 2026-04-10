@@ -142,4 +142,45 @@ test.describe("Crawl Monitor Live Updates", () => {
       page.getByRole("button", { name: "View Results" }),
     ).toBeVisible();
   });
+
+  test("paused state shows Resume and Stop buttons", async ({ page }) => {
+    await emitCrawlState(page, {
+      crawlId: CRAWL_ID_1,
+      state: "paused",
+    });
+
+    await expect(
+      page.getByRole("button", { name: "Resume" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Stop" }),
+    ).toBeVisible();
+    // Pause should be hidden
+    await expect(
+      page.getByRole("button", { name: "Pause" }),
+    ).toBeHidden();
+  });
+
+  test("resume after pause shows Pause button again", async ({ page }) => {
+    // First pause
+    await emitCrawlState(page, {
+      crawlId: CRAWL_ID_1,
+      state: "paused",
+    });
+    await expect(
+      page.getByRole("button", { name: "Resume" }),
+    ).toBeVisible();
+
+    // Then resume
+    await emitCrawlState(page, {
+      crawlId: CRAWL_ID_1,
+      state: "running",
+    });
+    await expect(
+      page.getByRole("button", { name: "Pause" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Resume" }),
+    ).toBeHidden();
+  });
 });

@@ -74,3 +74,33 @@ test.describe("Export Dialog Column Selection", () => {
     await expect(page.getByText("Title", { exact: true }).first()).toBeVisible();
   });
 });
+
+test.describe("Export Dialog Execution", () => {
+  test("clicking Export shows success result", async ({ page }) => {
+    const app = new AppHelper(page);
+    await openExportDialog(app);
+
+    // Click the Export button in the dialog footer
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Export", exact: true }).click();
+
+    // Should show the success result message
+    await expect(dialog.getByText("150")).toBeVisible();
+    await expect(dialog.getByText("export.csv")).toBeVisible();
+
+    // The "Done" button should replace the Export button
+    await expect(dialog.getByRole("button", { name: "Done" })).toBeVisible();
+  });
+
+  test("clicking Done closes the dialog", async ({ page }) => {
+    const app = new AppHelper(page);
+    await openExportDialog(app);
+
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Export", exact: true }).click();
+    await expect(dialog.getByText("export.csv")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+  });
+});

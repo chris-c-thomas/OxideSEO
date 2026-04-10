@@ -139,3 +139,26 @@ test.describe("Crawl Config Advanced Sections", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("Crawl Config Error States", () => {
+  test("shows error when start_crawl fails", async ({ page }) => {
+    const app = new AppHelper(page);
+    const mocks = new TauriMockBuilder()
+      .withCommandError("start_crawl", "Connection refused")
+      .build();
+    await app.setup(mocks);
+    await app.navigateTo("New Crawl");
+
+    await page
+      .getByPlaceholder("https://example.com")
+      .fill("https://test.com");
+    await page.getByRole("button", { name: "Start Crawl" }).click();
+
+    // Should show error message instead of navigating to monitor
+    await expect(page.getByText("Connection refused")).toBeVisible();
+    // Should still be on the config page
+    await expect(
+      page.getByRole("heading", { name: "Configure Crawl" }),
+    ).toBeVisible();
+  });
+});

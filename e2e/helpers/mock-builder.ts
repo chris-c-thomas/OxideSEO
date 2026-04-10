@@ -287,6 +287,12 @@ export class TauriMockBuilder {
     return this;
   }
 
+  /** Make a command throw an error when invoked. */
+  withCommandError(name: string, errorMessage: string): this {
+    this.commands[name] = { __mockError__: errorMessage };
+    return this;
+  }
+
   /** Build the final command map. */
   build(): MockCommandMap {
     return { ...this.commands };

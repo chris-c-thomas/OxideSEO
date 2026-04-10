@@ -36,7 +36,8 @@ export async function setupTauriMocks(
       (window as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ ??
       {};
 
-    // Callback registry (mirrors the official mocks.js)
+    // Callback registry (mirrors the official mocks.js, with events always
+    // enabled since E2E tests require event simulation)
     const callbacks = new Map<
       number,
       (data: unknown) => unknown | undefined
@@ -119,8 +120,18 @@ export async function setupTauriMocks(
 
       // Look up mock response
       if (cmd in commandMap) {
-        // Return a deep copy to prevent cross-test mutation
         const response = commandMap[cmd];
+        // Support error simulation: if the value is an object with
+        // __mockError__, throw it as an error string (matching Tauri's
+        // Result<T, String> IPC error format).
+        if (
+          response !== null &&
+          typeof response === "object" &&
+          "__mockError__" in (response as Record<string, unknown>)
+        ) {
+          throw (response as { __mockError__: string }).__mockError__;
+        }
+        // Return a deep copy to prevent cross-test mutation
         return response === undefined || response === null
           ? response
           : JSON.parse(JSON.stringify(response));

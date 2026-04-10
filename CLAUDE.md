@@ -40,6 +40,9 @@ npm run test:e2e
 # E2E tests interactive UI mode
 npm run test:e2e:ui
 
+# E2E tests debug mode (with inspector)
+npm run test:e2e:debug
+
 # Generate app icons (requires a 1024x1024 source PNG)
 npx tauri icon app-icon.png
 ```
@@ -181,7 +184,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | ----------------------------- | ----------------------------------------------------------- |
 | `playwright.config.ts`        | Playwright config, auto-starts Vite dev server on port 1420 |
 | `setup/tauri-mock.ts`         | Core `__TAURI_INTERNALS__` mock injection via addInitScript  |
-| `helpers/mock-builder.ts`     | Fluent builder with defaults for all 42 IPC commands         |
+| `helpers/mock-builder.ts`     | Fluent builder with defaults for all registered IPC commands |
 | `helpers/event-emitter.ts`    | Simulate crawl://progress and crawl://state events           |
 | `helpers/app.ts`              | Page object for navigation and common assertions             |
 | `fixtures/*.ts`               | Factory functions for all IPC response types                 |
@@ -317,4 +320,4 @@ When adding new functionality, write tests in the same file using `#[cfg(test)] 
 - **Sidebar nav items are `<button>` not `<a>`** — In E2E tests, use `page.getByRole("navigation").getByRole("button", { name })` to scope clicks to the sidebar and avoid strict mode violations when the same label appears elsewhere (e.g., "New Crawl" button in Dashboard header).
 - **`cmdk` search filters on `value` prop, not visible text** — The Command Palette's `CommandItem` uses `value={cmd.id}` (e.g., `"theme:toggle"`). Search terms must fuzzy-match the ID or `keywords` array, not the display label.
 - **Most form `<Label>` elements lack `htmlFor`** — Only `<Switch>` components use `htmlFor`/`id` linking. For other fields, use `page.getByText("Label").locator("..").locator("input")` or `page.locator("#id")` instead of `page.getByLabel()`.
-- **`activeCrawlId` is cleared by App.tsx useEffect** — The effect at App.tsx:59-63 syncs local `activeCrawlId` with the crawl store. If the store's `activeCrawlId` is null (no crawl started via `setCrawlStarted`), navigating to results/comparison with a crawlId will be immediately cleared. E2E tests that need a crawlId should start a crawl via the config form first.
+- **`activeCrawlId` is cleared by App.tsx useEffect** — The useEffect in App.tsx that syncs local `activeCrawlId` with the crawl store will clear `activeCrawlId` if the store's value is null (no crawl started via `setCrawlStarted`). This means navigating to results/comparison with a crawlId will be immediately cleared. E2E tests that need a crawlId should start a crawl via the config form first.
