@@ -14,7 +14,10 @@ import { makePaginatedLinks } from "../fixtures/link-data";
  * Helper to set up the Results Explorer with a crawl loaded.
  * Starts a crawl from the config page, then navigates to results via the sidebar.
  */
-async function setupWithResults(app: AppHelper, mocks: ReturnType<TauriMockBuilder["build"]>) {
+async function setupWithResults(
+  app: AppHelper,
+  mocks: ReturnType<TauriMockBuilder["build"]>,
+) {
   await app.setup(mocks);
   // Start a crawl to get an active crawlId in the app state
   await app.navigateTo("New Crawl");
@@ -48,9 +51,7 @@ test.describe("Results Explorer with Data", () => {
   });
 
   test("shows Results heading", async ({ page }) => {
-    await expect(
-      page.getByRole("heading", { name: "Results" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Results" })).toBeVisible();
   });
 
   test("renders all 8 tab triggers", async ({ page }) => {
@@ -74,9 +75,7 @@ test.describe("Results Explorer with Data", () => {
   });
 
   test("Export button is visible", async ({ page }) => {
-    await expect(
-      page.getByRole("button", { name: "Export" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
   });
 
   test("clicking Export opens the export dialog", async ({ page }) => {

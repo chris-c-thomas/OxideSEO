@@ -70,9 +70,7 @@ export const SAMPLE_ISSUES: IssueRow[] = [
   }),
 ];
 
-export function makePaginatedIssues(
-  issues?: IssueRow[],
-): PaginatedResponse<IssueRow> {
+export function makePaginatedIssues(issues?: IssueRow[]): PaginatedResponse<IssueRow> {
   const items = issues ?? SAMPLE_ISSUES;
   return {
     items,

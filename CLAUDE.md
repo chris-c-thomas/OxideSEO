@@ -172,7 +172,7 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 | `features/results-explorer/ResultsExplorer.tsx` | Tabbed results: pages, issues, links, images, sitemap, external, tree, AI |
 | `features/issues/IssuesView.tsx`                | Issues grouped by rule with collapsible sections                          |
 | `hooks/useCrawlStateEvents.ts`                  | Global `crawl://state` event listener, auto-updates store + toasts        |
-| `components/ConfirmDialog.tsx`                   | Reusable AlertDialog wrapper for destructive action confirmation          |
+| `components/ConfirmDialog.tsx`                  | Reusable AlertDialog wrapper for destructive action confirmation          |
 | `features/settings/SettingsView.tsx`            | Settings with left sub-nav (General, Appearance, AI, About)               |
 | `components/comparison/*.tsx`                   | Crawl comparison: overview, page/issue/metadata diff tabs                 |
 | `components/export/ExportDialog.tsx`            | Export dialog with format/type/column selection                           |
@@ -180,22 +180,22 @@ All Rust types use `#[serde(rename_all = "camelCase")]`. TypeScript types use ca
 
 ### E2E Tests (`e2e/`)
 
-| File                          | Purpose                                                     |
-| ----------------------------- | ----------------------------------------------------------- |
-| `playwright.config.ts`        | Playwright config, auto-starts Vite dev server on port 1420 |
-| `setup/tauri-mock.ts`         | Core `__TAURI_INTERNALS__` mock injection via addInitScript  |
-| `helpers/mock-builder.ts`     | Fluent builder with defaults for all registered IPC commands |
-| `helpers/event-emitter.ts`    | Simulate crawl://progress and crawl://state events           |
-| `helpers/app.ts`              | Page object for navigation and common assertions             |
-| `fixtures/*.ts`               | Factory functions for all IPC response types                 |
-| `specs/navigation.spec.ts`    | Sidebar, keyboard shortcuts, Command Palette                 |
-| `specs/dashboard.spec.ts`     | Empty state, crawl list, actions, compare mode               |
-| `specs/crawl-config.spec.ts`  | Form defaults, validation, advanced sections                 |
-| `specs/crawl-monitor.spec.ts` | Progress display, controls, live event updates               |
-| `specs/results-explorer.spec.ts` | Tabs, summary bar, export trigger, issues tab             |
-| `specs/export.spec.ts`        | Format/type/column selection                                 |
-| `specs/settings.spec.ts`      | Sub-nav, theme, density, AI providers                        |
-| `specs/crawl-comparison.spec.ts` | Compare mode flow, navigation                             |
+| File                             | Purpose                                                      |
+| -------------------------------- | ------------------------------------------------------------ |
+| `playwright.config.ts`           | Playwright config, auto-starts Vite dev server on port 1420  |
+| `setup/tauri-mock.ts`            | Core `__TAURI_INTERNALS__` mock injection via addInitScript  |
+| `helpers/mock-builder.ts`        | Fluent builder with defaults for all registered IPC commands |
+| `helpers/event-emitter.ts`       | Simulate crawl://progress and crawl://state events           |
+| `helpers/app.ts`                 | Page object for navigation and common assertions             |
+| `fixtures/*.ts`                  | Factory functions for all IPC response types                 |
+| `specs/navigation.spec.ts`       | Sidebar, keyboard shortcuts, Command Palette                 |
+| `specs/dashboard.spec.ts`        | Empty state, crawl list, actions, compare mode               |
+| `specs/crawl-config.spec.ts`     | Form defaults, validation, advanced sections                 |
+| `specs/crawl-monitor.spec.ts`    | Progress display, controls, live event updates               |
+| `specs/results-explorer.spec.ts` | Tabs, summary bar, export trigger, issues tab                |
+| `specs/export.spec.ts`           | Format/type/column selection                                 |
+| `specs/settings.spec.ts`         | Sub-nav, theme, density, AI providers                        |
+| `specs/crawl-comparison.spec.ts` | Compare mode flow, navigation                                |
 
 ## Testing Approach
 

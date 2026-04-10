@@ -1,6 +1,7 @@
 # AI
 .claude/plans/
 .claude/handoffs/
+.claude/internal/
 
 # Dependencies
 node_modules/

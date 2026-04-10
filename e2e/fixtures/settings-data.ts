@@ -4,9 +4,7 @@
 
 import type { AppSettings, AiProviderConfig } from "@/types";
 
-export function makeSettings(
-  overrides?: Partial<AppSettings>,
-): AppSettings {
+export function makeSettings(overrides?: Partial<AppSettings>): AppSettings {
   return {
     defaultCrawlConfig: {},
     theme: "light",
@@ -15,9 +13,7 @@ export function makeSettings(
   };
 }
 
-export function makeAiConfig(
-  overrides?: Partial<AiProviderConfig>,
-): AiProviderConfig {
+export function makeAiConfig(overrides?: Partial<AiProviderConfig>): AiProviderConfig {
   return {
     providerType: "open_ai",
     model: "gpt-4o",

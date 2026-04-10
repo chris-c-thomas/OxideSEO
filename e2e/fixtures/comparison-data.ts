@@ -34,9 +34,7 @@ export function makeComparisonSummary(
   };
 }
 
-export function makePageDiffRow(
-  overrides?: Partial<PageDiffRow>,
-): PageDiffRow {
+export function makePageDiffRow(overrides?: Partial<PageDiffRow>): PageDiffRow {
   return {
     url: "https://example.com/new-page",
     diffType: "new",
@@ -50,9 +48,7 @@ export function makePageDiffRow(
   };
 }
 
-export function makeIssueDiffRow(
-  overrides?: Partial<IssueDiffRow>,
-): IssueDiffRow {
+export function makeIssueDiffRow(overrides?: Partial<IssueDiffRow>): IssueDiffRow {
   return {
     url: "https://example.com/about",
     ruleId: "title-missing",

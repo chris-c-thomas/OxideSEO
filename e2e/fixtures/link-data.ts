@@ -44,9 +44,7 @@ export const SAMPLE_LINKS: LinkRow[] = [
   }),
 ];
 
-export function makePaginatedLinks(
-  links?: LinkRow[],
-): PaginatedResponse<LinkRow> {
+export function makePaginatedLinks(links?: LinkRow[]): PaginatedResponse<LinkRow> {
   const items = links ?? SAMPLE_LINKS;
   return {
     items,

@@ -52,9 +52,7 @@ test.describe("Export Dialog Format Selection", () => {
   });
 
   test("Export button is present", async ({ page }) => {
-    await expect(
-      page.getByRole("button", { name: /Export/i }).last(),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Export/i }).last()).toBeVisible();
   });
 });
 

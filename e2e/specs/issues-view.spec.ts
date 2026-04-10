@@ -31,35 +31,25 @@ test.describe("Issues View with Data", () => {
     await app.setup(mocks);
     // Start a crawl to establish active crawlId
     await app.navigateTo("New Crawl");
-    await page
-      .getByPlaceholder("https://example.com")
-      .fill("https://test.com");
+    await page.getByPlaceholder("https://example.com").fill("https://test.com");
     await page.getByRole("button", { name: "Start Crawl" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Crawl Monitor" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawl Monitor" })).toBeVisible();
     await app.navigateTo("Issues");
   });
 
   test("shows Issues heading", async ({ page }) => {
-    await expect(
-      page.getByRole("heading", { name: "Issues" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
   });
 
   test("displays issue data from mock", async ({ page }) => {
     // Should show at least one issue message from the fixtures
     await expect(
-      page
-        .getByText(/missing a <title> tag|Meta description is too short/i)
-        .first(),
+      page.getByText(/missing a <title> tag|Meta description is too short/i).first(),
     ).toBeVisible();
   });
 
   test("shows filter bar", async ({ page }) => {
     // The IssueFilterBar should be visible
-    await expect(
-      page.getByText(/Severity|Category/i).first(),
-    ).toBeVisible();
+    await expect(page.getByText(/Severity|Category/i).first()).toBeVisible();
   });
 });

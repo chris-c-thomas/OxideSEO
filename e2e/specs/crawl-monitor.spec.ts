@@ -24,28 +24,20 @@ test.describe("Crawl Monitor Active Crawl", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder()
-      .withStartCrawlId(CRAWL_ID_1)
-      .build();
+    const mocks = new TauriMockBuilder().withStartCrawlId(CRAWL_ID_1).build();
     await app.setup(mocks);
 
     // Navigate to crawl config, start a crawl to get a crawlId
     await app.navigateTo("New Crawl");
-    await page
-      .getByPlaceholder("https://example.com")
-      .fill("https://test.com");
+    await page.getByPlaceholder("https://example.com").fill("https://test.com");
     await page.getByRole("button", { name: "Start Crawl" }).click();
 
     // Should now be on crawl monitor
-    await expect(
-      page.getByRole("heading", { name: "Crawl Monitor" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawl Monitor" })).toBeVisible();
   });
 
   test("displays Crawl Monitor heading", async ({ page }) => {
-    await expect(
-      page.getByRole("heading", { name: "Crawl Monitor" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawl Monitor" })).toBeVisible();
   });
 
   test("shows metric cards", async ({ page }) => {
@@ -60,23 +52,15 @@ test.describe("Crawl Monitor Active Crawl", () => {
     await expect(page.getByText("Waiting for crawl data...")).toBeVisible();
   });
 
-  test("Pause and Stop buttons are visible for running crawl", async ({
-    page,
-  }) => {
-    await expect(
-      page.getByRole("button", { name: "Pause" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Stop" }),
-    ).toBeVisible();
+  test("Pause and Stop buttons are visible for running crawl", async ({ page }) => {
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   });
 
   test("Stop button shows confirmation dialog", async ({ page }) => {
     await page.getByRole("button", { name: "Stop" }).click();
     await expect(page.getByText("Stop Crawl")).toBeVisible();
-    await expect(
-      page.getByText("In-flight requests will complete"),
-    ).toBeVisible();
+    await expect(page.getByText("In-flight requests will complete")).toBeVisible();
   });
 });
 
@@ -85,20 +69,14 @@ test.describe("Crawl Monitor Live Updates", () => {
 
   test.beforeEach(async ({ page }) => {
     app = new AppHelper(page);
-    const mocks = new TauriMockBuilder()
-      .withStartCrawlId(CRAWL_ID_1)
-      .build();
+    const mocks = new TauriMockBuilder().withStartCrawlId(CRAWL_ID_1).build();
     await app.setup(mocks);
 
     // Start a crawl
     await app.navigateTo("New Crawl");
-    await page
-      .getByPlaceholder("https://example.com")
-      .fill("https://test.com");
+    await page.getByPlaceholder("https://example.com").fill("https://test.com");
     await page.getByRole("button", { name: "Start Crawl" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Crawl Monitor" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crawl Monitor" })).toBeVisible();
   });
 
   test("progress event updates metrics and recent URLs", async ({ page }) => {
@@ -112,9 +90,7 @@ test.describe("Crawl Monitor Live Updates", () => {
     await emitCrawlProgress(page, progress);
 
     // Wait for the recent URL to appear
-    await expect(
-      page.getByText("https://example.com/page-1"),
-    ).toBeVisible();
+    await expect(page.getByText("https://example.com/page-1")).toBeVisible();
   });
 
   test("completed state shows View Results button", async ({ page }) => {
@@ -123,13 +99,9 @@ test.describe("Crawl Monitor Live Updates", () => {
       state: "completed",
     });
 
-    await expect(
-      page.getByRole("button", { name: "View Results" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "View Results" })).toBeVisible();
     // Pause/Stop should be hidden
-    await expect(
-      page.getByRole("button", { name: "Pause" }),
-    ).toBeHidden();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeHidden();
   });
 
   test("stopped state shows View Results button", async ({ page }) => {
@@ -138,9 +110,7 @@ test.describe("Crawl Monitor Live Updates", () => {
       state: "stopped",
     });
 
-    await expect(
-      page.getByRole("button", { name: "View Results" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "View Results" })).toBeVisible();
   });
 
   test("paused state shows Resume and Stop buttons", async ({ page }) => {
@@ -149,16 +119,10 @@ test.describe("Crawl Monitor Live Updates", () => {
       state: "paused",
     });
 
-    await expect(
-      page.getByRole("button", { name: "Resume" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Stop" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
     // Pause should be hidden
-    await expect(
-      page.getByRole("button", { name: "Pause" }),
-    ).toBeHidden();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeHidden();
   });
 
   test("resume after pause shows Pause button again", async ({ page }) => {
@@ -167,20 +131,14 @@ test.describe("Crawl Monitor Live Updates", () => {
       crawlId: CRAWL_ID_1,
       state: "paused",
     });
-    await expect(
-      page.getByRole("button", { name: "Resume" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
 
     // Then resume
     await emitCrawlState(page, {
       crawlId: CRAWL_ID_1,
       state: "running",
     });
-    await expect(
-      page.getByRole("button", { name: "Pause" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Resume" }),
-    ).toBeHidden();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeHidden();
   });
 });
