@@ -98,6 +98,10 @@ test.describe("Keyboard Shortcuts", () => {
     await app.setup(mocks);
   });
 
+  // Note: uses Control (not ControlOrMeta) because Playwright's headless
+  // Chromium on macOS intercepts Meta+digit as browser tab-switching shortcuts
+  // before they reach the page. Control works in both headless and CI contexts.
+
   test("Ctrl+1 navigates to Dashboard", async ({ page }) => {
     // First navigate away
     await app.navigateTo("Settings");

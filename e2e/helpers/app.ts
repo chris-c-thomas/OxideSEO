@@ -59,7 +59,13 @@ export class AppHelper {
     await expect(this.page.getByText(text).first()).toBeVisible();
   }
 
-  /** Open the Command Palette with Ctrl+K / Cmd+K. */
+  /**
+   * Open the Command Palette.
+   * Uses Control (not ControlOrMeta) because Playwright's headless Chromium
+   * on macOS intercepts Meta+K as a browser shortcut before it reaches the
+   * page. The app's useHotkeys checks metaKey on macOS but Playwright's
+   * Control key still dispatches correctly in the headless context.
+   */
   async openCommandPalette(): Promise<void> {
     await this.page.keyboard.press("Control+k");
     await this.page.getByRole("dialog").waitFor({ state: "visible" });

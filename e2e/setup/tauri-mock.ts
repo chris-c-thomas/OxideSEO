@@ -85,6 +85,7 @@ export async function setupTauriMocks(
       for (const handlerId of listeners) {
         runCallback(handlerId, {
           event: args.event,
+          id: handlerId,
           payload: args.payload,
         });
       }
@@ -164,7 +165,7 @@ export async function setupTauriMocks(
     ): void => {
       const listeners = eventListeners.get(event) ?? [];
       for (const handlerId of listeners) {
-        runCallback(handlerId, { event, payload });
+        runCallback(handlerId, { event, id: handlerId, payload });
       }
     };
 
